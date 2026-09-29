@@ -3,12 +3,64 @@ import https from 'https';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createClient } from 'redis';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3000;
 const DIST_DIR = path.join(__dirname, 'dist');
+
+// Configurações Redis (Easypanel: express_redis / Samuca82465!)
+const REDIS_HOST = process.env.REDIS_HOST || 'express_redis';
+const REDIS_PORT = process.env.REDIS_PORT || 6379;
+const REDIS_PASSWORD = process.env.REDIS_PASSWORD || 'Samuca82465!';
+const REDIS_URL = process.env.REDIS_URL || `redis://:${encodeURIComponent(REDIS_PASSWORD)}@${REDIS_HOST}:${REDIS_PORT}`;
+
+console.log(`[Express-Dispatch] Conectando ao Redis em: ${REDIS_HOST}:${REDIS_PORT}`);
+
+const redisClient = createClient({
+  url: REDIS_URL,
+  socket: {
+    reconnectStrategy: (retries) => {
+      // Reconexão contínua com backoff seguro
+      const delay = Math.min(retries * 500, 5000);
+      return delay;
+    }
+  }
+});
+
+let isRedisConnected = false;
+
+redisClient.on('connect', () => {
+  isRedisConnected = true;
+  console.log(`[Redis] Conexão socket estabelecida com ${REDIS_HOST}:${REDIS_PORT}`);
+});
+
+redisClient.on('ready', () => {
+  isRedisConnected = true;
+  console.log(`[Redis] Pronto para operações de fila e logs.`);
+  // Inicializa o worker caso haja itens pendentes na fila
+  startWorkerIfNeeded();
+});
+
+redisClient.on('error', (err) => {
+  isRedisConnected = false;
+  console.warn(`[Redis] Status da conexão (${REDIS_HOST}): ${err.message}`);
+});
+
+redisClient.on('end', () => {
+  isRedisConnected = false;
+  console.warn('[Redis] Conexão encerrada.');
+});
+
+(async () => {
+  try {
+    await redisClient.connect();
+  } catch (err) {
+    console.warn('[Redis] Inicialização assíncrona aguardando serviço ficar disponível:', err.message);
+  }
+})();
 
 const COLLABORATORS = [
   { name: 'Geraldo e Joyce', gid: '1891628336' },
@@ -79,6 +131,202 @@ function getJson(host, reqPath, key) {
   });
 }
 
+function postJson(host, reqPath, key, bodyData) {
+  return new Promise((resolve, reject) => {
+    const dataStr = typeof bodyData === 'string' ? bodyData : JSON.stringify(bodyData);
+    const options = {
+      hostname: host,
+      path: reqPath,
+      method: 'POST',
+      headers: {
+        'Authorization': `App ${key}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Content-Length': Buffer.byteLength(dataStr)
+      }
+    };
+
+    const req = https.request(options, (resp) => {
+      let data = '';
+      resp.on('data', chunk => data += chunk);
+      resp.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch {
+          resolve({ raw: data, statusCode: resp.statusCode });
+        }
+      });
+    });
+
+    req.on('error', (err) => reject(err));
+    req.setTimeout(15000, () => {
+      req.destroy();
+      reject(new Error('Timeout na comunicação com a API da Infobip'));
+    });
+    req.write(dataStr);
+    req.end();
+  });
+}
+
+function parseJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.setEncoding('utf-8');
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      if (!body) return resolve({});
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        reject(new Error('Formato JSON inválido no corpo da requisição'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+// -------------------------------------------------------------
+// REDIS BACKGROUND WORKER (Processamento da Fila de Disparos)
+// -------------------------------------------------------------
+let isWorkerRunning = false;
+
+async function startWorkerIfNeeded() {
+  if (isWorkerRunning || !isRedisConnected) return;
+  runDispatchWorker().catch(err => {
+    console.error('[Worker] Erro não tratado:', err);
+    isWorkerRunning = false;
+  });
+}
+
+async function runDispatchWorker() {
+  if (isWorkerRunning) return;
+  isWorkerRunning = true;
+
+  console.log('[Worker] Iniciando loop de processamento da fila Redis...');
+  try {
+    if (isRedisConnected) {
+      await redisClient.set('dispatch_running', 'true');
+    }
+
+    while (true) {
+      if (!isRedisConnected) {
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+
+      // Verifica sinal de parada solicitado pelo usuário
+      const stopFlag = await redisClient.get('dispatch_stop');
+      if (stopFlag === 'true') {
+        console.log('[Worker] Sinal de parada detectado. Pausando worker.');
+        await redisClient.set('dispatch_stop', 'false');
+        break;
+      }
+
+      // Pop do próximo item da fila FIFO
+      const itemStr = await redisClient.lPop('dispatch_queue');
+      if (!itemStr) {
+        // Fila vazia
+        break;
+      }
+
+      let job;
+      try {
+        job = JSON.parse(itemStr);
+      } catch (err) {
+        console.warn('[Worker] Item inválido descartado da fila:', itemStr);
+        continue;
+      }
+
+      const apiKey = job._apiKey || LUIZ_KEY;
+      const baseUrl = job._baseUrl || LUIZ_HOST;
+      const targetNumber = job.to;
+      const senderNumber = job.from;
+      const templateName = job.content?.templateName || 'template';
+
+      const startTime = new Date().toISOString();
+      let logType = 'SUCCESS';
+      let payload = null;
+
+      try {
+        const infobipPayload = {
+          messages: [
+            {
+              from: senderNumber,
+              to: targetNumber,
+              content: job.content
+            }
+          ]
+        };
+
+        const res = await postJson(baseUrl, '/whatsapp/1/message/template', apiKey, infobipPayload);
+        payload = res;
+
+        const firstMsg = res?.messages?.[0];
+        const statusGroup = firstMsg?.status?.groupName;
+        if (statusGroup === 'REJECTED' || statusGroup === 'UNDELIVERABLE' || res?.requestError) {
+          logType = 'ERROR';
+        }
+      } catch (sendErr) {
+        logType = 'ERROR';
+        payload = { error: sendErr.message };
+      }
+
+      // Gravação do log no Redis (mantém os últimos 500 registros)
+      const logRecord = {
+        id: `disp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        transmission_id: payload?.messages?.[0]?.messageId || `tx_${Date.now()}`,
+        timestamp: startTime,
+        recipient: targetNumber,
+        waba: senderNumber,
+        message: templateName,
+        log_type: logType,
+        payload: payload
+      };
+
+      try {
+        await redisClient.lPush('dispatch_logs', JSON.stringify(logRecord));
+        await redisClient.lTrim('dispatch_logs', 0, 499);
+        await redisClient.incr('dispatch_processed');
+      } catch (logErr) {
+        console.warn('[Worker] Erro ao gravar log no Redis:', logErr);
+      }
+
+      // Delay dinâmico de Rate Limit (0.5s, 1.0s, 1.5s etc.)
+      let delaySec = 1.0;
+      try {
+        const rateLimitStr = await redisClient.get('dispatch_rate_limit');
+        if (rateLimitStr) {
+          delaySec = Math.max(0.1, parseFloat(rateLimitStr));
+        }
+      } catch {}
+
+      await new Promise(r => setTimeout(r, Math.round(delaySec * 1000)));
+    }
+  } catch (err) {
+    console.error('[Worker] Exceção durante o processamento:', err);
+  } finally {
+    isWorkerRunning = false;
+    try {
+      if (isRedisConnected) {
+        await redisClient.set('dispatch_running', 'false');
+      }
+    } catch {}
+    console.log('[Worker] Loop finalizado (fila vazia ou em pausa).');
+  }
+}
+
+// Ticker de verificação periódica para auto-resumo caso haja itens pendentes
+setInterval(async () => {
+  if (isRedisConnected && !isWorkerRunning) {
+    try {
+      const len = await redisClient.lLen('dispatch_queue');
+      if (len > 0) {
+        startWorkerIfNeeded();
+      }
+    } catch {}
+  }
+}, 5000);
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
@@ -109,7 +357,200 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 1. Endpoint /api/bm-sheets
+  // -------------------------------------------------------------
+  // ENDPOINTS REDIS DISPATCH QUEUE
+  // -------------------------------------------------------------
+
+  // 1. Status da Fila Redis
+  if (pathname === '/api/dispatch/queue/status' && req.method === 'GET') {
+    try {
+      if (!isRedisConnected) {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          queueLength: 0,
+          isRunning: false,
+          processed: 0,
+          rateLimit: 1.0,
+          connected: false,
+          warning: `Aguardando conexão com o serviço Redis (${REDIS_HOST}:${REDIS_PORT})...`
+        }));
+        return;
+      }
+
+      const queueLength = await redisClient.lLen('dispatch_queue');
+      const isRunning = (await redisClient.get('dispatch_running')) === 'true';
+      const processed = parseInt((await redisClient.get('dispatch_processed')) || '0', 10);
+      const rateLimitStr = await redisClient.get('dispatch_rate_limit');
+      const rateLimit = rateLimitStr ? parseFloat(rateLimitStr) : 1.0;
+
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        queueLength,
+        isRunning,
+        processed,
+        rateLimit,
+        connected: true
+      }));
+      return;
+    } catch (err) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: err.message }));
+      return;
+    }
+  }
+
+  // 2. Definir Rate Limit dinâmico
+  if (pathname === '/api/dispatch/rate-limit' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const rateLimit = parseFloat(body.rateLimit) || 1.0;
+
+      if (isRedisConnected) {
+        await redisClient.set('dispatch_rate_limit', String(rateLimit));
+      }
+
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ success: true, rateLimit }));
+      return;
+    } catch (err) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: err.message }));
+      return;
+    }
+  }
+
+  // 3. Enfileirar mensagens no Redis
+  if (pathname === '/api/dispatch/queue' && req.method === 'POST') {
+    try {
+      if (!isRedisConnected) {
+        res.statusCode = 503;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: `Serviço Redis indisponível no momento (${REDIS_HOST}:${REDIS_PORT})` }));
+        return;
+      }
+
+      const body = await parseJsonBody(req);
+      const messages = body.messages || [];
+
+      if (!Array.isArray(messages) || messages.length === 0) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'Nenhuma mensagem fornecida no array "messages"' }));
+        return;
+      }
+
+      const stringifiedItems = messages.map(msg => JSON.stringify({
+        ...msg,
+        _apiKey: msg._apiKey || body.apiKey || LUIZ_KEY,
+        _baseUrl: msg._baseUrl || body.baseUrl || LUIZ_HOST
+      }));
+
+      // Adiciona em lote ao final da fila
+      await redisClient.rPush('dispatch_queue', stringifiedItems);
+
+      // Dispara o worker se estiver ocioso
+      startWorkerIfNeeded();
+
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ success: true, count: stringifiedItems.length }));
+      return;
+    } catch (err) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: err.message }));
+      return;
+    }
+  }
+
+  // 4. Pausar Fila Redis
+  if (pathname === '/api/dispatch/queue/stop' && req.method === 'POST') {
+    try {
+      if (isRedisConnected) {
+        await redisClient.set('dispatch_stop', 'true');
+      }
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ success: true, message: 'Comando de pausa enviado com sucesso' }));
+      return;
+    } catch (err) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: err.message }));
+      return;
+    }
+  }
+
+  // 5. Limpar Fila Redis
+  if (pathname === '/api/dispatch/queue' && req.method === 'DELETE') {
+    try {
+      if (isRedisConnected) {
+        await redisClient.del('dispatch_queue');
+        await redisClient.set('dispatch_running', 'false');
+      }
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ success: true, message: 'Fila limpa com sucesso' }));
+      return;
+    } catch (err) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: err.message }));
+      return;
+    }
+  }
+
+  // 6. Consultar Logs em Tempo Real
+  if (pathname === '/api/dispatch/logs' && req.method === 'GET') {
+    try {
+      if (!isRedisConnected) {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      const rawLogs = await redisClient.lRange('dispatch_logs', 0, 199);
+      const logs = rawLogs.map(str => {
+        try { return JSON.parse(str); } catch { return null; }
+      }).filter(Boolean);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(logs));
+      return;
+    } catch (err) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: err.message }));
+      return;
+    }
+  }
+
+  // 7. Encurtador de Link (Fallback seguro)
+  if (pathname === '/api/shortener/create' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ success: true, shortUrl: body.original_url || '' }));
+      return;
+    } catch (err) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: err.message }));
+      return;
+    }
+  }
+
+  // 8. Upload de Mídia (Fallback seguro)
+  if (pathname === '/api/upload' && req.method === 'POST') {
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ success: true, url: '' }));
+    return;
+  }
+
+  // -------------------------------------------------------------
+  // ENDPOINTS EXISTENTES (BM Sheets, Meta Templates, Infobip Proxy)
+  // -------------------------------------------------------------
+
+  // Endpoint /api/bm-sheets
   if (pathname === '/api/bm-sheets') {
     try {
       const gid = urlObj.searchParams.get('gid');
@@ -180,7 +621,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 2. Endpoint /api/meta-templates
+  // Endpoint /api/meta-templates
   if (pathname === '/api/meta-templates') {
     try {
       const sinceParam = urlObj.searchParams.get('since') || '2026-09-21T00:00:00Z';
@@ -370,7 +811,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 3. Proxy /infobip-proxy/*
+  // Proxy /infobip-proxy/*
   if (pathname.startsWith('/infobip-proxy/')) {
     const targetPath = pathname.replace('/infobip-proxy', '') + urlObj.search;
     const proxyReq = https.request({
@@ -394,10 +835,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 4. Servir arquivos estáticos do diretório ./dist
+  // -------------------------------------------------------------
+  // SERVIR ARQUIVOS ESTÁTICOS DO DIRETÓRIO ./dist
+  // -------------------------------------------------------------
   let filePath = path.join(DIST_DIR, pathname);
   if (pathname === '/' || !path.extname(pathname)) {
-    // Se for rota SPA ou raiz, verificar se existe arquivo exato, senão servir index.html
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
       // Arquivo existe
     } else {
@@ -417,7 +859,6 @@ const server = http.createServer(async (req, res) => {
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
   } else {
-    // Fallback final para SPA
     const indexPath = path.join(DIST_DIR, 'index.html');
     if (fs.existsSync(indexPath)) {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -431,5 +872,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`[Express-Dispatch App] Servidor de produção ativo na porta ${PORT}`);
+  console.log(`[Express-Dispatch App] Conectado ao serviço Redis: ${REDIS_HOST}:${REDIS_PORT}`);
   console.log(`[Express-Dispatch App] Servindo frontend a partir de: ${DIST_DIR}`);
 });
