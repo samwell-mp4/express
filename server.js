@@ -182,6 +182,18 @@ async function initDB() {
       )
     `);
 
+    // 7. Tabela uploaded_files (Persistência Permanente de Imagens & Mídias contra reinicializações e novos deploys)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS uploaded_files (
+        id SERIAL PRIMARY KEY,
+        filename TEXT UNIQUE NOT NULL,
+        mime_type TEXT NOT NULL,
+        data_base64 TEXT NOT NULL,
+        size_bytes INTEGER,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Bootstrap do usuário admin se banco estiver vazio
     const userCheck = await client.query('SELECT id FROM users LIMIT 1');
     if (userCheck.rows.length === 0) {
@@ -194,6 +206,7 @@ async function initDB() {
     }
 
     client.release();
+    setTimeout(() => syncLocalUploadsToPostgres(), 1000);
   } catch (err) {
     isPostgresConnected = false;
     console.warn(`[Postgres] Aguardando disponibilidade do banco (${DATABASE_URL}): ${err.message}`);
@@ -205,6 +218,33 @@ initDB();
 setInterval(() => {
   if (!isPostgresConnected) initDB();
 }, 20000);
+
+async function syncLocalUploadsToPostgres() {
+  if (!isPostgresConnected) return;
+  try {
+    const files = fs.readdirSync(UPLOADS_DIR);
+    for (const f of files) {
+      const fullPath = path.join(UPLOADS_DIR, f);
+      if (fs.statSync(fullPath).isFile() && !f.startsWith('.')) {
+        const ext = path.extname(f).toLowerCase();
+        const mime = MIME_TYPES[ext] || 'application/octet-stream';
+        const fileBuf = fs.readFileSync(fullPath);
+        if (fileBuf.length <= 15 * 1024 * 1024) {
+          const b64 = fileBuf.toString('base64');
+          await pgPool.query(
+            `INSERT INTO uploaded_files (filename, mime_type, data_base64, size_bytes)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (filename) DO NOTHING`,
+            [f, mime, b64, fileBuf.length]
+          );
+        }
+      }
+    }
+    console.log('💾 [Uploads Backup] Sincronização de arquivos locais com o banco PostgreSQL concluída.');
+  } catch (err) {
+    console.warn('[Uploads Backup] Aviso ao sincronizar mídias locais com banco:', err.message);
+  }
+}
 
 // -------------------------------------------------------------
 // REDIS CLIENT & WORKER CONFIGURATION
@@ -1439,6 +1479,16 @@ const server = http.createServer(async (req, res) => {
         if (fileData.startsWith('data:')) {
           const base64Data = fileData.split(',')[1];
           fs.writeFileSync(targetPath, Buffer.from(base64Data, 'base64'));
+
+          // Backup permanente no banco PostgreSQL (Auto-Healing após Deploys)
+          if (isPostgresConnected) {
+            pgPool.query(
+              `INSERT INTO uploaded_files (filename, mime_type, data_base64, size_bytes)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (filename) DO UPDATE SET data_base64 = EXCLUDED.data_base64`,
+              [uniqueFileName, MIME_TYPES[ext] || 'application/octet-stream', base64Data, Buffer.from(base64Data, 'base64').length]
+            ).catch(pgErr => console.warn('[Upload] Erro ao salvar backup no Postgres:', pgErr.message));
+          }
         } else {
           fs.writeFileSync(targetPath, fileData);
         }
@@ -1454,6 +1504,18 @@ const server = http.createServer(async (req, res) => {
 
       req.pipe(writeStream);
       writeStream.on('finish', () => {
+        // Se conectado ao Postgres, salvar backup
+        if (isPostgresConnected && fs.existsSync(targetPath)) {
+          try {
+            const buf = fs.readFileSync(targetPath);
+            pgPool.query(
+              `INSERT INTO uploaded_files (filename, mime_type, data_base64, size_bytes)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (filename) DO NOTHING`,
+              [safeRandomName, 'application/octet-stream', buf.toString('base64'), buf.length]
+            ).catch(() => {});
+          } catch (_) {}
+        }
         return sendJson({ success: true, url: `/uploads/${safeRandomName}` });
       });
       writeStream.on('error', (err) => {
@@ -1465,10 +1527,34 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Servir arquivos de upload com segurança
+  // Servir arquivos de upload com segurança & auto-healing após redeploys
   if (pathname.startsWith('/uploads/') && req.method === 'GET') {
     const requestedFile = path.basename(pathname.replace('/uploads/', ''));
-    const safeFilePath = path.join(UPLOADS_DIR, requestedFile);
+    let safeFilePath = path.join(UPLOADS_DIR, requestedFile);
+
+    // 1. Se não existir no UPLOADS_DIR local, verificar pasta pai fallback (migração)
+    if (!fs.existsSync(safeFilePath) || !fs.statSync(safeFilePath).isFile()) {
+      const parentUploads = path.join(__dirname, '..', 'uploads', requestedFile);
+      if (fs.existsSync(parentUploads) && fs.statSync(parentUploads).isFile()) {
+        safeFilePath = parentUploads;
+      }
+    }
+
+    // 2. Se ainda não existir no disco (ex: container reconstruído em novo deploy), restaurar do PostgreSQL
+    if ((!fs.existsSync(safeFilePath) || !fs.statSync(safeFilePath).isFile()) && isPostgresConnected) {
+      try {
+        const dbFile = await pgPool.query('SELECT mime_type, data_base64 FROM uploaded_files WHERE filename = $1', [requestedFile]);
+        if (dbFile.rows.length > 0 && dbFile.rows[0].data_base64) {
+          const row = dbFile.rows[0];
+          const restoredBuf = Buffer.from(row.data_base64, 'base64');
+          fs.writeFileSync(path.join(UPLOADS_DIR, requestedFile), restoredBuf);
+          safeFilePath = path.join(UPLOADS_DIR, requestedFile);
+          console.log(`[Uploads Auto-Healing] Arquivo '${requestedFile}' restaurado com sucesso do PostgreSQL!`);
+        }
+      } catch (dbErr) {
+        console.warn(`[Uploads Auto-Healing] Falha ao consultar arquivo '${requestedFile}' no PostgreSQL:`, dbErr.message);
+      }
+    }
 
     if (fs.existsSync(safeFilePath) && fs.statSync(safeFilePath).isFile()) {
       const ext = path.extname(safeFilePath).toLowerCase();

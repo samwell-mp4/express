@@ -2,6 +2,8 @@ import { defineConfig, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import https from 'https';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
 
 const COLLABORATORS = [
   { name: 'Geraldo e Joyce', gid: '1891628336' },
@@ -527,6 +529,43 @@ function googleSheetsProxyPlugin(): Plugin {
         }
         next();
       });
+
+      // Middleware de fallback para servir arquivos de /uploads no ambiente Vite dev
+      server.middlewares.use((req, res, next) => {
+        const rawUrl = req.url || '';
+        if (rawUrl.startsWith('/uploads/')) {
+          const filename = path.basename(rawUrl.split('?')[0]);
+          const candidate1 = path.join(__dirname, 'uploads', filename);
+          const candidate2 = path.join(__dirname, '..', 'uploads', filename);
+
+          let filePath = '';
+          if (fs.existsSync(candidate1)) {
+            filePath = candidate1;
+          } else if (fs.existsSync(candidate2)) {
+            filePath = candidate2;
+          }
+
+          if (filePath) {
+            const ext = path.extname(filePath).toLowerCase();
+            const mimeTypes: Record<string, string> = {
+              '.png': 'image/png',
+              '.jpg': 'image/jpeg',
+              '.jpeg': 'image/jpeg',
+              '.gif': 'image/gif',
+              '.webp': 'image/webp',
+              '.svg': 'image/svg+xml',
+              '.pdf': 'application/pdf',
+              '.mp4': 'video/mp4'
+            };
+            const contentType = mimeTypes[ext] || 'application/octet-stream';
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            fs.createReadStream(filePath).pipe(res);
+            return;
+          }
+        }
+        next();
+      });
     }
   };
 }
@@ -536,6 +575,11 @@ export default defineConfig({
   server: {
     port: 5174,
     proxy: {
+      '/uploads': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false
+      },
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
@@ -553,3 +597,4 @@ export default defineConfig({
     }
   }
 });
+

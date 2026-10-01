@@ -15,6 +15,10 @@ COPY --from=build /app/dist ./dist
 COPY server.js ./
 COPY README.md ./
 
+# Diretório de uploads e definição de Volume Persistente para sobreviver a deploys
+RUN mkdir -p uploads && chmod 777 uploads
+VOLUME ["/app/uploads"]
+
 ENV PORT=3000
 ENV NODE_ENV=production
 EXPOSE 3000
