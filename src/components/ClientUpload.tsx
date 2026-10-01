@@ -37,7 +37,15 @@ import {
     CheckSquare,
     Square,
     Link as LinkIcon,
-    Zap
+    Zap,
+    LayoutGrid,
+    List,
+    FileText,
+    RotateCw,
+    CheckCircle,
+    XCircle,
+    Clock4,
+    Smartphone
 } from 'lucide-react';
 import { ParsedContact, ClientSubmission, SubmissionAd, RotatorTarget } from '../types';
 import { excelService, SpreadsheetAnalysis } from '../services/excelService';
@@ -118,6 +126,20 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     const [startDateFilter, setStartDateFilter] = useState('');
     const [endDateFilter, setEndDateFilter] = useState('');
     const [onlyUpcomingFilter, setOnlyUpcomingFilter] = useState(false);
+    const [originFilter, setOriginFilter] = useState<'ALL' | 'MANUAL' | 'TEMPLATE_CREATOR'>('ALL');
+    const [layoutMode, setLayoutMode] = useState<'grid' | 'list'>('grid');
+
+    // Templates Modal & Real-time Meta Status State
+    const [selectedTemplatesSubmission, setSelectedTemplatesSubmission] = useState<ClientSubmission | null>(null);
+    const [templateLiveStatuses, setTemplateLiveStatuses] = useState<Record<string, {
+        status: string;
+        lastChecked: string;
+        rejectionReason?: string;
+        category?: string;
+        language?: string;
+    }>>({});
+    const [isRefreshingAllTemplates, setIsRefreshingAllTemplates] = useState(false);
+    const [refreshingTemplateNames, setRefreshingTemplateNames] = useState<Record<string, boolean>>({});
 
     // Bulk Selection State
     const [selectedIds, setSelectedIds] = useState<(number | string)[]>([]);
@@ -1364,6 +1386,140 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     const availableDdds = Array.from(new Set(submissions.map(s => s.ddd).filter(Boolean))).sort();
 
     // -------------------------------------------------------------
+    // REAL-TIME INFOBIP / META TEMPLATES STATUS ENGINE
+    // -------------------------------------------------------------
+    const fetchAllTemplatesRealtime = async (sub: ClientSubmission) => {
+        setIsRefreshingAllTemplates(true);
+        try {
+            const cleanSender = (sub.sender_phone || sub.sender_number || '').replace(/\D/g, '');
+            const res = await fetch(`/api/meta-templates?force=true${cleanSender ? `&knownSenders=${cleanSender}` : ''}`);
+            let apiTemplates: any[] = [];
+            if (res.ok) {
+                const data = await res.json();
+                if (data.templates && Array.isArray(data.templates)) {
+                    apiTemplates = data.templates;
+                }
+            }
+
+            if (cleanSender) {
+                try {
+                    const sRes = await fetch(`/infobip-proxy/whatsapp/2/senders/${cleanSender}/templates`);
+                    if (sRes.ok) {
+                        const sData = await sRes.json();
+                        if (sData.templates && Array.isArray(sData.templates)) {
+                            apiTemplates = [...sData.templates, ...apiTemplates];
+                        }
+                    }
+                } catch (e) {
+                    // Fallback ok
+                }
+            }
+
+            const nowStr = new Date().toLocaleTimeString('pt-BR');
+            setTemplateLiveStatuses(prev => {
+                const next = { ...prev };
+                const campaignNames = new Set<string>();
+                if (sub.campaign_name) campaignNames.add(sub.campaign_name.toLowerCase().trim());
+                if (sub.ads && sub.ads.length > 0) {
+                    sub.ads.forEach(ad => {
+                        if (ad.ad_name) campaignNames.add(ad.ad_name.toLowerCase().trim());
+                    });
+                }
+
+                apiTemplates.forEach((t: any) => {
+                    const tNameNorm = (t.name || '').toLowerCase().trim();
+                    const statusInfo = {
+                        status: (t.status || 'PENDING').toUpperCase(),
+                        lastChecked: nowStr,
+                        rejectionReason: t.rejectionReason,
+                        category: t.category,
+                        language: t.language
+                    };
+                    next[t.name] = statusInfo;
+                    if (tNameNorm) {
+                        next[tNameNorm] = statusInfo;
+                    }
+                });
+
+                campaignNames.forEach(cn => {
+                    if (!next[cn]) {
+                        next[cn] = {
+                            status: 'PENDENTE_META',
+                            lastChecked: nowStr
+                        };
+                    }
+                });
+
+                return next;
+            });
+        } catch (err) {
+            console.warn('Erro ao atualizar status dos templates em tempo real:', err);
+        } finally {
+            setIsRefreshingAllTemplates(false);
+        }
+    };
+
+    const handleRefreshSingleTemplate = async (templateName: string, senderPhone?: string) => {
+        setRefreshingTemplateNames(prev => ({ ...prev, [templateName]: true }));
+        try {
+            const cleanSender = (senderPhone || '').replace(/\D/g, '');
+            const res = await fetch(`/api/meta-templates?force=true${cleanSender ? `&knownSenders=${cleanSender}` : ''}`);
+            let found: any = null;
+            if (res.ok) {
+                const data = await res.json();
+                if (data.templates && Array.isArray(data.templates)) {
+                    found = data.templates.find((t: any) => (t.name || '').toLowerCase().trim() === templateName.toLowerCase().trim());
+                }
+            }
+
+            if (!found && cleanSender) {
+                try {
+                    const sRes = await fetch(`/infobip-proxy/whatsapp/2/senders/${cleanSender}/templates`);
+                    if (sRes.ok) {
+                        const sData = await sRes.json();
+                        if (sData.templates && Array.isArray(sData.templates)) {
+                            found = sData.templates.find((t: any) => (t.name || '').toLowerCase().trim() === templateName.toLowerCase().trim());
+                        }
+                    }
+                } catch (e) {
+                    // Ignore
+                }
+            }
+
+            const nowStr = new Date().toLocaleTimeString('pt-BR');
+            const statusInfo = {
+                status: found ? (found.status || 'PENDING').toUpperCase() : 'PENDENTE_META',
+                lastChecked: nowStr,
+                rejectionReason: found?.rejectionReason,
+                category: found?.category,
+                language: found?.language
+            };
+
+            setTemplateLiveStatuses(prev => ({
+                ...prev,
+                [templateName]: statusInfo,
+                [templateName.toLowerCase().trim()]: statusInfo
+            }));
+        } catch (err) {
+            console.warn(`Erro ao atualizar template individual ${templateName}:`, err);
+        } finally {
+            setRefreshingTemplateNames(prev => ({ ...prev, [templateName]: false }));
+        }
+    };
+
+    // Auto polling every 8s when modal is active (Tempo Real)
+    useEffect(() => {
+        if (!selectedTemplatesSubmission) return;
+        fetchAllTemplatesRealtime(selectedTemplatesSubmission);
+
+        const timer = setInterval(() => {
+            fetchAllTemplatesRealtime(selectedTemplatesSubmission);
+        }, 8000);
+
+        return () => clearInterval(timer);
+    }, [selectedTemplatesSubmission]);
+
+    // -------------------------------------------------------------
     // SMART FILTERING ENGINE
     // -------------------------------------------------------------
     const filteredSubmissions = submissions.filter(s => {
@@ -1378,6 +1534,9 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
         const matchesStatus = statusFilter === 'ALL' || s.status === statusFilter;
         const matchesType = typeFilter === 'ALL' || s.template_type === typeFilter;
         const matchesDdd = dddFilter === 'ALL' || s.ddd === dddFilter;
+        const matchesOrigin = originFilter === 'ALL' ||
+            (originFilter === 'TEMPLATE_CREATOR' && s.origin === 'TEMPLATE_CREATOR') ||
+            (originFilter === 'MANUAL' && s.origin !== 'TEMPLATE_CREATOR');
 
         // Date range
         const dispatchTime = s.dispatch_date ? new Date(s.dispatch_date).getTime() : (s.timestamp ? new Date(s.timestamp).getTime() : 0);
@@ -1388,16 +1547,17 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
         const isUpcoming = s.dispatch_date ? new Date(s.dispatch_date).getTime() > Date.now() : false;
         const matchesUpcoming = !onlyUpcomingFilter || isUpcoming;
 
-        return matchesSearch && matchesStatus && matchesType && matchesDdd && matchesStart && matchesEnd && matchesUpcoming;
+        return matchesSearch && matchesStatus && matchesType && matchesDdd && matchesOrigin && matchesStart && matchesEnd && matchesUpcoming;
     });
 
-    const hasActiveFilters = statusFilter !== 'ALL' || typeFilter !== 'ALL' || dddFilter !== 'ALL' || startDateFilter || endDateFilter || onlyUpcomingFilter || searchQuery.trim() !== '';
+    const hasActiveFilters = statusFilter !== 'ALL' || typeFilter !== 'ALL' || dddFilter !== 'ALL' || originFilter !== 'ALL' || startDateFilter || endDateFilter || onlyUpcomingFilter || searchQuery.trim() !== '';
 
     const resetFilters = () => {
         setSearchQuery('');
         setStatusFilter('ALL');
         setTypeFilter('ALL');
         setDddFilter('ALL');
+        setOriginFilter('ALL');
         setStartDateFilter('');
         setEndDateFilter('');
         setOnlyUpcomingFilter(false);
@@ -1636,7 +1796,64 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                 )}
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                {/* Grade (Grid) vs Lista (List) Layout Switcher */}
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    background: '#F1F5F9',
+                                    padding: '2px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #CBD5E1'
+                                }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setLayoutMode('grid')}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px',
+                                            padding: '4px 10px',
+                                            borderRadius: '4px',
+                                            border: 'none',
+                                            fontSize: '12px',
+                                            fontWeight: 600,
+                                            background: layoutMode === 'grid' ? '#FFFFFF' : 'transparent',
+                                            color: layoutMode === 'grid' ? '#0F172A' : '#64748B',
+                                            boxShadow: layoutMode === 'grid' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                                            cursor: 'pointer',
+                                            transition: 'all 120ms ease'
+                                        }}
+                                        title="Visualização em Grade de Cards"
+                                    >
+                                        <LayoutGrid size={13} color={layoutMode === 'grid' ? '#059669' : '#64748B'} />
+                                        Grade
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setLayoutMode('list')}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px',
+                                            padding: '4px 10px',
+                                            borderRadius: '4px',
+                                            border: 'none',
+                                            fontSize: '12px',
+                                            fontWeight: 600,
+                                            background: layoutMode === 'list' ? '#FFFFFF' : 'transparent',
+                                            color: layoutMode === 'list' ? '#0F172A' : '#64748B',
+                                            boxShadow: layoutMode === 'list' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                                            cursor: 'pointer',
+                                            transition: 'all 120ms ease'
+                                        }}
+                                        title="Visualização em Lista Detalhada"
+                                    >
+                                        <List size={13} color={layoutMode === 'list' ? '#059669' : '#64748B'} />
+                                        Lista
+                                    </button>
+                                </div>
+
                                 <button
                                     type="button"
                                     onClick={toggleSelectAll}
@@ -1671,6 +1888,75 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                             </div>
                         </div>
 
+                        {/* Quick Filter Pills (Origem da Campanha) */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '6px',
+                            paddingTop: '6px',
+                            borderTop: '1px solid #F1F5F9'
+                        }}>
+                            <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', marginRight: '4px' }}>
+                                Filtro de Origem:
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setOriginFilter('ALL')}
+                                style={{
+                                    padding: '3px 10px',
+                                    borderRadius: '12px',
+                                    border: originFilter === 'ALL' ? '1px solid #059669' : '1px solid #E2E8F0',
+                                    background: originFilter === 'ALL' ? '#ECFDF5' : '#FFFFFF',
+                                    color: originFilter === 'ALL' ? '#065F46' : 'var(--text-muted)',
+                                    fontSize: '11.5px',
+                                    fontWeight: originFilter === 'ALL' ? 700 : 500,
+                                    cursor: 'pointer',
+                                    transition: 'all 120ms ease'
+                                }}
+                            >
+                                Todas as Campanhas ({submissions.length})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setOriginFilter('MANUAL')}
+                                style={{
+                                    padding: '3px 10px',
+                                    borderRadius: '12px',
+                                    border: originFilter === 'MANUAL' ? '1px solid #059669' : '1px solid #E2E8F0',
+                                    background: originFilter === 'MANUAL' ? '#ECFDF5' : '#FFFFFF',
+                                    color: originFilter === 'MANUAL' ? '#065F46' : 'var(--text-muted)',
+                                    fontSize: '11.5px',
+                                    fontWeight: originFilter === 'MANUAL' ? 700 : 500,
+                                    cursor: 'pointer',
+                                    transition: 'all 120ms ease'
+                                }}
+                            >
+                                Campanhas Criadas Manualmente ({submissions.filter(s => s.origin !== 'TEMPLATE_CREATOR').length})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setOriginFilter('TEMPLATE_CREATOR')}
+                                style={{
+                                    padding: '3px 10px',
+                                    borderRadius: '12px',
+                                    border: originFilter === 'TEMPLATE_CREATOR' ? '1px solid #059669' : '1px solid #E2E8F0',
+                                    background: originFilter === 'TEMPLATE_CREATOR' ? '#ECFDF5' : '#FFFFFF',
+                                    color: originFilter === 'TEMPLATE_CREATOR' ? '#065F46' : 'var(--text-muted)',
+                                    fontSize: '11.5px',
+                                    fontWeight: originFilter === 'TEMPLATE_CREATOR' ? 700 : 500,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    transition: 'all 120ms ease'
+                                }}
+                            >
+                                <Sparkles size={11} color="#059669" />
+                                Criador de Templates Meta ({submissions.filter(s => s.origin === 'TEMPLATE_CREATOR').length})
+                            </button>
+                        </div>
+
                         {/* Collapsible Smart Filter Options */}
                         {showSmartFilters && (
                             <div style={{
@@ -1681,6 +1967,21 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                 gap: '10px',
                                 alignItems: 'end'
                             }}>
+                                {/* Filter 0: Origem */}
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '3px' }}>
+                                        Origem da Criação
+                                    </label>
+                                    <select
+                                        value={originFilter}
+                                        onChange={(e) => setOriginFilter(e.target.value as any)}
+                                        style={{ width: '100%', height: '32px', padding: '0 8px', borderRadius: '5px', border: '1px solid #D1D5DB', fontSize: '12px', background: '#FFFFFF' }}
+                                    >
+                                        <option value="ALL">Todas as Origens</option>
+                                        <option value="MANUAL">Criadas Manualmente</option>
+                                        <option value="TEMPLATE_CREATOR">Criador de Templates</option>
+                                    </select>
+                                </div>
                                 {/* Filter 1: Status */}
                                 <div>
                                     <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '3px' }}>
@@ -1925,7 +2226,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                 </button>
                             )}
                         </div>
-                    ) : (
+                    ) : layoutMode === 'grid' ? (
                         <div style={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))',
@@ -2171,6 +2472,45 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                     Preview
                                                 </button>
 
+                                                {/* Templates Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedTemplatesSubmission(sub);
+                                                        fetchAllTemplatesRealtime(sub);
+                                                    }}
+                                                    style={{
+                                                        background: '#EEF2FF',
+                                                        border: '1px solid #C7D2FE',
+                                                        borderRadius: '5px',
+                                                        padding: '4px 8px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 600,
+                                                        color: '#4338CA',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        transition: 'all 120ms ease'
+                                                    }}
+                                                    title="Ver Templates da Campanha e Status em Tempo Real na Meta"
+                                                >
+                                                    <FileText size={12} color="#4F46E5" />
+                                                    Templates
+                                                    {sub.ads && sub.ads.length > 0 && (
+                                                        <span style={{
+                                                            background: '#4338CA',
+                                                            color: '#FFFFFF',
+                                                            borderRadius: '8px',
+                                                            padding: '0 5px',
+                                                            fontSize: '9.5px',
+                                                            fontWeight: 700
+                                                        }}>
+                                                            {sub.ads.length}
+                                                        </span>
+                                                    )}
+                                                </button>
+
                                                 {/* Edit Button */}
                                                 <button
                                                     type="button"
@@ -2228,6 +2568,253 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                     </div>
                                 );
                             })}
+                        </div>
+                    ) : (
+                        /* ========================================================= */
+                        /* VIEW: LISTA TABELADA DE CAMPANHAS & TEMPLATES             */
+                        /* ========================================================= */
+                        <div style={{
+                            background: '#FFFFFF',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            boxShadow: 'var(--shadow-subtle)'
+                        }}>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                                    <thead>
+                                        <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600 }}>
+                                            <th style={{ padding: '10px 14px', width: '36px' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.length === filteredSubmissions.length && filteredSubmissions.length > 0}
+                                                    onChange={toggleSelectAll}
+                                                    style={{ accentColor: 'var(--primary-color)', cursor: 'pointer' }}
+                                                />
+                                            </th>
+                                            <th style={{ padding: '10px 12px' }}>Campanha / Atendimento</th>
+                                            <th style={{ padding: '10px 12px' }}>Origem</th>
+                                            <th style={{ padding: '10px 12px' }}>Formato</th>
+                                            <th style={{ padding: '10px 12px' }}>DDD / Remetente</th>
+                                            <th style={{ padding: '10px 12px' }}>Status</th>
+                                            <th style={{ padding: '10px 12px' }}>Contatos</th>
+                                            <th style={{ padding: '10px 12px' }}>Agendamento</th>
+                                            <th style={{ padding: '10px 14px', textAlign: 'right' }}>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredSubmissions.map(sub => {
+                                            const isChecked = selectedIds.includes(sub.id);
+                                            const statusCfg = STATUS_CONFIG[sub.status] || STATUS_CONFIG['PENDENTE'];
+                                            const leadsCount = sub.validCount || (sub.contacts ? sub.contacts.length : 0);
+                                            const tplCount = sub.ads && sub.ads.length > 0 ? sub.ads.length : 1;
+
+                                            return (
+                                                <tr
+                                                    key={sub.id}
+                                                    style={{
+                                                        borderBottom: '1px solid #F1F5F9',
+                                                        background: isChecked ? '#F0FDF4' : 'transparent',
+                                                        transition: 'background 120ms ease'
+                                                    }}
+                                                >
+                                                    <td style={{ padding: '12px 14px' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isChecked}
+                                                            onChange={() => toggleSelect(sub.id)}
+                                                            style={{ accentColor: 'var(--primary-color)', cursor: 'pointer' }}
+                                                        />
+                                                    </td>
+                                                    <td style={{ padding: '12px 12px' }}>
+                                                        <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '12.5px' }}>
+                                                            {sub.campaign_name || sub.client_name || sub.profile_name}
+                                                        </div>
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                            Atend: {sub.profile_name} • #{sub.id}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 12px' }}>
+                                                        {sub.origin === 'TEMPLATE_CREATOR' ? (
+                                                            <span style={{
+                                                                background: '#EEF2FF',
+                                                                color: '#4338CA',
+                                                                border: '1px solid #C7D2FE',
+                                                                padding: '2px 8px',
+                                                                borderRadius: '12px',
+                                                                fontSize: '10.5px',
+                                                                fontWeight: 600,
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '3px'
+                                                            }}>
+                                                                <Sparkles size={10} color="#4338CA" /> Criador de Templates
+                                                            </span>
+                                                        ) : (
+                                                            <span style={{
+                                                                background: '#F1F5F9',
+                                                                color: '#475569',
+                                                                border: '1px solid #CBD5E1',
+                                                                padding: '2px 8px',
+                                                                borderRadius: '12px',
+                                                                fontSize: '10.5px',
+                                                                fontWeight: 600
+                                                            }}>
+                                                                Manual
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ padding: '12px 12px' }}>
+                                                        <span style={{
+                                                            background: '#F8FAFC',
+                                                            color: '#334155',
+                                                            border: '1px solid #E2E8F0',
+                                                            padding: '2px 7px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 600
+                                                        }}>
+                                                            {sub.template_type === 'TEXT' ? 'Texto' : sub.template_type === 'IMAGE' ? 'Imagem' : 'Vídeo'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '12px 12px' }}>
+                                                        <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-main)' }}>
+                                                            DDD {sub.ddd}
+                                                        </div>
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                            {sub.sender_phone || sub.sender_number || 'Sem remetente'}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 12px' }}>
+                                                        <span style={{
+                                                            background: statusCfg.bg,
+                                                            color: statusCfg.color,
+                                                            border: `1px solid ${statusCfg.border}`,
+                                                            padding: '2px 8px',
+                                                            borderRadius: '10px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 700
+                                                        }}>
+                                                            {statusCfg.label}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '12px 12px' }}>
+                                                        <span style={{ fontSize: '11.5px', fontWeight: 600, color: leadsCount > 0 ? '#16A34A' : '#94A3B8' }}>
+                                                            {leadsCount > 0 ? `${leadsCount.toLocaleString('pt-BR')} leads` : '0 contatos'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '12px 12px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                        {sub.dispatch_date ? (
+                                                            <div>{new Date(sub.dispatch_date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                                                        ) : (
+                                                            <span>Imediato</span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '5px' }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setPreviewModalSubmission(sub)}
+                                                                style={{
+                                                                    background: '#FFFFFF',
+                                                                    border: '1px solid var(--border-subtle)',
+                                                                    borderRadius: '4px',
+                                                                    padding: '4px 7px',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600,
+                                                                    color: 'var(--text-main)',
+                                                                    cursor: 'pointer',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '3px'
+                                                                }}
+                                                                title="Visualizar no Celular"
+                                                            >
+                                                                <Eye size={12} color="#0284C7" /> Preview
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedTemplatesSubmission(sub);
+                                                                    fetchAllTemplatesRealtime(sub);
+                                                                }}
+                                                                style={{
+                                                                    background: '#EEF2FF',
+                                                                    border: '1px solid #C7D2FE',
+                                                                    borderRadius: '4px',
+                                                                    padding: '4px 7px',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600,
+                                                                    color: '#4338CA',
+                                                                    cursor: 'pointer',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '3px'
+                                                                }}
+                                                                title="Ver Templates e Status em Tempo Real"
+                                                            >
+                                                                <FileText size={12} color="#4F46E5" /> Templates
+                                                                {tplCount > 0 && (
+                                                                    <span style={{ background: '#4338CA', color: '#FFFFFF', borderRadius: '8px', padding: '0 4px', fontSize: '9px', fontWeight: 700 }}>
+                                                                        {tplCount}
+                                                                    </span>
+                                                                )}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenEdit(sub)}
+                                                                style={{
+                                                                    background: '#F1F5F9',
+                                                                    border: '1px solid #CBD5E1',
+                                                                    borderRadius: '4px',
+                                                                    padding: '4px 7px',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600,
+                                                                    color: '#334155',
+                                                                    cursor: 'pointer',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '3px'
+                                                                }}
+                                                                title="Editar Campanha"
+                                                            >
+                                                                <Edit3 size={11} color="#059669" /> Editar
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => handleDuplicate(sub, e)}
+                                                                style={{ background: 'none', border: 'none', color: '#6B7280', cursor: 'pointer', padding: '4px' }}
+                                                                title="Duplicar"
+                                                            >
+                                                                <Copy size={13} />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => handleDeleteSubmission(sub.id, e)}
+                                                                style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', padding: '4px' }}
+                                                                title="Excluir"
+                                                            >
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                            {leadsCount > 0 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => onSendToDispatch(sub.contacts || [], sub.headers || ['Telefone', 'Nome'], sub.campaign_name || sub.profile_name)}
+                                                                    className="btn-primary"
+                                                                    style={{ height: '26px', padding: '0 8px', fontSize: '11px', gap: '3px' }}
+                                                                    title="Carregar no Disparador"
+                                                                >
+                                                                    <Send size={10} /> Disparar
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -2497,6 +3084,30 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                     }}
                                                 >
                                                     <Eye size={12} color="#0284C7" /> Preview
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedTemplatesSubmission(sub);
+                                                        fetchAllTemplatesRealtime(sub);
+                                                    }}
+                                                    style={{
+                                                        background: '#EEF2FF',
+                                                        border: '1px solid #C7D2FE',
+                                                        borderRadius: '5px',
+                                                        padding: '5px 10px',
+                                                        fontSize: '11.5px',
+                                                        fontWeight: 600,
+                                                        color: '#4338CA',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        transition: 'all 120ms ease'
+                                                    }}
+                                                    title="Ver Templates da Campanha e Status em Tempo Real"
+                                                >
+                                                    <FileText size={12} color="#4F46E5" /> Templates
                                                 </button>
                                                 {leads > 0 && (
                                                     <button
@@ -5076,6 +5687,572 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                         onClick={() => setPreviewModalSubmission(null)}
                                         className="btn-secondary"
                                         style={{ height: '32px', padding: '0 12px', fontSize: '12px' }}
+                                    >
+                                        Fechar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ========================================================= */}
+            {/* MODAL 5: TEMPLATES DA CAMPANHA & STATUS EM TEMPO REAL     */}
+            {/* ========================================================= */}
+            {selectedTemplatesSubmission && (() => {
+                const sub = selectedTemplatesSubmission;
+
+                const templatesList = (() => {
+                    const list: Array<{
+                        id: string;
+                        name: string;
+                        type: 'TEXT' | 'IMAGE' | 'VIDEO';
+                        ad_copy: string;
+                        media_url?: string;
+                        button_link?: string;
+                        sender_phone?: string;
+                        variables?: string[];
+                    }> = [];
+
+                    if (sub.ads && sub.ads.length > 0) {
+                        sub.ads.forEach((ad, i) => {
+                            list.push({
+                                id: ad.id || `tpl_${i}`,
+                                name: ad.ad_name || sub.campaign_name || `Template_${i + 1}`,
+                                type: ad.template_type || sub.template_type || 'TEXT',
+                                ad_copy: ad.ad_copy || sub.ad_copy || '',
+                                media_url: ad.media_url || sub.media_url,
+                                button_link: ad.button_link || sub.button_link,
+                                sender_phone: ad.sender_phone || sub.sender_phone || sub.sender_number,
+                                variables: ad.variables
+                            });
+                        });
+                    } else {
+                        list.push({
+                            id: 'main',
+                            name: sub.campaign_name || sub.profile_name || 'Template Principal',
+                            type: sub.template_type || 'TEXT',
+                            ad_copy: sub.ad_copy || '',
+                            media_url: sub.media_url,
+                            button_link: sub.button_link,
+                            sender_phone: sub.sender_phone || sub.sender_number,
+                            variables: sub.variables
+                        });
+                    }
+                    return list;
+                })();
+
+                let approvedCount = 0;
+                let pendingCount = 0;
+                let rejectedCount = 0;
+
+                templatesList.forEach(t => {
+                    const live = templateLiveStatuses[t.name] || templateLiveStatuses[t.name.toLowerCase().trim()];
+                    const st = live?.status ? live.status.toUpperCase() : (sub.status === 'GERADO' ? 'PENDING' : sub.status);
+                    if (st === 'APPROVED' || st === 'CONCLUIDO') approvedCount++;
+                    else if (st === 'REJECTED' || st === 'CANCELADO') rejectedCount++;
+                    else pendingCount++;
+                });
+
+                return (
+                    <div
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(15, 23, 42, 0.65)',
+                            backdropFilter: 'blur(3px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1050,
+                            padding: '16px'
+                        }}
+                        onClick={() => setSelectedTemplatesSubmission(null)}
+                    >
+                        <div
+                            style={{
+                                background: '#FFFFFF',
+                                width: '100%',
+                                maxWidth: '820px',
+                                maxHeight: '90vh',
+                                borderRadius: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                                overflow: 'hidden',
+                                border: '1px solid var(--border-subtle)',
+                                animation: 'fadeIn 0.2s ease-out'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* POPUP HEADER */}
+                            <div style={{
+                                padding: '16px 22px',
+                                borderBottom: '1px solid var(--border-subtle)',
+                                background: '#FFFFFF',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '14px',
+                                flexWrap: 'wrap'
+                            }}>
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                                        <div style={{
+                                            background: '#EEF2FF',
+                                            color: '#4F46E5',
+                                            borderRadius: '6px',
+                                            padding: '4px 6px',
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                        }}>
+                                            <FileText size={16} />
+                                        </div>
+                                        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-main)' }}>
+                                            Templates da Campanha: {sub.campaign_name || sub.profile_name}
+                                        </h3>
+                                        <span style={{
+                                            background: sub.origin === 'TEMPLATE_CREATOR' ? '#EEF2FF' : '#F1F5F9',
+                                            color: sub.origin === 'TEMPLATE_CREATOR' ? '#4338CA' : '#475569',
+                                            border: `1px solid ${sub.origin === 'TEMPLATE_CREATOR' ? '#C7D2FE' : '#CBD5E1'}`,
+                                            borderRadius: '12px',
+                                            padding: '2px 8px',
+                                            fontSize: '10.5px',
+                                            fontWeight: 600
+                                        }}>
+                                            {sub.origin === 'TEMPLATE_CREATOR' ? '✨ Criador de Templates' : 'Manual'}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                                        <span>Remetente: <strong>{sub.sender_phone || sub.sender_number || 'Não informado'}</strong></span>
+                                        <span>•</span>
+                                        <span>DDD {sub.ddd}</span>
+                                        <span>•</span>
+                                        <span>{templatesList.length} template(s) associado(s)</span>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => fetchAllTemplatesRealtime(sub)}
+                                        disabled={isRefreshingAllTemplates}
+                                        style={{
+                                            height: '32px',
+                                            padding: '0 12px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #C7D2FE',
+                                            background: '#EEF2FF',
+                                            color: '#4338CA',
+                                            fontSize: '11.5px',
+                                            fontWeight: 600,
+                                            cursor: isRefreshingAllTemplates ? 'not-allowed' : 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px',
+                                            transition: 'all 120ms ease'
+                                        }}
+                                        title="Consultar API Infobip/Meta agora"
+                                    >
+                                        <RotateCw size={12} className={isRefreshingAllTemplates ? 'animate-spin' : ''} />
+                                        {isRefreshingAllTemplates ? 'Verificando...' : 'Atualizar Todos em Tempo Real'}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedTemplatesSubmission(null)}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: '#94A3B8',
+                                            cursor: 'pointer',
+                                            padding: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            borderRadius: '4px'
+                                        }}
+                                        title="Fechar"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* REAL-TIME STATUS SUMMARY BANNER */}
+                            <div style={{
+                                padding: '10px 22px',
+                                background: '#F8FAFC',
+                                borderBottom: '1px solid var(--border-subtle)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: '10px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: '#166534', fontWeight: 600 }}>
+                                    <span style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: '#16A34A',
+                                        boxShadow: '0 0 0 3px rgba(22, 163, 74, 0.2)'
+                                    }} />
+                                    <span>Monitoramento em Tempo Real Ativo (Meta WhatsApp API)</span>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{
+                                        background: '#DCFCE7',
+                                        border: '1px solid #86EFAC',
+                                        color: '#15803D',
+                                        padding: '2px 8px',
+                                        borderRadius: '10px',
+                                        fontSize: '11px',
+                                        fontWeight: 700,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}>
+                                        <CheckCircle size={11} /> {approvedCount} Aprovado(s)
+                                    </div>
+
+                                    <div style={{
+                                        background: '#FEF9C3',
+                                        border: '1px solid #FDE047',
+                                        color: '#A16207',
+                                        padding: '2px 8px',
+                                        borderRadius: '10px',
+                                        fontSize: '11px',
+                                        fontWeight: 700,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}>
+                                        <Clock4 size={11} /> {pendingCount} Pendente(s)
+                                    </div>
+
+                                    {rejectedCount > 0 && (
+                                        <div style={{
+                                            background: '#FEE2E2',
+                                            border: '1px solid #FCA5A5',
+                                            color: '#B91C1C',
+                                            padding: '2px 8px',
+                                            borderRadius: '10px',
+                                            fontSize: '11px',
+                                            fontWeight: 700,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}>
+                                            <XCircle size={11} /> {rejectedCount} Rejeitado(s)
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* POPUP BODY: LIST OF TEMPLATES */}
+                            <div style={{
+                                padding: '18px 22px',
+                                overflowY: 'auto',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '14px',
+                                flex: 1
+                            }}>
+                                {templatesList.map((tpl, idx) => {
+                                    const live = templateLiveStatuses[tpl.name] || templateLiveStatuses[tpl.name.toLowerCase().trim()];
+                                    const rawStatus = (live?.status || (sub.status === 'GERADO' ? 'PENDING' : sub.status) || 'PENDING').toUpperCase();
+                                    const isApproved = rawStatus === 'APPROVED' || rawStatus === 'CONCLUIDO';
+                                    const isRejected = rawStatus === 'REJECTED' || rawStatus === 'CANCELADO';
+                                    const isPending = !isApproved && !isRejected;
+
+                                    const isChecking = !!refreshingTemplateNames[tpl.name];
+
+                                    return (
+                                        <div
+                                            key={tpl.id || idx}
+                                            style={{
+                                                background: '#FFFFFF',
+                                                border: `1.5px solid ${isApproved ? '#86EFAC' : isRejected ? '#FCA5A5' : '#E2E8F0'}`,
+                                                borderRadius: '8px',
+                                                padding: '14px 16px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '10px',
+                                                boxShadow: 'var(--shadow-subtle)',
+                                                transition: 'all 150ms ease'
+                                            }}
+                                        >
+                                            {/* Row 1: Template Info & Real-Time Status */}
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                flexWrap: 'wrap',
+                                                gap: '8px'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                    <span style={{
+                                                        background: '#0F172A',
+                                                        color: '#F8FAFC',
+                                                        padding: '3px 8px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '12px',
+                                                        fontWeight: 700,
+                                                        fontFamily: 'monospace'
+                                                    }}>
+                                                        {tpl.name}
+                                                    </span>
+
+                                                    <span style={{
+                                                        background: '#F1F5F9',
+                                                        color: '#475569',
+                                                        border: '1px solid #CBD5E1',
+                                                        borderRadius: '4px',
+                                                        padding: '2px 6px',
+                                                        fontSize: '10.5px',
+                                                        fontWeight: 600
+                                                    }}>
+                                                        {tpl.type === 'TEXT' ? 'Apenas Texto' : tpl.type === 'IMAGE' ? 'Imagem + Texto' : 'Vídeo + Texto'}
+                                                    </span>
+
+                                                    {live?.category && (
+                                                        <span style={{
+                                                            background: '#F0FDF4',
+                                                            color: '#166534',
+                                                            border: '1px solid #BBF7D0',
+                                                            borderRadius: '4px',
+                                                            padding: '2px 6px',
+                                                            fontSize: '10px',
+                                                            fontWeight: 600
+                                                        }}>
+                                                            {live.category}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Status Badge & Individual Refresh */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    {isApproved && (
+                                                        <span style={{
+                                                            background: '#DCFCE7',
+                                                            color: '#15803D',
+                                                            border: '1px solid #86EFAC',
+                                                            borderRadius: '12px',
+                                                            padding: '3px 10px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 700,
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}>
+                                                            <CheckCircle size={12} color="#15803D" /> Aprovado (Meta)
+                                                        </span>
+                                                    )}
+
+                                                    {isPending && (
+                                                        <span style={{
+                                                            background: '#FEF9C3',
+                                                            color: '#A16207',
+                                                            border: '1px solid #FDE047',
+                                                            borderRadius: '12px',
+                                                            padding: '3px 10px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 700,
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}>
+                                                            <Clock4 size={12} color="#A16207" /> Pendente na Meta
+                                                        </span>
+                                                    )}
+
+                                                    {isRejected && (
+                                                        <span style={{
+                                                            background: '#FEE2E2',
+                                                            color: '#B91C1C',
+                                                            border: '1px solid #FCA5A5',
+                                                            borderRadius: '12px',
+                                                            padding: '3px 10px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 700,
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}>
+                                                            <XCircle size={12} color="#B91C1C" /> Rejeitado
+                                                        </span>
+                                                    )}
+
+                                                    {/* Individual Refresh Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRefreshSingleTemplate(tpl.name, tpl.sender_phone)}
+                                                        disabled={isChecking}
+                                                        title="Verificar status deste template agora na Meta"
+                                                        style={{
+                                                            background: '#FFFFFF',
+                                                            border: '1px solid #CBD5E1',
+                                                            borderRadius: '5px',
+                                                            padding: '3px 8px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 600,
+                                                            color: '#334155',
+                                                            cursor: isChecking ? 'not-allowed' : 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px',
+                                                            transition: 'all 120ms ease'
+                                                        }}
+                                                    >
+                                                        <RotateCw size={11} className={isChecking ? 'animate-spin' : ''} />
+                                                        {isChecking ? 'Checando...' : 'Atualizar'}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Rejection Notice if applicable */}
+                                            {isRejected && live?.rejectionReason && (
+                                                <div style={{
+                                                    background: '#FEF2F2',
+                                                    border: '1px solid #FECACA',
+                                                    borderRadius: '6px',
+                                                    padding: '8px 12px',
+                                                    fontSize: '11.5px',
+                                                    color: '#991B1B'
+                                                }}>
+                                                    <strong>Motivo retornado pela Meta:</strong> {live.rejectionReason}
+                                                </div>
+                                            )}
+
+                                            {/* Content Preview Box */}
+                                            <div style={{
+                                                background: '#F8FAFC',
+                                                border: '1px solid var(--border-subtle)',
+                                                borderRadius: '6px',
+                                                padding: '10px 12px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '6px'
+                                            }}>
+                                                {/* Text with highlighted variables */}
+                                                <div style={{
+                                                    fontSize: '12.5px',
+                                                    color: 'var(--text-main)',
+                                                    lineHeight: 1.5,
+                                                    whiteSpace: 'pre-wrap'
+                                                }}>
+                                                    {tpl.ad_copy.split(/(\{\{\d+\}\})/).map((part, pIdx) => {
+                                                        if (/^\{\{\d+\}\}$/.test(part)) {
+                                                            return (
+                                                                <span
+                                                                    key={pIdx}
+                                                                    style={{
+                                                                        background: '#DBEAFE',
+                                                                        color: '#1D4ED8',
+                                                                        fontWeight: 700,
+                                                                        padding: '1px 5px',
+                                                                        borderRadius: '4px',
+                                                                        fontSize: '11.5px'
+                                                                    }}
+                                                                >
+                                                                    {part}
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return part;
+                                                    })}
+                                                </div>
+
+                                                {/* Media attachment preview */}
+                                                {tpl.media_url && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#0369A1', marginTop: '2px' }}>
+                                                        <ImageIcon size={13} />
+                                                        <span>Mídia vinculada:</span>
+                                                        <a href={tpl.media_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0284C7', textDecoration: 'underline' }}>
+                                                            {tpl.media_url.length > 45 ? `${tpl.media_url.substring(0, 45)}...` : tpl.media_url}
+                                                        </a>
+                                                    </div>
+                                                )}
+
+                                                {/* Button Link preview */}
+                                                {tpl.button_link && (
+                                                    <div style={{ marginTop: '4px' }}>
+                                                        <div style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            background: '#FFFFFF',
+                                                            border: '1px solid #CBD5E1',
+                                                            borderRadius: '6px',
+                                                            padding: '5px 10px',
+                                                            fontSize: '11.5px',
+                                                            color: '#0284C7',
+                                                            fontWeight: 600
+                                                        }}>
+                                                            <ExternalLink size={12} />
+                                                            <span>Botão WhatsApp:</span>
+                                                            <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>{tpl.button_link}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Last checked timestamp */}
+                                                <div style={{ fontSize: '10.5px', color: 'var(--text-dim)', textAlign: 'right', marginTop: '2px' }}>
+                                                    {live?.lastChecked ? `Última sincronização com a Meta: ${live.lastChecked}` : 'Sincronizando status...'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* POPUP FOOTER */}
+                            <div style={{
+                                padding: '12px 22px',
+                                borderTop: '1px solid var(--border-subtle)',
+                                background: '#F8FAFC',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '10px',
+                                flexWrap: 'wrap'
+                            }}>
+                                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                                    Campanha ID: <strong>#{sub.id}</strong> • Criado em {new Date(sub.timestamp || Date.now()).toLocaleDateString('pt-BR')}
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedTemplatesSubmission(null);
+                                            setPreviewModalSubmission(sub);
+                                        }}
+                                        style={{
+                                            height: '32px',
+                                            padding: '0 12px',
+                                            borderRadius: '6px',
+                                            border: '1px solid var(--border-subtle)',
+                                            background: '#FFFFFF',
+                                            fontSize: '12px',
+                                            fontWeight: 600,
+                                            color: 'var(--text-main)',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px'
+                                        }}
+                                    >
+                                        <Eye size={12} color="#0284C7" /> Visualizar no Celular (Preview)
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedTemplatesSubmission(null)}
+                                        className="btn-secondary"
+                                        style={{ height: '32px', padding: '0 14px', fontSize: '12px' }}
                                     >
                                         Fechar
                                     </button>
