@@ -49,8 +49,20 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
     // Toast Feedback
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(8);
+    const [expandedTargets, setExpandedTargets] = useState<Record<string | number, boolean>>({});
+
     useEffect(() => {
         loadRotators();
+        const handleSync = () => loadRotators();
+        window.addEventListener('rotators_updated', handleSync);
+        window.addEventListener('storage', handleSync);
+        return () => {
+            window.removeEventListener('rotators_updated', handleSync);
+            window.removeEventListener('storage', handleSync);
+        };
     }, []);
 
     const showToast = (msg: string) => {
@@ -327,6 +339,12 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
         return matchesTitle || matchesSlug || matchesTargets;
     });
 
+    // Pagination calculation
+    const totalItems = filteredRotators.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const safePage = Math.min(Math.max(1, currentPage), totalPages);
+    const paginatedRotators = filteredRotators.slice((safePage - 1) * pageSize, safePage * pageSize);
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
@@ -600,7 +618,10 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
                                 type="text"
                                 placeholder="Buscar por título, slug ou URL..."
                                 value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
+                                onChange={e => {
+                                    setSearchTerm(e.target.value);
+                                    setCurrentPage(1);
+                                }}
                                 style={{
                                     height: '34px',
                                     border: '1px solid #D1D5DB',
@@ -697,9 +718,13 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {filteredRotators.map((r) => {
+                            {paginatedRotators.map((r) => {
                                 const isChecked = selectedIds.includes(r.id);
                                 const totalClicks = r.total_clicks || 0;
+                                const isExp = !!expandedTargets[r.id];
+                                const allTargets = r.targets || [];
+                                const displayTargets = isExp ? allTargets : allTargets.slice(0, 3);
+                                const remainingTargets = allTargets.length - 3;
 
                                 return (
                                     <div 
@@ -775,13 +800,13 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
                                                     padding: '1px 6px',
                                                     borderRadius: '4px'
                                                 }}>
-                                                    {r.targets?.length || 0} destino{r.targets?.length > 1 ? 's' : ''}
+                                                    {allTargets.length} destino{allTargets.length > 1 ? 's' : ''}
                                                 </span>
                                             </div>
 
                                             {/* Targets Breakdown Chips */}
                                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
-                                                {(r.targets || []).map((t, idx) => (
+                                                {displayTargets.map((t, idx) => (
                                                     <div 
                                                         key={idx}
                                                         title={t.url}
@@ -798,7 +823,7 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
                                                         }}
                                                     >
                                                         <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>
-                                                            %{calculatePercentage(t.weight, r.targets)}
+                                                            %{calculatePercentage(t.weight, allTargets)}
                                                         </span>
                                                         <span style={{
                                                             color: 'var(--text-muted)',
@@ -810,6 +835,27 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
                                                         </span>
                                                     </div>
                                                 ))}
+                                                {remainingTargets > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setExpandedTargets(prev => ({ ...prev, [r.id]: !prev[r.id] }));
+                                                        }}
+                                                        style={{
+                                                            fontSize: '11px',
+                                                            fontWeight: 600,
+                                                            background: isExp ? '#EFF6FF' : '#F3F4F6',
+                                                            color: isExp ? '#2563EB' : 'var(--text-muted)',
+                                                            border: '1px solid var(--border-subtle)',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        {isExp ? 'Recolher destinos' : `+${remainingTargets} outro${remainingTargets > 1 ? 's' : ''}`}
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
 
@@ -886,6 +932,102 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
                                     </div>
                                 );
                             })}
+
+                            {/* Pagination Controls */}
+                            {totalPages > 1 && (
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    flexWrap: 'wrap',
+                                    gap: '12px',
+                                    padding: '12px 16px',
+                                    background: '#FFFFFF',
+                                    border: '1px solid var(--border-subtle)',
+                                    borderRadius: '8px',
+                                    marginTop: '6px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                            Mostrando <b>{(safePage - 1) * pageSize + 1}</b> a <b>{Math.min(safePage * pageSize, totalItems)}</b> de <b>{totalItems}</b>
+                                        </span>
+                                        <select
+                                            value={pageSize}
+                                            onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                                            style={{
+                                                height: '28px',
+                                                fontSize: '11.5px',
+                                                padding: '0 6px',
+                                                borderRadius: '4px',
+                                                border: '1px solid var(--border-subtle)',
+                                                background: '#FFFFFF',
+                                                color: 'var(--text-main)',
+                                                outline: 'none',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <option value={5}>5 por pág.</option>
+                                            <option value={8}>8 por pág.</option>
+                                            <option value={15}>15 por pág.</option>
+                                            <option value={25}>25 por pág.</option>
+                                        </select>
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            disabled={safePage <= 1}
+                                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                            style={{ height: '28px', padding: '0 10px', fontSize: '11.5px', opacity: safePage <= 1 ? 0.4 : 1 }}
+                                        >
+                                            Anterior
+                                        </button>
+
+                                        {Array.from({ length: totalPages }).map((_, pIdx) => {
+                                            const pNum = pIdx + 1;
+                                            if (pNum === 1 || pNum === totalPages || Math.abs(pNum - safePage) <= 1) {
+                                                return (
+                                                    <button
+                                                        key={pNum}
+                                                        type="button"
+                                                        onClick={() => setCurrentPage(pNum)}
+                                                        style={{
+                                                            height: '28px',
+                                                            minWidth: '28px',
+                                                            padding: '0 6px',
+                                                            fontSize: '11.5px',
+                                                            fontWeight: pNum === safePage ? 700 : 500,
+                                                            borderRadius: '4px',
+                                                            border: '1px solid',
+                                                            borderColor: pNum === safePage ? 'var(--primary-color)' : 'var(--border-subtle)',
+                                                            background: pNum === safePage ? 'var(--primary-color)' : '#FFFFFF',
+                                                            color: pNum === safePage ? '#000000' : 'var(--text-main)',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        {pNum}
+                                                    </button>
+                                                );
+                                            }
+                                            if (pNum === safePage - 2 || pNum === safePage + 2) {
+                                                return <span key={pNum} style={{ padding: '0 2px', color: 'var(--text-muted)', fontSize: '11px' }}>...</span>;
+                                            }
+                                            return null;
+                                        })}
+
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            disabled={safePage >= totalPages}
+                                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                            style={{ height: '28px', padding: '0 10px', fontSize: '11.5px', opacity: safePage >= totalPages ? 0.4 : 1 }}
+                                        >
+                                            Próxima
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 

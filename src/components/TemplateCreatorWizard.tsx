@@ -29,13 +29,12 @@ import {
     FileSpreadsheet,
     UploadCloud
 } from 'lucide-react';
-import { InfobipAccountTemplate } from '../types';
+import { InfobipAccountTemplate, RotatorTarget } from '../types';
 import { wabaStorage } from '../services/wabaStorage';
 import { templateService } from '../services/templateService';
 import { api, LUIS_BASE } from '../services/api';
 import { SpreadsheetCleaner } from './SpreadsheetCleaner';
 import { MediaHostingManager } from './MediaHostingManager';
-import { LinkRotatorManager } from './LinkRotatorManager';
 import { rotatorStorage } from '../services/rotatorStorage';
 
 interface TemplateCreatorWizardProps {
@@ -91,8 +90,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     const [creationMode, setCreationMode] = useState<'WIZARD' | 'BULK'>('WIZARD');
 
     // Quick Tools Drawer: 'cleaner' (Higienizar Planilha) | 'media' (Upload de Mídias) | null
-    // Add drawer state for Rotator PRO
-    const [activeToolDrawer, setActiveToolDrawer] = useState<'cleaner' | 'media' | 'rotator' | null>(null);
+    const [activeToolDrawer, setActiveToolDrawer] = useState<'cleaner' | 'media' | null>(null);
 
     // Individual Wizard Steps: 1, 2, 3, 4
     const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
@@ -143,11 +141,18 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     const [globalHeaderType, setGlobalHeaderType] = useState<'NONE' | 'IMAGE' | 'VIDEO'>('IMAGE');
     const [enableBulkCustomText, setEnableBulkCustomText] = useState(false);
 
-    // Link Shortener state
+    // Link Shortener & Rotator PRO inline state
     const [shortenerOriginal, setShortenerOriginal] = useState('');
     const [shortenerResult, setShortenerResult] = useState('');
     const [isShortening, setIsShortening] = useState(false);
     const [copiedShortLink, setCopiedShortLink] = useState(false);
+    const [inlineRotatorMode, setInlineRotatorMode] = useState<'SIMPLE' | 'ROTATOR'>('SIMPLE');
+    const [inlineRotatorTitle, setInlineRotatorTitle] = useState('');
+    const [inlineRotatorSlug, setInlineRotatorSlug] = useState('');
+    const [inlineTargets, setInlineTargets] = useState<RotatorTarget[]>([
+        { url: '', weight: 1 },
+        { url: '', weight: 1 }
+    ]);
 
     // Bulk campaigns
     const [campaigns, setCampaigns] = useState<CampaignBatch[]>([
@@ -525,20 +530,20 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     };
 
     // 2. Replicate Global Link to B1 or B2
-    const handleApplyGlobalLink = (targetBtnIndex: 0 | 1) => {
-        const link = shortenerResult || globalLinkInput;
-        if (!link.trim()) return alert('Informe ou encurte um link primeiro.');
+    const handleApplyGlobalLink = (targetBtnIndex: 0 | 1, customLink?: string, showAlert = true) => {
+        const link = (customLink || shortenerResult || globalLinkInput || '').trim();
+        if (!link) return alert('Informe ou encurte um link primeiro.');
 
         setCampaigns(prev => prev.map(c => ({
             ...c,
             rows: c.rows.map(r => {
                 const nextUrls = [...r.buttonUrls];
                 while (nextUrls.length <= targetBtnIndex) nextUrls.push('https://site.com');
-                nextUrls[targetBtnIndex] = link.trim();
+                nextUrls[targetBtnIndex] = link;
                 return { ...r, buttonUrls: nextUrls };
             })
         })));
-        alert(`✅ Link aplicado no Botão ${targetBtnIndex + 1} de todas as campanhas!`);
+        if (showAlert) alert(`✅ Link aplicado no Botão ${targetBtnIndex + 1} de todas as campanhas!`);
     };
 
     // 3. Set Global Button Count (1 or 2) across all campaigns & rows
@@ -586,28 +591,80 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         })));
     };
 
-    // 5. Shorten URL
+    // 5. Inline Rotator Destination Helpers
+    const handleAddInlineTarget = () => {
+        setInlineTargets(prev => [...prev, { url: '', weight: 1 }]);
+    };
+
+    const handleRemoveInlineTarget = (index: number) => {
+        if (inlineTargets.length > 1) {
+            setInlineTargets(prev => prev.filter((_, i) => i !== index));
+        }
+    };
+
+    const handleInlineTargetChange = (index: number, field: 'url' | 'weight', value: any) => {
+        setInlineTargets(prev => prev.map((t, idx) => {
+            if (idx === index) {
+                return { ...t, [field]: field === 'weight' ? (parseInt(value) || 1) : value };
+            }
+            return t;
+        }));
+    };
+
+    const calculateInlinePercentage = (weight: number) => {
+        const total = inlineTargets.reduce((sum, t) => sum + (Number(t.weight) || 1), 0);
+        return total === 0 ? '0.0' : ((weight / total) * 100).toFixed(1);
+    };
+
+    // 6. Generate Shortened Link or Rotator PRO Inline
     const handleShortenLink = async () => {
-        if (!shortenerOriginal.trim()) return alert('Cole o link que deseja encurtar.');
         setIsShortening(true);
         try {
-            const targetUrl = shortenerOriginal.trim();
-            const code = Math.random().toString(36).substring(2, 8);
+            let targetsToSave: RotatorTarget[] = [];
+            let finalTitle = '';
+
+            if (inlineRotatorMode === 'SIMPLE') {
+                if (!shortenerOriginal.trim()) {
+                    alert('Por favor, informe a URL de destino.');
+                    setIsShortening(false);
+                    return;
+                }
+                targetsToSave = [{ url: shortenerOriginal.trim(), weight: 1 }];
+                finalTitle = inlineRotatorTitle.trim() || `Encurtador Express`;
+            } else {
+                const valid = inlineTargets.filter(t => t.url.trim() !== '');
+                if (valid.length === 0) {
+                    alert('Adicione pelo menos uma URL de destino para o Rotacionador.');
+                    setIsShortening(false);
+                    return;
+                }
+                targetsToSave = valid.map(t => ({
+                    url: t.url.trim(),
+                    weight: Number(t.weight) > 0 ? Number(t.weight) : 1
+                }));
+                finalTitle = inlineRotatorTitle.trim() || `Rotacionador PRO`;
+            }
+
+            const cleanSlug = inlineRotatorSlug.trim().replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || Math.random().toString(36).substring(2, 8);
+
             const newRotator = await rotatorStorage.createRotator({
-                title: `Encurtador Express ${code}`,
-                slug: code,
-                targets: [{ url: targetUrl, weight: 1 }]
+                title: finalTitle,
+                slug: cleanSlug,
+                targets: targetsToSave
             });
-            
+
             const origin = window.location.origin;
             const short = `${origin}/r/${newRotator.slug}`;
-            
+
             setShortenerResult(short);
             setGlobalLinkInput(short);
+
+            // Auto-apply to B1 of all campaign rows
+            handleApplyGlobalLink(0, short, false);
         } catch (err: any) {
-            console.error('Erro ao encurtar link:', err);
-            const fallbackCode = Math.random().toString(36).substring(2, 8);
-            const fallbackUrl = `${window.location.origin}/r/${fallbackCode}`;
+            console.error('Erro ao gerar link:', err);
+            const fallbackSlug = inlineRotatorSlug.trim().replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || Math.random().toString(36).substring(2, 8);
+            const fallbackUrl = `${window.location.origin}/r/${fallbackSlug}`;
             setShortenerResult(fallbackUrl);
             setGlobalLinkInput(fallbackUrl);
         } finally {
@@ -862,16 +919,6 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                         {activeToolDrawer === 'media' ? 'Fechar Mídias' : 'Upload de Mídias'}
                     </button>
 
-                    <button
-                        type="button"
-                        onClick={() => setActiveToolDrawer(activeToolDrawer === 'rotator' ? null : 'rotator')}
-                        className={activeToolDrawer === 'rotator' ? 'btn-primary' : 'btn-secondary'}
-                        style={{ height: '34px', fontSize: '12.5px', gap: '6px' }}
-                    >
-                        <Zap size={15} />
-                        {activeToolDrawer === 'rotator' ? 'Fechar Rotacionador' : 'Rotacionador PRO'}
-                    </button>
-
                     {/* Mode Selector Tabs (Segmented Control) */}
                     <div className="segmented-control">
                         <button
@@ -911,22 +958,6 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                             setMediaUrl(url);
                             setGlobalMediaUrl(url);
                             setHeaderType(type);
-                            setActiveToolDrawer(null);
-                        }}
-                    />
-                </div>
-            )}
-
-            {/* EXPANDABLE DRAWER: ROTACIONADOR PRO */}
-            {activeToolDrawer === 'rotator' && (
-                <div>
-                    <LinkRotatorManager
-                        isEmbedded
-                        onClose={() => setActiveToolDrawer(null)}
-                        onSelectRotator={(url) => {
-                            setShortenerOriginal('');
-                            setShortenerResult(url);
-                            setGlobalLinkInput(url);
                             setActiveToolDrawer(null);
                         }}
                     />
@@ -1588,84 +1619,276 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
 
                                 <div className="section-divider" style={{ margin: '4px 0' }} />
 
-                                {/* ENCURTADOR DE LINKS & LINK GLOBAL */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <LinkIcon size={14} color="var(--accent-blue)" />
-                                        <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-main)' }}>
-                                            Encurtador de Link &amp; Aplicação Global
-                                        </span>
+                                {/* ENCURTADOR DE LINKS & ROTACIONADOR PRO INLINE */}
+                                <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '12px',
+                                    background: '#F9FAFB',
+                                    border: '1px solid var(--border-subtle)',
+                                    borderRadius: '8px',
+                                    padding: '14px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <LinkIcon size={15} color="var(--accent-blue)" />
+                                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                                                Encurtador de Link &amp; Rotacionador PRO
+                                            </span>
+                                        </div>
+
+                                        {/* Mode Switcher */}
+                                        <div className="segmented-control" style={{ height: '30px', padding: '2px' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setInlineRotatorMode('SIMPLE')}
+                                                className={`segmented-control-item ${inlineRotatorMode === 'SIMPLE' ? 'active' : ''}`}
+                                                style={{ fontSize: '11.5px', padding: '0 10px', height: '26px' }}
+                                            >
+                                                <LinkIcon size={12} />
+                                                Link Único
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setInlineRotatorMode('ROTATOR')}
+                                                className={`segmented-control-item ${inlineRotatorMode === 'ROTATOR' ? 'active' : ''}`}
+                                                style={{ fontSize: '11.5px', padding: '0 10px', height: '26px' }}
+                                            >
+                                                <Zap size={12} color={inlineRotatorMode === 'ROTATOR' ? '#16A34A' : 'currentColor'} />
+                                                Rotacionador PRO (Múltiplos)
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '6px' }}>
-                                        <input
-                                            type="text"
-                                            className="input-base"
-                                            placeholder="Cole qualquer link longo aqui (ex: https://meusite.com/checkout)..."
-                                            value={shortenerOriginal}
-                                            onChange={e => setShortenerOriginal(e.target.value)}
-                                            style={{ flex: 1 }}
-                                        />
-                                        <button
-                                            className="btn-primary"
-                                            style={{ height: '36px', fontSize: '12.5px' }}
-                                            onClick={handleShortenLink}
-                                            disabled={isShortening || !shortenerOriginal.trim()}
-                                        >
-                                            <Scissors size={14} />
-                                            {isShortening ? 'Encurtando...' : 'Encurtar'}
-                                        </button>
+                                    {/* MODE 1: SIMPLE SHORTENER */}
+                                    {inlineRotatorMode === 'SIMPLE' ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                            <div>
+                                                <label style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>
+                                                    URL DE DESTINO:
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    className="input-base"
+                                                    placeholder="https://meusite.com/checkout ou https://wa.me/5511999999999"
+                                                    value={shortenerOriginal}
+                                                    onChange={e => setShortenerOriginal(e.target.value)}
+                                                    style={{ width: '100%', height: '34px', fontSize: '12.5px' }}
+                                                />
+                                            </div>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                                <div>
+                                                    <label style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>
+                                                        SLUG PERSONALIZADO (OPCIONAL):
+                                                    </label>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'monospace' }}>/r/</span>
+                                                        <input
+                                                            type="text"
+                                                            className="input-base"
+                                                            placeholder="minha-oferta (automático se vazio)"
+                                                            value={inlineRotatorSlug}
+                                                            onChange={e => setInlineRotatorSlug(e.target.value)}
+                                                            style={{ flex: 1, height: '34px', fontSize: '12px' }}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>
+                                                        TÍTULO / REFERÊNCIA (OPCIONAL):
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        className="input-base"
+                                                        placeholder="Ex: Campanha Notificação B1"
+                                                        value={inlineRotatorTitle}
+                                                        onChange={e => setInlineRotatorTitle(e.target.value)}
+                                                        style={{ width: '100%', height: '34px', fontSize: '12.5px' }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        /* MODE 2: MULTI-TARGET ROTATOR PRO */
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                                <div>
+                                                    <label style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>
+                                                        TÍTULO DA CAMPANHA:
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        className="input-base"
+                                                        placeholder="Ex: Rotação Vendas WhatsApp"
+                                                        value={inlineRotatorTitle}
+                                                        onChange={e => setInlineRotatorTitle(e.target.value)}
+                                                        style={{ width: '100%', height: '34px', fontSize: '12.5px' }}
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>
+                                                        SLUG PERSONALIZADO:
+                                                    </label>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'monospace' }}>/r/</span>
+                                                        <input
+                                                            type="text"
+                                                            className="input-base"
+                                                            placeholder="rotator-campanha"
+                                                            value={inlineRotatorSlug}
+                                                            onChange={e => setInlineRotatorSlug(e.target.value)}
+                                                            style={{ flex: 1, height: '34px', fontSize: '12px' }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Targets & Weights List */}
+                                            <div style={{ border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '10px', background: '#FFFFFF' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                    <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-main)' }}>
+                                                        Destinos &amp; Distribuição de Pesos ({inlineTargets.length})
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAddInlineTarget}
+                                                        className="btn-secondary"
+                                                        style={{ height: '26px', padding: '0 8px', fontSize: '11px', borderRadius: '4px' }}
+                                                    >
+                                                        <Plus size={11} /> Adicionar Link
+                                                    </button>
+                                                </div>
+
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                    {inlineTargets.map((target, idx) => (
+                                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <span style={{ fontSize: '11px', color: 'var(--text-dim)', minWidth: '16px' }}>
+                                                                {idx + 1}.
+                                                            </span>
+                                                            <input
+                                                                className="input-base"
+                                                                style={{ height: '32px', fontSize: '12px', flex: 1 }}
+                                                                placeholder="https://wa.me/5511... ou https://site.com"
+                                                                value={target.url}
+                                                                onChange={e => handleInlineTargetChange(idx, 'url', e.target.value)}
+                                                            />
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                <input
+                                                                    type="number"
+                                                                    min="1"
+                                                                    max="100"
+                                                                    className="input-base"
+                                                                    style={{ width: '46px', height: '32px', textAlign: 'center', fontSize: '12px', padding: '0 2px' }}
+                                                                    value={target.weight}
+                                                                    onChange={e => handleInlineTargetChange(idx, 'weight', e.target.value)}
+                                                                />
+                                                                <span style={{ fontSize: '10.5px', fontWeight: 600, color: '#16A34A', minWidth: '40px', textAlign: 'right' }}>
+                                                                    {calculateInlinePercentage(target.weight)}%
+                                                                </span>
+                                                            </div>
+                                                            {inlineTargets.length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveInlineTarget(idx)}
+                                                                    style={{
+                                                                        width: '28px',
+                                                                        height: '28px',
+                                                                        borderRadius: '4px',
+                                                                        border: '1px solid #FECACA',
+                                                                        background: '#FEF2F2',
+                                                                        color: '#DC2626',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        cursor: 'pointer'
+                                                                    }}
+                                                                    title="Remover destino"
+                                                                >
+                                                                    <Trash2 size={12} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Action Button: Generate */}
+                                    <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                                         <button
                                             type="button"
-                                            onClick={() => setActiveToolDrawer(activeToolDrawer === 'rotator' ? null : 'rotator')}
-                                            className="btn-secondary"
-                                            style={{ height: '36px', fontSize: '12.5px', gap: '6px' }}
-                                            title="Usar Rotacionador PRO"
+                                            className="btn-primary"
+                                            style={{ height: '36px', fontSize: '12.5px', gap: '6px', padding: '0 16px' }}
+                                            onClick={handleShortenLink}
+                                            disabled={isShortening}
                                         >
-                                            <Zap size={14} color="#16A34A" />
-                                            Rotacionador PRO
+                                            {isShortening ? <RotateCcw size={14} className="animate-spin" /> : inlineRotatorMode === 'SIMPLE' ? <Scissors size={14} /> : <Zap size={14} />}
+                                            {isShortening ? 'Gerando Link...' : (inlineRotatorMode === 'SIMPLE' ? 'Gerar Link Encurtado' : 'Gerar Rotacionador PRO')}
                                         </button>
                                     </div>
 
                                     {/* Link Output com botões de aplicação */}
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', background: '#f9fafb', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--text-muted)' }}>
-                                                LINK ATUAL:
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', background: '#FFFFFF', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: '220px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                                LINK GERADO:
                                             </span>
-                                            <code style={{ fontSize: '12px', color: 'var(--primary-text)', fontWeight: 600 }}>
-                                                {shortenerResult || globalLinkInput || 'Nenhum link configurado'}
+                                            <code style={{ fontSize: '12.5px', color: shortenerResult ? '#16A34A' : 'var(--text-main)', fontWeight: 600 }}>
+                                                {shortenerResult || globalLinkInput || 'Nenhum link gerado ainda'}
                                             </code>
                                         </div>
 
-                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                                             {shortenerResult && (
-                                                <button
-                                                    onClick={handleCopyShortLink}
-                                                    className="badge"
-                                                    style={{ background: copiedShortLink ? '#f0fdf4' : '#ffffff', color: copiedShortLink ? '#15803d' : '#4b5563', cursor: 'pointer', border: '1px solid var(--border-subtle)' }}
-                                                >
-                                                    {copiedShortLink ? 'Copiado!' : 'Copiar'}
-                                                </button>
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleCopyShortLink}
+                                                        className="badge"
+                                                        style={{ background: copiedShortLink ? '#f0fdf4' : '#ffffff', color: copiedShortLink ? '#15803d' : '#4b5563', cursor: 'pointer', border: '1px solid var(--border-subtle)', height: '28px', padding: '0 10px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                    >
+                                                        {copiedShortLink ? <Check size={12} color="#16A34A" /> : <Copy size={12} />}
+                                                        {copiedShortLink ? 'Copiado!' : 'Copiar'}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => window.open(shortenerResult, '_blank')}
+                                                        className="badge"
+                                                        style={{ background: '#ffffff', color: 'var(--accent-blue)', cursor: 'pointer', border: '1px solid var(--border-subtle)', height: '28px', padding: '0 10px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                        title="Testar link em nova aba"
+                                                    >
+                                                        <ExternalLink size={12} />
+                                                        Testar Link
+                                                    </button>
+                                                </>
                                             )}
                                             <button
+                                                type="button"
                                                 className="badge badge-approved"
-                                                style={{ cursor: 'pointer' }}
+                                                style={{ cursor: 'pointer', height: '28px', padding: '0 10px', fontSize: '11.5px' }}
                                                 onClick={() => handleApplyGlobalLink(0)}
                                             >
-                                                Aplicar B1
+                                                Aplicar no B1
                                             </button>
                                             {buttonCount === 2 && (
                                                 <button
+                                                    type="button"
                                                     className="badge badge-pending"
-                                                    style={{ cursor: 'pointer' }}
+                                                    style={{ cursor: 'pointer', height: '28px', padding: '0 10px', fontSize: '11.5px' }}
                                                     onClick={() => handleApplyGlobalLink(1)}
                                                 >
-                                                    Aplicar B2
+                                                    Aplicar no B2
                                                 </button>
                                             )}
                                         </div>
                                     </div>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                                        💡 Todos os links gerados são salvos automaticamente no módulo <b>Encurtador &amp; Rotator</b> e redirecionam instantaneamente via <code>/r/:slug</code>.
+                                    </span>
                                 </div>
                             </div>
 

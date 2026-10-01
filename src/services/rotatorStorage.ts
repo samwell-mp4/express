@@ -2,6 +2,21 @@ import { ProRotator, RotatorTarget, RotatorStats } from '../types';
 
 const STORAGE_KEY = 'plugesales_pro_rotators_v1';
 
+function getLocalListSafe(): ProRotator[] {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
+}
+
+function notifyRotatorsUpdated() {
+    try {
+        window.dispatchEvent(new CustomEvent('rotators_updated'));
+    } catch {}
+}
+
 export const rotatorStorage = {
     // 1. Get all rotators
     async getRotators(): Promise<ProRotator[]> {
@@ -28,16 +43,7 @@ export const rotatorStorage = {
         }
 
         // Fallback to localStorage
-        try {
-            const localRaw = localStorage.getItem(STORAGE_KEY);
-            if (localRaw) {
-                return JSON.parse(localRaw);
-            }
-        } catch (e) {
-            console.error('[RotatorStorage] Error reading localStorage:', e);
-        }
-
-        return [];
+        return getLocalListSafe();
     },
 
     // 2. Create new rotator
@@ -52,6 +58,10 @@ export const rotatorStorage = {
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
         const cleanSlug = data.slug ? String(data.slug).trim().replace(/[^a-zA-Z0-9_-]/g, '') : Math.random().toString(36).substring(2, 8);
+        const cleanTargets = (data.targets && data.targets.length > 0 ? data.targets : [{ url: '', weight: 1 }]).map(t => ({
+            url: t.url.trim(),
+            weight: Number(t.weight) > 0 ? Number(t.weight) : 1
+        }));
         
         let createdItem: ProRotator | null = null;
 
@@ -62,7 +72,7 @@ export const rotatorStorage = {
                 body: JSON.stringify({
                     title: data.title || 'Rotacionador PRO',
                     slug: cleanSlug,
-                    targets: data.targets,
+                    targets: cleanTargets,
                     client_id: data.client_id || null
                 })
             });
@@ -71,7 +81,7 @@ export const rotatorStorage = {
                 const resData = await res.json();
                 createdItem = {
                     ...resData,
-                    targets: typeof resData.targets === 'string' ? JSON.parse(resData.targets) : (resData.targets || [])
+                    targets: typeof resData.targets === 'string' ? JSON.parse(resData.targets) : (resData.targets || cleanTargets)
                 };
             }
         } catch (err) {
@@ -84,16 +94,18 @@ export const rotatorStorage = {
                 id: Date.now(),
                 title: data.title || 'Rotacionador PRO',
                 slug: cleanSlug,
-                targets: data.targets,
+                targets: cleanTargets,
                 total_clicks: 0,
                 created_at: new Date().toISOString()
             };
         }
 
         // Update local cache
-        const current = await this.getLocalList();
+        const current = getLocalListSafe();
         const updated = [createdItem, ...current.filter(r => r.id !== createdItem!.id)];
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+        notifyRotatorsUpdated();
 
         return createdItem;
     },
@@ -129,7 +141,7 @@ export const rotatorStorage = {
         }
 
         // Update local list
-        const current = await this.getLocalList();
+        const current = getLocalListSafe();
         const index = current.findIndex(r => String(r.id) === String(id));
         if (index >= 0) {
             const existing = current[index];
@@ -141,8 +153,11 @@ export const rotatorStorage = {
             };
             current[index] = updatedItem || merged;
             localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+            notifyRotatorsUpdated();
             return current[index];
         }
+
+        if (updatedItem) notifyRotatorsUpdated();
 
         return updatedItem || {
             id,
@@ -164,9 +179,10 @@ export const rotatorStorage = {
             console.warn('[RotatorStorage] API delete failed, deleting locally:', err);
         }
 
-        const current = await this.getLocalList();
+        const current = getLocalListSafe();
         const filtered = current.filter(r => String(r.id) !== String(id));
         localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+        notifyRotatorsUpdated();
         return true;
     },
 
@@ -197,7 +213,7 @@ export const rotatorStorage = {
         }
 
         // Local calculation fallback
-        const current = await this.getLocalList();
+        const current = getLocalListSafe();
         const item = current.find(r => String(r.id) === String(id));
         if (!item) return null;
 
@@ -247,9 +263,10 @@ export const rotatorStorage = {
         }
 
         const idsSet = new Set(ids.map(String));
-        const current = await this.getLocalList();
+        const current = getLocalListSafe();
         const filtered = current.filter(r => !idsSet.has(String(r.id)));
         localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+        notifyRotatorsUpdated();
         return true;
     },
 
@@ -270,7 +287,7 @@ export const rotatorStorage = {
         }
 
         const idsSet = new Set(ids.map(String));
-        const current = await this.getLocalList();
+        const current = getLocalListSafe();
         const updated = current.map(r => {
             if (idsSet.has(String(r.id))) {
                 return {
@@ -281,6 +298,7 @@ export const rotatorStorage = {
             return r;
         });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        notifyRotatorsUpdated();
         return true;
     },
 
@@ -301,7 +319,7 @@ export const rotatorStorage = {
         }
 
         const idsSet = new Set(ids.map(String));
-        const current = await this.getLocalList();
+        const current = getLocalListSafe();
         const updated = current.map(r => {
             if (idsSet.has(String(r.id))) {
                 return {
@@ -312,16 +330,12 @@ export const rotatorStorage = {
             return r;
         });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        notifyRotatorsUpdated();
         return true;
     },
 
     // Helper: read raw list from localStorage
     async getLocalList(): Promise<ProRotator[]> {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            return raw ? JSON.parse(raw) : [];
-        } catch {
-            return [];
-        }
+        return getLocalListSafe();
     }
 };

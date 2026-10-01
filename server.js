@@ -669,7 +669,7 @@ const server = http.createServer(async (req, res) => {
     try {
       if (isPostgresConnected) {
         const result = await pgPool.query(
-          'SELECT * FROM pro_rotators WHERE LOWER(slug) = LOWER($1) AND status = $2 LIMIT 1',
+          'SELECT * FROM pro_rotators WHERE LOWER(slug) = LOWER($1) AND (status IS NULL OR UPPER(status) = $2) LIMIT 1',
           [slug, 'ACTIVE']
         );
 
@@ -677,19 +677,29 @@ const server = http.createServer(async (req, res) => {
           const rotator = result.rows[0];
           const rawTargets = typeof rotator.targets === 'string' ? JSON.parse(rotator.targets) : rotator.targets;
           
+          let targetUrl = null;
           if (Array.isArray(rawTargets) && rawTargets.length > 0) {
-            const totalW = rawTargets.reduce((s, t) => s + (parseFloat(t.weight) || 1), 0);
-            let rnd = Math.random() * totalW;
-            let targetUrl = rawTargets[0].url;
+            const validTargets = rawTargets.filter(t => t && t.url);
+            if (validTargets.length > 0) {
+              const totalW = validTargets.reduce((s, t) => s + (parseFloat(t.weight) || 1), 0);
+              let rnd = Math.random() * totalW;
+              targetUrl = validTargets[0].url;
 
-            for (let i = 0; i < rawTargets.length; i++) {
-              rnd -= (parseFloat(rawTargets[i].weight) || 1);
-              if (rnd <= 0) {
-                targetUrl = rawTargets[i].url;
-                break;
+              for (let i = 0; i < validTargets.length; i++) {
+                rnd -= (parseFloat(validTargets[i].weight) || 1);
+                if (rnd <= 0) {
+                  targetUrl = validTargets[i].url;
+                  break;
+                }
               }
             }
+          }
 
+          if (!targetUrl && rotator.original_url) {
+            targetUrl = rotator.original_url;
+          }
+
+          if (targetUrl) {
             // Asynchronously record click
             pgPool.query(
               'UPDATE pro_rotators SET total_clicks = total_clicks + 1 WHERE id = $1',
@@ -701,17 +711,78 @@ const server = http.createServer(async (req, res) => {
               [rotator.id, targetUrl, req.headers['user-agent'] || '', clientIp]
             ).catch(() => {});
 
-            if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
-            res.writeHead(302, { Location: targetUrl });
+            let finalUrl = targetUrl.trim();
+            if (!/^https?:\/\//i.test(finalUrl)) finalUrl = 'https://' + finalUrl;
+            res.writeHead(302, { Location: finalUrl });
             res.end();
             return;
           }
         }
       }
 
-      // HTML de fallback limpo se não encontrado
+      // Fallback: Redirecionador do cliente com verificação no localStorage (garante funcionamento offline / cache)
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Link Não Encontrado</title><style>body{background:#0b0f19;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;margin:0;} .card{background:#111827;padding:32px;border-radius:12px;border:1px solid #1f2937;text-align:center;max-width:400px;}</style></head><body><div class="card"><h2 style="color:#ef4444;margin-top:0;">Link não encontrado</h2><p style="color:#9ca3af;font-size:14px;">O link rotacionador PRO <b>/r/${slug}</b> não foi localizado ou está desativado.</p><a href="/" style="display:inline-block;margin-top:16px;padding:8px 16px;background:#374151;color:#acf800;text-decoration:none;border-radius:6px;font-size:13px;">Voltar ao Início</a></div></body></html>`);
+      res.end(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Redirecionando | Link Rotator PRO</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0B0F19; color: #F3F4F6; }
+    .box { text-align: center; max-width: 440px; width: 90%; padding: 36px 28px; background: #111827; border: 1px solid #1F2937; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+    .spinner { width: 36px; height: 36px; border: 3px solid #374151; border-top-color: #ACF800; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h3 { margin: 0 0 10px; font-size: 17px; font-weight: 700; color: #F9FAFB; }
+    p { margin: 0; font-size: 13px; color: #9CA3AF; line-height: 1.5; }
+    .err-btn { display: inline-block; margin-top: 20px; padding: 9px 18px; background: #1F2937; color: #ACF800; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 600; border: 1px solid #374151; }
+  </style>
+</head>
+<body>
+  <div class="box" id="box">
+    <div class="spinner"></div>
+    <h3>Redirecionando...</h3>
+    <p>Conectando você ao destino inteligente...</p>
+  </div>
+  <script>
+    (function() {
+      var slug = "${slug}".trim().toLowerCase();
+      try {
+        var local = JSON.parse(localStorage.getItem('plugesales_pro_rotators_v1') || '[]');
+        var found = local.find(function(r) { return (r.slug || '').toLowerCase() === slug; });
+        if (found) {
+          var rawTargets = Array.isArray(found.targets) ? found.targets : (typeof found.targets === 'string' ? JSON.parse(found.targets) : []);
+          var targetUrl = null;
+          if (rawTargets && rawTargets.length > 0) {
+            var valid = rawTargets.filter(function(t) { return t && t.url; });
+            if (valid.length > 0) {
+              var totalW = valid.reduce(function(s, t) { return s + (parseFloat(t.weight) || 1); }, 0);
+              var rnd = Math.random() * totalW;
+              targetUrl = valid[0].url;
+              for (var i = 0; i < valid.length; i++) {
+                rnd -= (parseFloat(valid[i].weight) || 1);
+                if (rnd <= 0) { targetUrl = valid[i].url; break; }
+              }
+            }
+          }
+          if (!targetUrl && found.original_url) targetUrl = found.original_url;
+          if (targetUrl) {
+            if (!/^https?:\\/\\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
+            found.total_clicks = (found.total_clicks || 0) + 1;
+            try { localStorage.setItem('plugesales_pro_rotators_v1', JSON.stringify(local)); } catch(e) {}
+            window.location.replace(targetUrl);
+            return;
+          }
+        }
+      } catch(e) {}
+
+      var box = document.getElementById('box');
+      if (box) {
+        box.innerHTML = '<h3 style="color:#EF4444;">Link Não Encontrado</h3><p style="color:#9CA3AF;">O link rotacionador PRO <b>/r/' + slug + '</b> não existe ou foi removido.</p><a href="/" class="err-btn">Voltar ao Início</a>';
+      }
+    })();
+  </script>
+</body>
+</html>`);
       return;
     } catch (err) {
       return sendError(err.message, 500);
