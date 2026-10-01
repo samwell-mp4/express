@@ -35,6 +35,7 @@ import { templateService } from '../services/templateService';
 import { api, LUIS_BASE } from '../services/api';
 import { SpreadsheetCleaner } from './SpreadsheetCleaner';
 import { MediaHostingManager } from './MediaHostingManager';
+import { LinkRotatorManager } from './LinkRotatorManager';
 import { rotatorStorage } from '../services/rotatorStorage';
 
 interface TemplateCreatorWizardProps {
