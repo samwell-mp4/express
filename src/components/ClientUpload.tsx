@@ -1765,8 +1765,8 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     // -------------------------------------------------------------
     const handleOpenAutomationModal = (sub: ClientSubmission, tpl: any) => {
         const copy = tpl.ad_copy || sub.ad_copy || '';
-        const matches = copy.match(/\{\{(\d+)\}\}/g) || [];
-        const indices = Array.from(new Set(matches.map((m: string) => parseInt(m.replace(/\D/g, ''), 10)))).sort((a: number, b: number) => a - b);
+        const rawMatches = copy.match(/\{\{(\d+)\}\}/g) || [];
+        const indices: number[] = Array.from<number>(new Set(rawMatches.map((m: string) => parseInt(m.replace(/\D/g, ''), 10)))).sort((a: number, b: number) => a - b);
         const varCount = indices.length > 0 ? Math.max(...indices) : (tpl.variables?.filter(Boolean).length || 0);
 
         const initialVars: string[] = [];
@@ -3173,7 +3173,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                         <input
                                                             type="checkbox"
                                                             checked={isChecked}
-                                                            onChange={() => toggleSelect(sub.id)}
+                                                            onChange={() => toggleSelectSubmission(sub.id)}
                                                             style={{ accentColor: 'var(--primary-color)', cursor: 'pointer' }}
                                                         />
                                                     </td>

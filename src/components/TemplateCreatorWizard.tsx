@@ -502,7 +502,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
             : (cleanSender.slice(0, 2) || '11');
 
         const effectiveType: 'TEXT' | 'IMAGE' | 'VIDEO' = headerType === 'NONE' ? 'TEXT' : headerType;
-        const effectiveMedia = headerType !== 'NONE' ? headerMediaUrl : '';
+        const effectiveMedia = headerType !== 'NONE' ? mediaUrl : '';
         const effectiveBtnUrl = effectiveButtons.find(b => b.type === 'URL')?.url || '';
 
         const newAd: SubmissionAd = {

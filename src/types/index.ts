@@ -197,6 +197,8 @@ export interface ClientSubmission {
     user_id?: number | string;
     client_name?: string;
     timestamp: string;
+    created_at?: string;
+    updated_at?: string;
     dispatch_date?: string;
     notes?: string;
     ads: SubmissionAd[];
