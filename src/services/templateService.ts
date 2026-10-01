@@ -20,7 +20,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
             buttons: [
-                { type: 'URL', text: 'Clique Aqui', url: 'https://plugesales.com/r/ivo' },
+                { type: 'URL', text: 'Clique Aqui', url: 'https://fastdispatch.com.br/r/ivo' },
                 { type: 'QUICK_REPLY', text: 'Não Reconheço' }
             ],
             type: 'MEDIA'
@@ -48,7 +48,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
             buttons: [
-                { type: 'URL', text: 'Clique Aqui', url: 'https://plugesales.com/r/ivo' },
+                { type: 'URL', text: 'Clique Aqui', url: 'https://fastdispatch.com.br/r/ivo' },
                 { type: 'QUICK_REPLY', text: 'Não Reconheço' }
             ],
             type: 'MEDIA'
@@ -76,7 +76,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
             buttons: [
-                { type: 'URL', text: 'Clique Aqui', url: 'https://plugesales.com/r/ivo' },
+                { type: 'URL', text: 'Clique Aqui', url: 'https://fastdispatch.com.br/r/ivo' },
                 { type: 'QUICK_REPLY', text: 'Não Reconheço' }
             ],
             type: 'MEDIA'
@@ -104,7 +104,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
             buttons: [
-                { type: 'URL', text: 'Clique Aqui', url: 'https://plugesales.com/r/ivo' },
+                { type: 'URL', text: 'Clique Aqui', url: 'https://fastdispatch.com.br/r/ivo' },
                 { type: 'QUICK_REPLY', text: 'Não Reconheço' }
             ],
             type: 'MEDIA'
@@ -132,7 +132,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
             buttons: [
-                { type: 'URL', text: 'Clique Aqui', url: 'https://plugesales.com/r/TRANSALMEIDA' },
+                { type: 'URL', text: 'Clique Aqui', url: 'https://fastdispatch.com.br/r/TRANSALMEIDA' },
                 { type: 'QUICK_REPLY', text: 'Não Reconheço' }
             ],
             type: 'MEDIA'
@@ -251,7 +251,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
                 examples: ['Ana', '#77621']
             },
             buttons: [
-                { type: 'URL', text: 'Abrir Comprovante', url: 'https://plugesales.com/c/final1743' }
+                { type: 'URL', text: 'Abrir Comprovante', url: 'https://fastdispatch.com.br/c/final1743' }
             ],
             type: 'MEDIA'
         },

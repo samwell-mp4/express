@@ -244,7 +244,7 @@ export const api = {
 
         // Robust fallback: generate short redirect code
         const code = Math.random().toString(36).substring(2, 8);
-        return `https://plugesales.com/r/${code}`;
+        return `https://fastdispatch.com.br/r/${code}`;
     },
 
     // 10. Upload media (images, videos, documents) with safe permanent storage

@@ -127,7 +127,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     // Button 1
     const [button1Type, setButton1Type] = useState<'URL' | 'QUICK_REPLY'>('URL');
     const [button1Text, setButton1Text] = useState('Clique Aqui');
-    const [button1Url, setButton1Url] = useState('https://plugesales.com/r/ivo');
+    const [button1Url, setButton1Url] = useState('https://fastdispatch.com.br/r/ivo');
 
     // Button 2
     const [button2Type, setButton2Type] = useState<'URL' | 'QUICK_REPLY'>('QUICK_REPLY');
@@ -138,7 +138,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     // BULK GENERATION STATE (GERAR EM MASSA)
     // ==========================================
     const [globalSender, setGlobalSender] = useState<string>('');
-    const [globalLinkInput, setGlobalLinkInput] = useState<string>('https://plugesales.com/r/ivo');
+    const [globalLinkInput, setGlobalLinkInput] = useState<string>('https://fastdispatch.com.br/r/ivo');
     const [globalMediaUrl, setGlobalMediaUrl] = useState<string>('https://i.imgur.com/gZLbY6p.jpeg');
     const [globalHeaderType, setGlobalHeaderType] = useState<'NONE' | 'IMAGE' | 'VIDEO'>('IMAGE');
     const [enableBulkCustomText, setEnableBulkCustomText] = useState(false);
@@ -161,7 +161,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                     headerType: 'IMAGE',
                     mediaUrl: 'https://i.imgur.com/gZLbY6p.jpeg',
                     hasButtons: true,
-                    buttonUrls: ['https://plugesales.com/r/ivo'],
+                    buttonUrls: ['https://fastdispatch.com.br/r/ivo'],
                     buttonTexts: ['Clique Aqui'],
                     buttonTypes: ['url']
                 },
@@ -171,7 +171,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                     headerType: 'IMAGE',
                     mediaUrl: 'https://i.imgur.com/gZLbY6p.jpeg',
                     hasButtons: true,
-                    buttonUrls: ['https://plugesales.com/r/ivo'],
+                    buttonUrls: ['https://fastdispatch.com.br/r/ivo'],
                     buttonTexts: ['Clique Aqui'],
                     buttonTypes: ['url']
                 }

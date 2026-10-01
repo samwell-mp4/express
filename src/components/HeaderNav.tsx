@@ -38,7 +38,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
                     </div>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <h1 style={{ fontSize: '1.35rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Plug &amp; Sales</h1>
+                            <h1 style={{ fontSize: '1.35rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Fast Dispatch</h1>
                             <span className="badge badge-approved" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
                                 Standalone Engine
                             </span>

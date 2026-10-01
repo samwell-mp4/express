@@ -3408,7 +3408,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                         }}>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                                 <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-main)' }}>
-                                                    Padrões de Variáveis Plug &amp; Sales:
+                                                    Padrões de Variáveis Fast Dispatch:
                                                 </span>
                                                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                                                     Selecione o padrão desejado ou edite livremente abaixo
@@ -4236,7 +4236,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                         <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-main)' }}>
-                                            Padrões de Variáveis Plug &amp; Sales:
+                                            Padrões de Variáveis Fast Dispatch:
                                         </span>
                                         <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
                                             Atualiza o texto padrão ou mantenha aberto

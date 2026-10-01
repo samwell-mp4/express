@@ -184,7 +184,7 @@ async function initDB() {
       await client.query(`
         INSERT INTO users (name, email, password, role)
         VALUES ($1, $2, $3, $4)
-      `, ['Admin Plug&Sales', 'plug2026#adsales', defaultPasswordHash, 'ADMIN']);
+      `, ['Admin Fast Dispatch', 'plug2026#adsales', defaultPasswordHash, 'ADMIN']);
       console.log('🔒 [Security] Usuário administrador padrão inicializado.');
     }
 
@@ -738,7 +738,7 @@ const server = http.createServer(async (req, res) => {
       if (!isPostgresConnected) {
         // Fallback administrativo local de emergência se banco ainda estiver inicializando
         if (email === 'plug2026#adsales' && password === 'AQ2938AJWIU3Y280#') {
-          const mockUser = { id: 1, name: 'Admin Plug&Sales', email, role: 'ADMIN' };
+          const mockUser = { id: 1, name: 'Admin Fast Dispatch', email, role: 'ADMIN' };
           const token = generateToken(mockUser);
           return sendJson({ success: true, token, user: mockUser });
         }

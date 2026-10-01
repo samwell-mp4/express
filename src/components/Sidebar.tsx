@@ -30,13 +30,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 const parsed = JSON.parse(raw);
                 return {
                     name: parsed.name || parsed.nome || 'Meu Perfil',
-                    email: parsed.email || 'operador@plugesales.com'
+                    email: parsed.email || 'operador@fastdispatch.com.br'
                 };
             }
         } catch {}
         return {
             name: 'Meu Perfil',
-            email: 'operador@plugesales.com'
+            email: 'operador@fastdispatch.com.br'
         };
     });
 
@@ -72,7 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <div style={{ overflow: 'hidden' }}>
                     <div style={{ fontSize: '14.5px', fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1.2, color: 'var(--text-main)' }}>
-                        Plug &amp; Sales
+                        Fast Dispatch
                     </div>
                     <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 400 }}>
                         Operacional Meta

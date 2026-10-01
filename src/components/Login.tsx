@@ -59,7 +59,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                             <Zap size={28} color="#020617" strokeWidth={2.5} />
                         </div>
                         <h1 style={{ color: '#ffffff', fontSize: '32px', margin: 0, fontWeight: 800, letterSpacing: '-0.5px' }}>
-                            Fast Plug
+                            Fast Dispatch
                         </h1>
                     </div>
                     <p style={{ color: '#94a3b8', margin: 0, fontSize: '15px', fontWeight: 500 }}>
