@@ -20,8 +20,31 @@ import { bmSheetService } from './services/bmSheetService';
 import { templateService } from './services/templateService';
 import { Login } from './components/Login';
 
+const isLocalhost = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.endsWith('.local')
+);
+
 export const App: React.FC = () => {
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!localStorage.getItem('auth_token'));
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+        if (isLocalhost) return true;
+        return !!localStorage.getItem('auth_token');
+    });
+
+    useEffect(() => {
+        if (isLocalhost && !localStorage.getItem('auth_token')) {
+            localStorage.setItem('auth_token', 'dev_localhost_token');
+            localStorage.setItem('auth_user', JSON.stringify({
+                id: 1,
+                name: 'Desenvolvedor Local',
+                email: 'dev@localhost',
+                role: 'ADMIN',
+                isAdmin: true
+            }));
+        }
+    }, []);
+
     // Current Active View Tab: 'upload-clientes' | 'create-template' | 'spreadsheet-cleaner' | 'media-hosting' | 'bms' | 'registry' | 'dispatch' | 'monitor'
     const [activeTab, setActiveTab] = useState<AppTab>('upload-clientes');
 
@@ -197,7 +220,7 @@ export const App: React.FC = () => {
 
     const savedWabas = wabaStorage.getSavedWabas();
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !isLocalhost) {
         return (
             <Login onLoginSuccess={() => {
                 setIsAuthenticated(true);

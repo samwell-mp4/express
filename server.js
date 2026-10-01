@@ -447,8 +447,30 @@ function extractToken(req) {
   return req.headers['x-access-token'] || null;
 }
 
+function isLocalhostRequest(req) {
+  const host = (req.headers.host || '').toLowerCase();
+  const clientIp = typeof getClientIp === 'function' ? getClientIp(req) : '';
+  const isLoopbackIp = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp.includes('127.0.0.1');
+  const isLocalHostHeader = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+  const isNotProduction = !process.env.NODE_ENV || process.env.NODE_ENV !== 'production';
+
+  return isNotProduction && (isLoopbackIp || isLocalHostHeader);
+}
+
 function authenticateToken(req) {
   const token = extractToken(req);
+
+  // Apenas para desenvolvimento em localhost: dispensa login manual conforme solicitado
+  if (isLocalhostRequest(req) && (!token || token === 'dev_localhost_token')) {
+    return {
+      id: 1,
+      name: 'Desenvolvedor Local',
+      email: 'dev@localhost',
+      role: 'ADMIN',
+      isAdmin: true
+    };
+  }
+
   if (!token) {
     const err = new Error('Acesso não autorizado: token de autenticação ausente.');
     err.status = 401;
@@ -458,6 +480,15 @@ function authenticateToken(req) {
     const decoded = jwt.verify(token, JWT_SECRET);
     return decoded;
   } catch (e) {
+    if (isLocalhostRequest(req)) {
+      return {
+        id: 1,
+        name: 'Desenvolvedor Local',
+        email: 'dev@localhost',
+        role: 'ADMIN',
+        isAdmin: true
+      };
+    }
     const err = new Error('Sessão inválida ou expirada. Faça login novamente.');
     err.status = 403;
     throw err;

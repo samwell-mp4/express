@@ -245,6 +245,42 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     const [isRefreshingAllTemplates, setIsRefreshingAllTemplates] = useState(false);
     const [refreshingTemplateNames, setRefreshingTemplateNames] = useState<Record<string, boolean>>({});
 
+    // Chrome Extension Integration State (Automatic Transmission)
+    const [isExtensionInstalled, setIsExtensionInstalled] = useState(false);
+    const [automationModalData, setAutomationModalData] = useState<{
+        isOpen: boolean;
+        sub: ClientSubmission;
+        tpl: any;
+        broadcastName: string;
+        senderNumber: string;
+        tabCount: number;
+        templateName: string;
+        variables: string[];
+        isExecuting: boolean;
+        statusText: string;
+    } | null>(null);
+
+    // Escuta respostas da Extensão Chrome
+    useEffect(() => {
+        const handleExtMessage = (event: MessageEvent) => {
+            if (event.data?.type === 'INFOBIP_AUTOMATION_EXTENSION_INSTALLED') {
+                setIsExtensionInstalled(true);
+            }
+            if (event.data?.type === 'AUTOMATION_RESPONSE_FROM_EXTENSION') {
+                if (event.data.success) {
+                    showToast('✓ Automação iniciada com sucesso na Infobip!');
+                } else {
+                    showToast(`⚠️ Extensão: ${event.data.error || 'Verifique se as abas foram abertas'}`);
+                }
+            }
+        };
+
+        window.addEventListener('message', handleExtMessage);
+        window.postMessage({ type: 'PING_INFOBIP_EXTENSION' }, '*');
+
+        return () => window.removeEventListener('message', handleExtMessage);
+    }, []);
+
     // Bulk Selection State
     const [selectedIds, setSelectedIds] = useState<(number | string)[]>([]);
     const [showBulkScheduleModal, setShowBulkScheduleModal] = useState(false);
@@ -1713,6 +1749,74 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
         const interval = setInterval(syncAllSubmissionsTemplates, 15000);
         return () => clearInterval(interval);
     }, [syncAllSubmissionsTemplates]);
+
+    // -------------------------------------------------------------
+    // CHROME EXTENSION AUTOMATION HANDLERS (TRANSMISSÃO AUTOMÁTICA)
+    // -------------------------------------------------------------
+    const handleOpenAutomationModal = (sub: ClientSubmission, tpl: any) => {
+        const copy = tpl.ad_copy || sub.ad_copy || '';
+        const matches = copy.match(/\{\{(\d+)\}\}/g) || [];
+        const indices = Array.from(new Set(matches.map((m: string) => parseInt(m.replace(/\D/g, ''), 10)))).sort((a: number, b: number) => a - b);
+        const varCount = indices.length > 0 ? Math.max(...indices) : (tpl.variables?.filter(Boolean).length || 0);
+
+        const initialVars: string[] = [];
+        for (let i = 0; i < varCount; i++) {
+            const existing = tpl.variables?.[i] || sub.variables?.[i] || '';
+            initialVars.push(existing);
+        }
+
+        const defaultBroadcastName = sub.campaign_name || tpl.name || 'Minha_Transmissao';
+        const defaultSender = sub.sender_phone || sub.sender_number || tpl.sender_phone || '';
+
+        setAutomationModalData({
+            isOpen: true,
+            sub,
+            tpl,
+            broadcastName: defaultBroadcastName,
+            senderNumber: defaultSender,
+            tabCount: 1,
+            templateName: tpl.name,
+            variables: initialVars,
+            isExecuting: false,
+            statusText: ''
+        });
+    };
+
+    const handleExecuteAutomation = () => {
+        if (!automationModalData) return;
+        const { tabCount, broadcastName, senderNumber, templateName, variables } = automationModalData;
+
+        if (!broadcastName.trim()) {
+            alert('Por favor, informe o Nome da Transmissão.');
+            return;
+        }
+        if (!senderNumber.trim()) {
+            alert('Por favor, informe o Número do Remetente.');
+            return;
+        }
+        if (tabCount < 1) {
+            alert('A quantidade mínima de abas é 1.');
+            return;
+        }
+
+        setAutomationModalData(prev => prev ? ({ ...prev, isExecuting: true, statusText: 'Disparando comando para a extensão...' }) : null);
+
+        // Dispara mensagem para o content script da extensão no navegador
+        window.postMessage({
+            type: 'START_AUTOMATION_FROM_PLUGSALES',
+            tabCount,
+            broadcastName: broadcastName.trim(),
+            senderNumber: senderNumber.trim(),
+            templateName,
+            variables
+        }, '*');
+
+        showToast(`🚀 Disparando automação para ${tabCount} aba(s) na Infobip...`);
+
+        setTimeout(() => {
+            setAutomationModalData(prev => prev ? ({ ...prev, isExecuting: false, statusText: 'Comando enviado! Verifique as abas da Infobip abertas no navegador.' }) : null);
+        }, 1500);
+    };
 
     // -------------------------------------------------------------
     // SMART FILTERING ENGINE
@@ -6631,6 +6735,31 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                         <RotateCw size={11} className={isChecking ? 'animate-spin' : ''} />
                                                         {isChecking ? 'Checando...' : 'Atualizar'}
                                                     </button>
+
+                                                    {/* Botão de Transmissão Automática com a Extensão */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenAutomationModal(sub, tpl)}
+                                                        style={{
+                                                            background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)',
+                                                            border: 'none',
+                                                            borderRadius: '5px',
+                                                            padding: '3px 10px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 700,
+                                                            color: '#FFFFFF',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '5px',
+                                                            boxShadow: '0 2px 4px rgba(79, 70, 229, 0.25)',
+                                                            transition: 'all 120ms ease'
+                                                        }}
+                                                        title="Iniciar Transmissão Automática com a Extensão Infobip"
+                                                    >
+                                                        <Zap size={12} color="#FDE047" />
+                                                        Transmissão Automática
+                                                    </button>
                                                 </div>
                                             </div>
 
@@ -6784,6 +6913,392 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                     </div>
                 );
             })()}
+
+            {/* MODAL DE TRANSMISSÃO AUTOMÁTICA (INTEGRAÇÃO EXTENSÃO INFOBIP) */}
+            {automationModalData && automationModalData.isOpen && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(15, 23, 42, 0.75)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1100,
+                        padding: '16px'
+                    }}
+                    onClick={() => setAutomationModalData(null)}
+                >
+                    <div
+                        style={{
+                            background: '#FFFFFF',
+                            width: '100%',
+                            maxWidth: '580px',
+                            maxHeight: '92vh',
+                            borderRadius: '12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+                            overflow: 'hidden',
+                            border: '1px solid #E2E8F0',
+                            animation: 'fadeIn 0.2s ease-out'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* HEADER */}
+                        <div style={{
+                            padding: '18px 22px',
+                            borderBottom: '1px solid #E2E8F0',
+                            background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)',
+                            color: '#FFFFFF',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '8px',
+                                    background: 'rgba(255, 255, 255, 0.15)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    <Zap size={20} color="#FDE047" />
+                                </div>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#FFFFFF' }}>
+                                        Transmissão Automática Infobip
+                                    </h3>
+                                    <div style={{ fontSize: '11.5px', color: '#C7D2FE', marginTop: '2px' }}>
+                                        Template: <strong>{automationModalData.templateName}</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setAutomationModalData(null)}
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.1)',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    width: '28px',
+                                    height: '28px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#FFFFFF',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        {/* STATUS EXTENSÃO */}
+                        <div style={{
+                            background: isExtensionInstalled ? '#F0FDF4' : '#FFFBEB',
+                            borderBottom: `1px solid ${isExtensionInstalled ? '#BBF7D0' : '#FDE68A'}`,
+                            padding: '8px 22px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            fontSize: '11px'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: isExtensionInstalled ? '#166534' : '#92400E' }}>
+                                <span style={{
+                                    width: '7px',
+                                    height: '7px',
+                                    borderRadius: '50%',
+                                    background: isExtensionInstalled ? '#16A34A' : '#D97706'
+                                }} />
+                                <strong>{isExtensionInstalled ? 'Extensão Chrome Detectada e Pronta' : 'Extensão Pronta para Disparo'}</strong>
+                            </div>
+                            <span style={{ color: '#64748B', fontSize: '10px' }}>
+                                v2.0 PlugSales Pro
+                            </span>
+                        </div>
+
+                        {/* BODY FORM */}
+                        <div style={{
+                            padding: '20px 22px',
+                            overflowY: 'auto',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '16px',
+                            flex: 1
+                        }}>
+                            {/* CAMPO 1: NOME DA TRANSMISSÃO */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                                    Nome da Transmissão (Infobip) <span style={{ color: '#DC2626' }}>*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={automationModalData.broadcastName}
+                                    onChange={(e) => setAutomationModalData({
+                                        ...automationModalData,
+                                        broadcastName: e.target.value
+                                    })}
+                                    placeholder="Ex: Campanha_Vendas_01"
+                                    style={{
+                                        width: '100%',
+                                        padding: '9px 12px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #CBD5E1',
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        color: '#1E293B',
+                                        outline: 'none',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                                <div style={{ fontSize: '11px', color: '#64748B', marginTop: '3px' }}>
+                                    Puxado automaticamente do nome do card / campanha.
+                                </div>
+                            </div>
+
+                            {/* CAMPO 2: NÚMERO DO REMETENTE */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                                    Número do Remetente WhatsApp <span style={{ color: '#DC2626' }}>*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={automationModalData.senderNumber}
+                                    onChange={(e) => setAutomationModalData({
+                                        ...automationModalData,
+                                        senderNumber: e.target.value
+                                    })}
+                                    placeholder="Ex: 5511922343216"
+                                    style={{
+                                        width: '100%',
+                                        padding: '9px 12px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #CBD5E1',
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        color: '#1E293B',
+                                        outline: 'none',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                                <div style={{ fontSize: '11px', color: '#64748B', marginTop: '3px' }}>
+                                    Puxado automaticamente do remetente vinculado ao template.
+                                </div>
+                            </div>
+
+                            {/* CAMPO 3: QUANTIDADE DE PÁGINAS / ABAS */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                                    Quantidade de Páginas / Abas para Abrir <span style={{ color: '#DC2626' }}>*</span>
+                                </label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAutomationModalData({
+                                            ...automationModalData,
+                                            tabCount: Math.max(1, automationModalData.tabCount - 1)
+                                        })}
+                                        style={{
+                                            width: '36px',
+                                            height: '36px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #CBD5E1',
+                                            background: '#F8FAFC',
+                                            fontSize: '16px',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        -
+                                    </button>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={20}
+                                        value={automationModalData.tabCount}
+                                        onChange={(e) => setAutomationModalData({
+                                            ...automationModalData,
+                                            tabCount: Math.max(1, Math.min(20, parseInt(e.target.value) || 1))
+                                        })}
+                                        style={{
+                                            width: '80px',
+                                            textAlign: 'center',
+                                            padding: '8px 10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #CBD5E1',
+                                            fontSize: '14px',
+                                            fontWeight: 700,
+                                            outline: 'none'
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setAutomationModalData({
+                                            ...automationModalData,
+                                            tabCount: Math.min(20, automationModalData.tabCount + 1)
+                                        })}
+                                        style={{
+                                            width: '36px',
+                                            height: '36px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #CBD5E1',
+                                            background: '#F8FAFC',
+                                            fontSize: '16px',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        +
+                                    </button>
+                                    <span style={{ fontSize: '12px', color: '#64748B' }}>
+                                        {automationModalData.tabCount === 1 ? 'aba será aberta e preenchida' : 'abas serão abertas e preenchidas'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* CAMPO 4: VARIÁVEIS DO TEMPLATE */}
+                            <div style={{
+                                borderTop: '1px solid #E2E8F0',
+                                paddingTop: '14px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155', margin: 0 }}>
+                                        Variáveis do Template ({automationModalData.variables.length})
+                                    </label>
+                                    <span style={{ fontSize: '11px', color: '#64748B' }}>
+                                        Puxadas do conteúdo do card
+                                    </span>
+                                </div>
+
+                                {automationModalData.variables.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {automationModalData.variables.map((val, vIdx) => (
+                                            <div key={vIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{
+                                                    background: '#EEF2FF',
+                                                    color: '#4338CA',
+                                                    border: '1px solid #C7D2FE',
+                                                    borderRadius: '4px',
+                                                    padding: '6px 10px',
+                                                    fontSize: '11.5px',
+                                                    fontWeight: 700,
+                                                    fontFamily: 'monospace',
+                                                    width: '54px',
+                                                    textAlign: 'center',
+                                                    flexShrink: 0
+                                                }}>
+                                                    {`{{${vIdx + 1}}}`}
+                                                </span>
+                                                <input
+                                                    type="text"
+                                                    value={val}
+                                                    onChange={(e) => {
+                                                        const updated = [...automationModalData.variables];
+                                                        updated[vIdx] = e.target.value;
+                                                        setAutomationModalData({
+                                                            ...automationModalData,
+                                                            variables: updated
+                                                        });
+                                                    }}
+                                                    placeholder={`Valor para a variável {{${vIdx + 1}}}`}
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '7px 10px',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #CBD5E1',
+                                                        fontSize: '12px',
+                                                        outline: 'none',
+                                                        boxSizing: 'border-box'
+                                                    }}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{
+                                        background: '#F8FAFC',
+                                        border: '1px solid #E2E8F0',
+                                        borderRadius: '6px',
+                                        padding: '10px 12px',
+                                        fontSize: '11.5px',
+                                        color: '#64748B'
+                                    }}>
+                                        ℹ️ Este template não possui variáveis dinâmicas (<code>{'{{1}}'}</code>) no texto.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* STATUS FEEDBACK */}
+                            {automationModalData.statusText && (
+                                <div style={{
+                                    background: '#F0F9FF',
+                                    border: '1px solid #BAE6FD',
+                                    borderRadius: '6px',
+                                    padding: '9px 12px',
+                                    fontSize: '11.5px',
+                                    color: '#0369A1',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}>
+                                    <Sparkles size={14} color="#0284C7" />
+                                    <span>{automationModalData.statusText}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* FOOTER */}
+                        <div style={{
+                            padding: '14px 22px',
+                            borderTop: '1px solid #E2E8F0',
+                            background: '#F8FAFC',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '10px'
+                        }}>
+                            <button
+                                type="button"
+                                onClick={() => setAutomationModalData(null)}
+                                className="btn-secondary"
+                                style={{ height: '36px', padding: '0 14px', fontSize: '12px' }}
+                            >
+                                Cancelar
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleExecuteAutomation}
+                                disabled={automationModalData.isExecuting}
+                                style={{
+                                    height: '36px',
+                                    padding: '0 18px',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)',
+                                    color: '#FFFFFF',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    cursor: automationModalData.isExecuting ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    boxShadow: '0 2px 6px rgba(79, 70, 229, 0.35)',
+                                    transition: 'all 120ms ease'
+                                }}
+                            >
+                                <Zap size={13} color="#FDE047" />
+                                {automationModalData.isExecuting ? 'Disparando...' : `Iniciar Transmissão (${automationModalData.tabCount} ${automationModalData.tabCount === 1 ? 'aba' : 'abas'})`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );
