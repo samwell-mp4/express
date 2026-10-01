@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     UploadCloud,
     FileSpreadsheet,
@@ -45,7 +45,8 @@ import {
     CheckCircle,
     XCircle,
     Clock4,
-    Smartphone
+    Smartphone,
+    AlertTriangle
 } from 'lucide-react';
 import { ParsedContact, ClientSubmission, SubmissionAd, RotatorTarget } from '../types';
 import { excelService, SpreadsheetAnalysis } from '../services/excelService';
@@ -109,6 +110,107 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
     CANCELADO: { label: 'Cancelado', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' }
 };
 
+export const getSubmissionTemplatesList = (sub: ClientSubmission) => {
+    const list: Array<{
+        id: string;
+        name: string;
+        type: 'TEXT' | 'IMAGE' | 'VIDEO';
+        ad_copy: string;
+        media_url?: string;
+        button_link?: string;
+        sender_phone?: string;
+        variables?: string[];
+        createdAt?: string;
+    }> = [];
+
+    if (sub.ads && sub.ads.length > 0) {
+        sub.ads.forEach((ad, i) => {
+            list.push({
+                id: ad.id || `tpl_${i}`,
+                name: ad.ad_name || sub.campaign_name || `Template_${i + 1}`,
+                type: (ad.template_type || sub.template_type || 'TEXT') as any,
+                ad_copy: ad.ad_copy || sub.ad_copy || '',
+                media_url: ad.media_url || sub.media_url,
+                button_link: ad.button_link || sub.button_link,
+                sender_phone: ad.sender_phone || sub.sender_phone || sub.sender_number,
+                variables: ad.variables,
+                createdAt: (ad as any).created_at || sub.timestamp || sub.created_at
+            });
+        });
+    } else {
+        list.push({
+            id: 'main',
+            name: sub.campaign_name || sub.profile_name || 'Template Principal',
+            type: (sub.template_type || 'TEXT') as any,
+            ad_copy: sub.ad_copy || '',
+            media_url: sub.media_url,
+            button_link: sub.button_link,
+            sender_phone: sub.sender_phone || sub.sender_number,
+            variables: sub.variables,
+            createdAt: sub.timestamp || sub.created_at
+        });
+    }
+    return list;
+};
+
+export const formatTemplateDateTime = (dateStr?: string, timeStr?: string) => {
+    if (!dateStr) {
+        return timeStr ? `Checado às ${timeStr}` : '';
+    }
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return timeStr ? `Checado às ${timeStr}` : '';
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const mins = String(d.getMinutes()).padStart(2, '0');
+        return `${day}/${month} às ${hours}:${mins}`;
+    } catch {
+        return timeStr ? `Checado às ${timeStr}` : '';
+    }
+};
+
+export const getTemplateStatusConfig = (rawStatus?: string) => {
+    const s = (rawStatus || 'PENDING').toUpperCase();
+    if (s === 'APPROVED' || s === 'CONCLUIDO') {
+        return {
+            label: 'Aprovado',
+            bg: '#F0FDF4',
+            border: '#BBF7D0',
+            color: '#166534',
+            dot: '#16A34A',
+            badgeBg: '#DCFCE7',
+            isPending: false,
+            isApproved: true,
+            isBanned: false
+        };
+    }
+    if (s === 'REJECTED' || s === 'CANCELADO' || s === 'BANNED' || s === 'DISABLED' || s === 'BANIDO') {
+        return {
+            label: 'Banido / Rejeitado',
+            bg: '#FEF2F2',
+            border: '#FECACA',
+            color: '#991B1B',
+            dot: '#DC2626',
+            badgeBg: '#FEE2E2',
+            isPending: false,
+            isApproved: false,
+            isBanned: true
+        };
+    }
+    return {
+        label: 'Pendente na Meta',
+        bg: '#FFFBEB',
+        border: '#FDE68A',
+        color: '#92400E',
+        dot: '#D97706',
+        badgeBg: '#FEF3C7',
+        isPending: true,
+        isApproved: false,
+        isBanned: false
+    };
+};
+
 export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) => {
     // View Toggle: 'cards' | 'schedule' | 'quick_upload'
     const [viewMode, setViewMode] = useState<'cards' | 'schedule' | 'quick_upload'>('cards');
@@ -134,6 +236,8 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     const [templateLiveStatuses, setTemplateLiveStatuses] = useState<Record<string, {
         status: string;
         lastChecked: string;
+        createdAt?: string;
+        lastUpdatedAt?: string;
         rejectionReason?: string;
         category?: string;
         language?: string;
@@ -1431,6 +1535,8 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                     const statusInfo = {
                         status: (t.status || 'PENDING').toUpperCase(),
                         lastChecked: nowStr,
+                        createdAt: t.createdAt,
+                        lastUpdatedAt: t.lastUpdatedAt,
                         rejectionReason: t.rejectionReason,
                         category: t.category,
                         language: t.language
@@ -1445,7 +1551,9 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                     if (!next[cn]) {
                         next[cn] = {
                             status: 'PENDENTE_META',
-                            lastChecked: nowStr
+                            lastChecked: nowStr,
+                            createdAt: sub.timestamp || sub.created_at,
+                            lastUpdatedAt: sub.timestamp || sub.created_at
                         };
                     }
                 });
@@ -1490,6 +1598,8 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
             const statusInfo = {
                 status: found ? (found.status || 'PENDING').toUpperCase() : 'PENDENTE_META',
                 lastChecked: nowStr,
+                createdAt: found?.createdAt,
+                lastUpdatedAt: found?.lastUpdatedAt,
                 rejectionReason: found?.rejectionReason,
                 category: found?.category,
                 language: found?.language
@@ -1518,6 +1628,91 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
 
         return () => clearInterval(timer);
     }, [selectedTemplatesSubmission]);
+
+    // -------------------------------------------------------------
+    // REAL-TIME GLOBAL TEMPLATES SYNC FOR ALL CARDS
+    // -------------------------------------------------------------
+    const syncAllSubmissionsTemplates = useCallback(async () => {
+        if (!submissions || submissions.length === 0) return;
+        try {
+            const senders = new Set<string>();
+            submissions.forEach(s => {
+                const clean = (s.sender_phone || s.sender_number || '').replace(/\D/g, '');
+                if (clean) senders.add(clean);
+            });
+            const sendersQuery = Array.from(senders).join(',');
+            const res = await fetch(`/api/meta-templates?force=true${sendersQuery ? `&knownSenders=${sendersQuery}` : ''}`);
+            let apiTemplates: any[] = [];
+            if (res.ok) {
+                const data = await res.json();
+                if (data.templates && Array.isArray(data.templates)) {
+                    apiTemplates = data.templates;
+                }
+            }
+
+            if (senders.size > 0) {
+                await Promise.all(Array.from(senders).map(async (sender) => {
+                    try {
+                        const sRes = await fetch(`/infobip-proxy/whatsapp/2/senders/${sender}/templates`);
+                        if (sRes.ok) {
+                            const sData = await sRes.json();
+                            if (sData.templates && Array.isArray(sData.templates)) {
+                                apiTemplates = [...sData.templates, ...apiTemplates];
+                            }
+                        }
+                    } catch {}
+                }));
+            }
+
+            const nowStr = new Date().toLocaleTimeString('pt-BR');
+            setTemplateLiveStatuses(prev => {
+                const next = { ...prev };
+                apiTemplates.forEach((t: any) => {
+                    const info = {
+                        status: (t.status || 'PENDING').toUpperCase(),
+                        lastChecked: nowStr,
+                        createdAt: t.createdAt,
+                        lastUpdatedAt: t.lastUpdatedAt,
+                        rejectionReason: t.rejectionReason,
+                        category: t.category,
+                        language: t.language
+                    };
+                    if (t.name) {
+                        next[t.name] = info;
+                        next[t.name.toLowerCase().trim()] = info;
+                    }
+                });
+
+                submissions.forEach(sub => {
+                    const tplList = getSubmissionTemplatesList(sub);
+                    tplList.forEach(tpl => {
+                        const k1 = tpl.name;
+                        const k2 = tpl.name.toLowerCase().trim();
+                        if (!next[k1] && !next[k2]) {
+                            next[k1] = {
+                                status: (sub.status === 'GERADO' || sub.origin === 'TEMPLATE_CREATOR') ? 'PENDENTE_META' : (sub.status || 'PENDING'),
+                                lastChecked: nowStr,
+                                createdAt: sub.timestamp || sub.created_at,
+                                lastUpdatedAt: sub.timestamp || sub.created_at
+                            };
+                            next[k2] = next[k1];
+                        }
+                    });
+                });
+
+                return next;
+            });
+        } catch (e) {
+            console.warn('[syncAllSubmissionsTemplates] Erro:', e);
+        }
+    }, [submissions]);
+
+    // Polling global a cada 15s para atualizar o status dos templates de todos os cards
+    useEffect(() => {
+        syncAllSubmissionsTemplates();
+        const interval = setInterval(syncAllSubmissionsTemplates, 15000);
+        return () => clearInterval(interval);
+    }, [syncAllSubmissionsTemplates]);
 
     // -------------------------------------------------------------
     // SMART FILTERING ENGINE
@@ -2440,6 +2635,237 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                             </div>
                                         )}
 
+                                        {/* Monitoramento dos Templates em Tempo Real no Card */}
+                                        {(() => {
+                                            const tplList = getSubmissionTemplatesList(sub);
+                                            let approvedTotal = 0;
+                                            let pendingTotal = 0;
+                                            let bannedTotal = 0;
+
+                                            const listWithStatuses = tplList.map(t => {
+                                                const live = templateLiveStatuses[t.name] || templateLiveStatuses[t.name.toLowerCase().trim()];
+                                                const rawStatus = (live?.status || (sub.status === 'GERADO' || sub.origin === 'TEMPLATE_CREATOR' ? 'PENDING' : sub.status) || 'PENDING').toUpperCase();
+                                                const cfg = getTemplateStatusConfig(rawStatus);
+                                                if (cfg.isApproved) approvedTotal++;
+                                                else if (cfg.isBanned) bannedTotal++;
+                                                else pendingTotal++;
+
+                                                const bestDate = live?.lastUpdatedAt || live?.createdAt || t.createdAt || sub.timestamp || sub.created_at;
+                                                const formattedDate = formatTemplateDateTime(bestDate, live?.lastChecked);
+
+                                                return {
+                                                    ...t,
+                                                    cfg,
+                                                    rawStatus,
+                                                    formattedDate,
+                                                    lastChecked: live?.lastChecked,
+                                                    rejectionReason: live?.rejectionReason
+                                                };
+                                            });
+
+                                            return (
+                                                <div style={{
+                                                    background: pendingTotal > 0 ? '#FFFDF5' : (bannedTotal > 0 ? '#FFF5F5' : '#F8FAFC'),
+                                                    border: `1px solid ${pendingTotal > 0 ? '#FDE68A' : (bannedTotal > 0 ? '#FECACA' : '#E2E8F0')}`,
+                                                    borderRadius: '7px',
+                                                    padding: '7px 9px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '5px'
+                                                }}>
+                                                    {/* Header com Status Resumido e Contador */}
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        fontSize: '11px',
+                                                        gap: '6px'
+                                                    }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 700, color: '#334155' }}>
+                                                            <FileText size={12} color="#4F46E5" />
+                                                            <span>Templates Meta</span>
+                                                            <span style={{
+                                                                background: '#EEF2FF',
+                                                                color: '#4338CA',
+                                                                fontSize: '9.5px',
+                                                                padding: '1px 5px',
+                                                                borderRadius: '6px',
+                                                                fontWeight: 700
+                                                            }}>
+                                                                {listWithStatuses.length}
+                                                            </span>
+                                                        </div>
+
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            {pendingTotal > 0 && (
+                                                                <span
+                                                                    title="Templates em análise / aguardando aprovação na Meta"
+                                                                    style={{
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '3px',
+                                                                        background: '#FEF3C7',
+                                                                        color: '#92400E',
+                                                                        border: '1px solid #FDE68A',
+                                                                        borderRadius: '4px',
+                                                                        padding: '1px 5px',
+                                                                        fontSize: '10px',
+                                                                        fontWeight: 700
+                                                                    }}
+                                                                >
+                                                                    <span style={{
+                                                                        width: '5px',
+                                                                        height: '5px',
+                                                                        borderRadius: '50%',
+                                                                        background: '#D97706'
+                                                                    }} />
+                                                                    {pendingTotal} pendente{pendingTotal > 1 ? 's' : ''}
+                                                                </span>
+                                                            )}
+
+                                                            {approvedTotal > 0 && (
+                                                                <span
+                                                                    title="Templates aprovados pela Meta"
+                                                                    style={{
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '3px',
+                                                                        background: '#DCFCE7',
+                                                                        color: '#166534',
+                                                                        border: '1px solid #BBF7D0',
+                                                                        borderRadius: '4px',
+                                                                        padding: '1px 5px',
+                                                                        fontSize: '10px',
+                                                                        fontWeight: 700
+                                                                    }}
+                                                                >
+                                                                    <CheckCircle2 size={10} color="#16A34A" />
+                                                                    {approvedTotal} aprovado{approvedTotal > 1 ? 's' : ''}
+                                                                </span>
+                                                            )}
+
+                                                            {bannedTotal > 0 && (
+                                                                <span
+                                                                    title="Templates banidos ou rejeitados pela Meta"
+                                                                    style={{
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '3px',
+                                                                        background: '#FEE2E2',
+                                                                        color: '#991B1B',
+                                                                        border: '1px solid #FECACA',
+                                                                        borderRadius: '4px',
+                                                                        padding: '1px 5px',
+                                                                        fontSize: '10px',
+                                                                        fontWeight: 700
+                                                                    }}
+                                                                >
+                                                                    <AlertTriangle size={10} color="#DC2626" />
+                                                                    {bannedTotal} banido{bannedTotal > 1 ? 's' : ''}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Lista dos templates no Card com Data e Horário */}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        {listWithStatuses.slice(0, 3).map((item, idx) => (
+                                                            <div
+                                                                key={item.id || idx}
+                                                                style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'space-between',
+                                                                    background: item.cfg.bg,
+                                                                    border: `1px solid ${item.cfg.border}`,
+                                                                    borderRadius: '5px',
+                                                                    padding: '3px 7px',
+                                                                    fontSize: '10.5px',
+                                                                    gap: '6px'
+                                                                }}
+                                                            >
+                                                                <div style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '5px',
+                                                                    minWidth: 0,
+                                                                    flex: 1
+                                                                }}>
+                                                                    <span style={{
+                                                                        width: '6px',
+                                                                        height: '6px',
+                                                                        borderRadius: '50%',
+                                                                        background: item.cfg.dot,
+                                                                        flexShrink: 0
+                                                                    }} />
+                                                                    <span
+                                                                        title={item.name}
+                                                                        style={{
+                                                                            fontWeight: 600,
+                                                                            color: '#1E293B',
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis',
+                                                                            whiteSpace: 'nowrap'
+                                                                        }}
+                                                                    >
+                                                                        {item.name}
+                                                                    </span>
+                                                                </div>
+
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                                                    <span style={{
+                                                                        fontWeight: 700,
+                                                                        color: item.cfg.color,
+                                                                        fontSize: '10px'
+                                                                    }}>
+                                                                        {item.cfg.label}
+                                                                    </span>
+                                                                    {item.formattedDate && (
+                                                                        <span style={{
+                                                                            color: '#64748B',
+                                                                            fontSize: '9.5px',
+                                                                            fontWeight: 500,
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '2px'
+                                                                        }}>
+                                                                            <Clock size={9} color="#94A3B8" />
+                                                                            {item.formattedDate}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+
+                                                        {listWithStatuses.length > 3 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedTemplatesSubmission(sub);
+                                                                    fetchAllTemplatesRealtime(sub);
+                                                                }}
+                                                                style={{
+                                                                    background: 'none',
+                                                                    border: 'none',
+                                                                    color: '#4338CA',
+                                                                    fontSize: '10.5px',
+                                                                    fontWeight: 600,
+                                                                    padding: '2px 0',
+                                                                    textAlign: 'left',
+                                                                    cursor: 'pointer',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '3px'
+                                                                }}
+                                                            >
+                                                                + Ver mais {listWithStatuses.length - 3} templates...
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+
                                         {/* Card Actions Bottom */}
                                         <div style={{
                                             borderTop: '1px solid var(--border-subtle)',
@@ -2665,17 +3091,90 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                         )}
                                                     </td>
                                                     <td style={{ padding: '12px 12px' }}>
-                                                        <span style={{
-                                                            background: '#F8FAFC',
-                                                            color: '#334155',
-                                                            border: '1px solid #E2E8F0',
-                                                            padding: '2px 7px',
-                                                            borderRadius: '4px',
-                                                            fontSize: '11px',
-                                                            fontWeight: 600
-                                                        }}>
-                                                            {sub.template_type === 'TEXT' ? 'Texto' : sub.template_type === 'IMAGE' ? 'Imagem' : 'Vídeo'}
-                                                        </span>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                <span style={{
+                                                                    background: '#F8FAFC',
+                                                                    color: '#334155',
+                                                                    border: '1px solid #E2E8F0',
+                                                                    padding: '2px 7px',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600
+                                                                }}>
+                                                                    {sub.template_type === 'TEXT' ? 'Texto' : sub.template_type === 'IMAGE' ? 'Imagem' : 'Vídeo'}
+                                                                </span>
+                                                            </div>
+                                                            {/* Mini status indicator with date/time for List View */}
+                                                            {(() => {
+                                                                const tplList = getSubmissionTemplatesList(sub);
+                                                                let app = 0, pen = 0, ban = 0;
+                                                                let bestFormattedDate = '';
+                                                                tplList.forEach(t => {
+                                                                    const live = templateLiveStatuses[t.name] || templateLiveStatuses[t.name.toLowerCase().trim()];
+                                                                    const raw = (live?.status || (sub.status === 'GERADO' || sub.origin === 'TEMPLATE_CREATOR' ? 'PENDING' : sub.status) || 'PENDING').toUpperCase();
+                                                                    const cfg = getTemplateStatusConfig(raw);
+                                                                    if (cfg.isApproved) app++;
+                                                                    else if (cfg.isBanned) ban++;
+                                                                    else pen++;
+                                                                    if (!bestFormattedDate) {
+                                                                        const bestDate = live?.lastUpdatedAt || live?.createdAt || t.createdAt || sub.timestamp || sub.created_at;
+                                                                        bestFormattedDate = formatTemplateDateTime(bestDate, live?.lastChecked);
+                                                                    }
+                                                                });
+
+                                                                return (
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexWrap: 'wrap' }}>
+                                                                            {pen > 0 && (
+                                                                                <span style={{
+                                                                                    background: '#FEF3C7',
+                                                                                    color: '#92400E',
+                                                                                    border: '1px solid #FDE68A',
+                                                                                    borderRadius: '4px',
+                                                                                    padding: '1px 5px',
+                                                                                    fontSize: '9.5px',
+                                                                                    fontWeight: 700
+                                                                                }}>
+                                                                                    🟡 {pen} pendente{pen > 1 ? 's' : ''}
+                                                                                </span>
+                                                                            )}
+                                                                            {app > 0 && (
+                                                                                <span style={{
+                                                                                    background: '#DCFCE7',
+                                                                                    color: '#166534',
+                                                                                    border: '1px solid #BBF7D0',
+                                                                                    borderRadius: '4px',
+                                                                                    padding: '1px 5px',
+                                                                                    fontSize: '9.5px',
+                                                                                    fontWeight: 700
+                                                                                }}>
+                                                                                    🟢 {app} aprovado{app > 1 ? 's' : ''}
+                                                                                </span>
+                                                                            )}
+                                                                            {ban > 0 && (
+                                                                                <span style={{
+                                                                                    background: '#FEE2E2',
+                                                                                    color: '#991B1B',
+                                                                                    border: '1px solid #FECACA',
+                                                                                    borderRadius: '4px',
+                                                                                    padding: '1px 5px',
+                                                                                    fontSize: '9.5px',
+                                                                                    fontWeight: 700
+                                                                                }}>
+                                                                                    🔴 {ban} banido{ban > 1 ? 's' : ''}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        {bestFormattedDate && (
+                                                                            <span style={{ fontSize: '9px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                                <Clock size={8} color="#94A3B8" /> {bestFormattedDate}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                     </td>
                                                     <td style={{ padding: '12px 12px' }}>
                                                         <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-main)' }}>
@@ -6084,6 +6583,29 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                             <XCircle size={12} color="#B91C1C" /> Rejeitado
                                                         </span>
                                                     )}
+
+                                                    {/* Data e Horário no Popup */}
+                                                    {(() => {
+                                                        const bestDate = live?.lastUpdatedAt || live?.createdAt || (tpl as any).createdAt || sub.timestamp || sub.created_at;
+                                                        const formatted = formatTemplateDateTime(bestDate, live?.lastChecked);
+                                                        if (!formatted) return null;
+                                                        return (
+                                                            <span style={{
+                                                                fontSize: '11px',
+                                                                color: '#64748B',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px',
+                                                                background: '#F8FAFC',
+                                                                border: '1px solid #E2E8F0',
+                                                                padding: '2px 7px',
+                                                                borderRadius: '4px'
+                                                            }}>
+                                                                <Clock size={11} color="#94A3B8" />
+                                                                {formatted}
+                                                            </span>
+                                                        );
+                                                    })()}
 
                                                     {/* Individual Refresh Button */}
                                                     <button
