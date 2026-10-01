@@ -103,6 +103,8 @@ export const clientSubmissionStorage = {
                     body: JSON.stringify({
                         profile_photo: payload.profile_photo || '',
                         profile_name: payload.profile_name || 'Atendimento Geral',
+                        campaign_name: payload.campaign_name || payload.profile_name || 'Nova Campanha',
+                        client_name: payload.client_name || payload.campaign_name || payload.profile_name || 'Cliente',
                         ddd: payload.ddd || '11',
                         template_type: payload.template_type || 'TEXT',
                         media_url: payload.media_url || '',
@@ -113,14 +115,26 @@ export const clientSubmissionStorage = {
                         status: payload.status || 'PENDENTE',
                         notes: payload.notes || '',
                         dispatch_date: payload.dispatch_date || null,
+                        sender_phone: payload.sender_phone || payload.sender_number || '',
+                        sender_number: payload.sender_number || payload.sender_phone || '',
                         ads: payload.ads || [],
-                        origin: 'CLIENT_FORM'
+                        origin: payload.origin || 'CLIENT_FORM',
+                        contacts: payload.contacts || [],
+                        headers: payload.headers || [],
+                        fileName: payload.fileName || '',
+                        validCount: payload.validCount || 0,
+                        totalRows: payload.totalRows || 0
                     })
                 });
                 if (res.ok) {
                     const data = await res.json();
                     created = {
                         ...data,
+                        campaign_name: data.campaign_name || payload.campaign_name || payload.profile_name,
+                        client_name: data.client_name || payload.client_name || payload.profile_name,
+                        sender_phone: data.sender_phone || payload.sender_phone || payload.sender_number,
+                        sender_number: data.sender_number || payload.sender_number || payload.sender_phone,
+                        origin: data.origin || payload.origin || 'CLIENT_FORM',
                         ads: typeof data.ads === 'string' ? JSON.parse(data.ads) : (data.ads || payload.ads || []),
                         contacts: payload.contacts || [],
                         headers: payload.headers || []
@@ -149,6 +163,9 @@ export const clientSubmissionStorage = {
                 timestamp: new Date().toISOString(),
                 dispatch_date: payload.dispatch_date || '',
                 notes: payload.notes || '',
+                sender_phone: payload.sender_phone || payload.sender_number || '',
+                sender_number: payload.sender_number || payload.sender_phone || '',
+                origin: payload.origin || 'CLIENT_FORM',
                 ads: payload.ads || [{
                     id: '1',
                     ad_name: payload.campaign_name || payload.profile_name || 'Anúncio 1',

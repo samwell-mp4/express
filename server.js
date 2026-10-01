@@ -113,12 +113,17 @@ async function initDB() {
         accepted_by TEXT,
         assigned_to TEXT,
         sender_number TEXT,
+        sender_phone TEXT,
+        origin TEXT DEFAULT 'CLIENT_FORM',
         user_id INTEGER,
         notes TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    await client.query(`ALTER TABLE client_submissions ADD COLUMN IF NOT EXISTS origin TEXT DEFAULT 'CLIENT_FORM'`);
+    await client.query(`ALTER TABLE client_submissions ADD COLUMN IF NOT EXISTS sender_phone TEXT`);
 
     // 3. Tabela pro_rotators (Link Rotator PRO)
     await client.query(`
@@ -906,7 +911,11 @@ const server = http.createServer(async (req, res) => {
       const headers = Array.isArray(body.headers) ? body.headers : [];
       const ads = Array.isArray(body.ads) ? body.ads : [];
       const status = body.status || 'PENDENTE';
-      const sender_number = body.sender_number || '';
+      const sender_number = body.sender_number || body.sender_phone || '';
+      const sender_phone = body.sender_phone || body.sender_number || '';
+      const origin = body.origin || 'CLIENT_FORM';
+      const notes = body.notes || '';
+      const client_name = body.client_name || campaign_name;
       const user_id = currentUser?.id || null;
 
       if (!isPostgresConnected) {
@@ -914,6 +923,7 @@ const server = http.createServer(async (req, res) => {
           id: Date.now(),
           campaign_name,
           profile_name,
+          client_name,
           ddd,
           template_type,
           media_url,
@@ -923,6 +933,10 @@ const server = http.createServer(async (req, res) => {
           headers,
           ads,
           status,
+          sender_number,
+          sender_phone,
+          origin,
+          notes,
           download_count: 0
         });
       }
@@ -931,14 +945,14 @@ const server = http.createServer(async (req, res) => {
         `INSERT INTO client_submissions (
           campaign_name, profile_name, ddd, template_type, media_url, ad_copy,
           button_link, spreadsheet_url, file_name, valid_count, total_rows,
-          contacts, headers, ads, status, sender_number, user_id, download_count, max_downloads
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 0, 3)
+          contacts, headers, ads, status, sender_number, sender_phone, origin, notes, user_id, download_count, max_downloads
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 0, 3)
         RETURNING *`,
         [
           campaign_name, profile_name, ddd, template_type, media_url, ad_copy,
           button_link, spreadsheet_url, file_name, valid_count, total_rows,
           JSON.stringify(contacts), JSON.stringify(headers), JSON.stringify(ads),
-          status, sender_number, user_id
+          status, sender_number, sender_phone, origin, notes, user_id
         ]
       );
 

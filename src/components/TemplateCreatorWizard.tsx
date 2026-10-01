@@ -29,9 +29,10 @@ import {
     FileSpreadsheet,
     UploadCloud
 } from 'lucide-react';
-import { InfobipAccountTemplate, RotatorTarget } from '../types';
+import { InfobipAccountTemplate, RotatorTarget, ClientSubmission, SubmissionAd } from '../types';
 import { wabaStorage } from '../services/wabaStorage';
 import { templateService } from '../services/templateService';
+import { clientSubmissionStorage } from '../services/clientSubmissionStorage';
 import { api, LUIS_BASE } from '../services/api';
 import { SpreadsheetCleaner } from './SpreadsheetCleaner';
 import { MediaHostingManager } from './MediaHostingManager';
@@ -495,12 +496,65 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         const updatedList = [newTemplateObj, ...currentCache.templates.filter(t => t.name !== newTemplateObj.name)];
         templateService.saveCached(updatedList);
 
+        // Criar novo card no Upload de Clientes (como na Plug & Sales)
+        const ddd = cleanSender.length >= 4 && cleanSender.startsWith('55')
+            ? cleanSender.slice(2, 4)
+            : (cleanSender.slice(0, 2) || '11');
+
+        const effectiveType: 'TEXT' | 'IMAGE' | 'VIDEO' = headerType === 'NONE' ? 'TEXT' : headerType;
+        const effectiveMedia = headerType !== 'NONE' ? headerMediaUrl : '';
+        const effectiveBtnUrl = effectiveButtons.find(b => b.type === 'URL')?.url || '';
+
+        const newAd: SubmissionAd = {
+            id: `ad_${Date.now()}`,
+            ad_name: payload.name,
+            template_type: effectiveType,
+            message_mode: 'manual',
+            media_url: effectiveMedia,
+            ad_copy: bodyText,
+            variables: bodyExamplesArray.length > 0 ? [...bodyExamplesArray] : ['', '', '', '', ''],
+            button_link: effectiveBtnUrl,
+            sender_phone: cleanSender,
+            sender_number: cleanSender,
+            origin: 'TEMPLATE_CREATOR',
+            delivered_leads: 0
+        };
+
+        const submissionData: Partial<ClientSubmission> = {
+            campaign_name: payload.name,
+            profile_name: payload.name,
+            client_name: selectedSender ? `Remetente ${selectedSender}` : `Template ${payload.name}`,
+            ddd: ddd,
+            template_type: effectiveType,
+            media_url: effectiveMedia,
+            ad_copy: bodyText,
+            button_link: effectiveBtnUrl,
+            status: 'GERADO',
+            origin: 'TEMPLATE_CREATOR',
+            sender_phone: cleanSender,
+            sender_number: cleanSender,
+            timestamp: new Date().toISOString(),
+            ads: [newAd],
+            contacts: [],
+            headers: ['Telefone', 'Nome'],
+            validCount: 0,
+            totalRows: 0,
+            notes: `Template criado via Criador de Templates (${payload.name}). Remetente: ${cleanSender}`
+        };
+
+        try {
+            await clientSubmissionStorage.createSubmission(submissionData);
+            window.dispatchEvent(new CustomEvent('client_submissions_updated'));
+        } catch (subErr) {
+            console.warn('[handleSubmitSingleTemplate] Erro ao criar card no Upload de Clientes:', subErr);
+        }
+
         setIsSubmitting(false);
         setLastCreatedName(payload.name);
         setSubmitSuccess(true);
 
         if (!res.success) {
-            alert(`⚠️ Resposta da API Infobip: ${res.error}\nO template foi registrado localmente e pode ser utilizado no disparador.`);
+            alert(`⚠️ Resposta da API Infobip: ${res.error}\nO template foi registrado localmente e o card foi gerado no Upload de Clientes.`);
         }
     };
 
@@ -870,7 +924,75 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                 templateService.saveCached([...createdTemplatesToCache, ...currentCache.templates]);
             }
 
-            alert(`✅ Concluído! ${successCount} de ${totalRows} templates criados e registrados.`);
+            // Criar novos cards no Upload de Clientes para cada campanha gerada (como na Plug & Sales)
+            for (const camp of campaigns) {
+                const campaignAds: SubmissionAd[] = [];
+                for (const row of camp.rows) {
+                    const fullTemplateName = `${camp.prefix}${row.suffix}`;
+                    const rowHeaderType: 'TEXT' | 'IMAGE' | 'VIDEO' = row.headerType === 'NONE' ? 'TEXT' : row.headerType;
+                    const rowMedia = row.headerType !== 'NONE' ? row.mediaUrl : '';
+                    const rowBtnUrl = (row.hasButtons && row.buttonUrls && row.buttonUrls[0]) ? row.buttonUrls[0] : '';
+                    const rowSender = (row.sender || globalSender || selectedSender || '').trim().replace(/\D/g, '');
+
+                    campaignAds.push({
+                        id: `ad_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                        ad_name: fullTemplateName,
+                        template_type: rowHeaderType,
+                        message_mode: 'manual',
+                        media_url: rowMedia,
+                        ad_copy: bodyText,
+                        variables: bodyExamplesArray.length > 0 ? [...bodyExamplesArray] : ['', '', '', '', ''],
+                        button_link: rowBtnUrl,
+                        sender_phone: rowSender,
+                        sender_number: rowSender,
+                        origin: 'TEMPLATE_CREATOR',
+                        delivered_leads: 0
+                    });
+                }
+
+                if (campaignAds.length > 0) {
+                    const campaignName = camp.prefix.endsWith('_') ? camp.prefix.slice(0, -1) : camp.prefix;
+                    const firstSender = (camp.rows[0]?.sender || globalSender || selectedSender || '').trim().replace(/\D/g, '');
+                    const ddd = firstSender.length >= 4 && firstSender.startsWith('55')
+                        ? firstSender.slice(2, 4)
+                        : (firstSender.slice(0, 2) || '11');
+
+                    const firstRowHeaderType = camp.rows[0]?.headerType === 'NONE' ? 'TEXT' : (camp.rows[0]?.headerType || 'TEXT');
+                    const firstRowMedia = camp.rows[0]?.headerType !== 'NONE' ? (camp.rows[0]?.mediaUrl || '') : '';
+                    const firstRowBtnUrl = (camp.rows[0]?.hasButtons && camp.rows[0]?.buttonUrls && camp.rows[0]?.buttonUrls[0]) || '';
+
+                    const submissionData: Partial<ClientSubmission> = {
+                        campaign_name: campaignName,
+                        profile_name: campaignName,
+                        client_name: firstSender ? `Remetente ${firstSender}` : `Campanha ${campaignName}`,
+                        ddd: ddd,
+                        template_type: firstRowHeaderType,
+                        media_url: firstRowMedia,
+                        ad_copy: bodyText,
+                        button_link: firstRowBtnUrl,
+                        status: 'GERADO',
+                        origin: 'TEMPLATE_CREATOR',
+                        sender_phone: firstSender,
+                        sender_number: firstSender,
+                        timestamp: new Date().toISOString(),
+                        ads: campaignAds,
+                        contacts: [],
+                        headers: ['Telefone', 'Nome'],
+                        validCount: 0,
+                        totalRows: 0,
+                        notes: `Campanha em lote gerada via Criador de Templates (${campaignAds.length} variações). Remetente: ${firstSender}`
+                    };
+
+                    try {
+                        await clientSubmissionStorage.createSubmission(submissionData);
+                    } catch (subErr) {
+                        console.warn('[handleStartBulkGeneration] Erro ao criar card no Upload de Clientes:', subErr);
+                    }
+                }
+            }
+            window.dispatchEvent(new CustomEvent('client_submissions_updated'));
+
+            alert(`✅ Concluído! ${successCount} de ${totalRows} templates criados e registrados.\n\nOs cards das campanhas foram adicionados no Upload de Clientes!`);
         } catch (err: any) {
             console.error('Erro na criação em lote:', err);
             alert(`Erro na criação em lote: ${err.message}`);
@@ -1409,9 +1531,9 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                     <CheckCircle2 color="#059669" size={18} />
                                                     <div>
-                                                        <strong style={{ color: '#166534', fontSize: '13px', fontWeight: 600 }}>Template Criado e Registrado!</strong>
+                                                        <strong style={{ color: '#166534', fontSize: '13px', fontWeight: 600 }}>Template Criado e Card Adicionado no Upload de Clientes!</strong>
                                                         <p style={{ margin: 0, fontSize: '12px', color: '#15803d' }}>
-                                                            {lastCreatedName} está pronto para envio no WhatsApp Oficial.
+                                                            {lastCreatedName} foi publicado e o novo card já está disponível em <strong>Upload de Clientes</strong>.
                                                         </p>
                                                     </div>
                                                 </div>

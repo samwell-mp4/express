@@ -214,6 +214,11 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
 
     useEffect(() => {
         loadSubmissions();
+        const handleSubmissionsUpdated = () => {
+            loadSubmissions();
+        };
+        window.addEventListener('client_submissions_updated', handleSubmissionsUpdated);
+        return () => window.removeEventListener('client_submissions_updated', handleSubmissionsUpdated);
     }, []);
 
     const showToast = (msg: string) => {
@@ -2021,6 +2026,19 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                                 borderRadius: '3px'
                                                             }} title={`Remetente: ${sub.sender_phone}`}>
                                                                 📱 {sub.sender_phone}
+                                                            </span>
+                                                        )}
+                                                        {sub.origin === 'TEMPLATE_CREATOR' && (
+                                                            <span style={{
+                                                                fontSize: '10px',
+                                                                fontWeight: 600,
+                                                                color: '#4F46E5',
+                                                                background: '#EEF2FF',
+                                                                border: '1px solid #C7D2FE',
+                                                                padding: '1px 5px',
+                                                                borderRadius: '3px'
+                                                            }}>
+                                                                Criador de Templates
                                                             </span>
                                                         )}
                                                     </div>

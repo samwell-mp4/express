@@ -173,12 +173,16 @@ export interface SubmissionAd {
     cta_targets?: RotatorTarget[];
     rotator_slug?: string;
     sender_phone?: string;
+    sender_number?: string;
+    origin?: string;
 }
 
 export interface ClientSubmission {
     id: number | string;
     campaign_name?: string;
     sender_phone?: string;
+    sender_number?: string;
+    origin?: string;
     profile_photo?: string;
     profile_name: string;
     ddd: string;
