@@ -269,8 +269,18 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
             if (event.data?.type === 'AUTOMATION_RESPONSE_FROM_EXTENSION') {
                 if (event.data.success) {
                     showToast('✓ Automação iniciada com sucesso na Infobip!');
+                    setAutomationModalData(prev => prev ? ({
+                        ...prev,
+                        isExecuting: false,
+                        statusText: '✅ Abas abertas! Automação preenchendo os dados na Infobip.'
+                    }) : null);
                 } else {
                     showToast(`⚠️ Extensão: ${event.data.error || 'Verifique se as abas foram abertas'}`);
+                    setAutomationModalData(prev => prev ? ({
+                        ...prev,
+                        isExecuting: false,
+                        statusText: `⚠️ Aviso: ${event.data.error || 'Verifique se você está logado na Infobip'}`
+                    }) : null);
                 }
             }
         };
@@ -1801,6 +1811,10 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
 
         setAutomationModalData(prev => prev ? ({ ...prev, isExecuting: true, statusText: 'Disparando comando para a extensão...' }) : null);
 
+        if (!isExtensionInstalled) {
+            showToast('ℹ️ Dica: Se a extensão foi recarregada agora, aperte F5 para sincronizar com esta aba.');
+        }
+
         // Dispara mensagem para o content script da extensão no navegador
         window.postMessage({
             type: 'START_AUTOMATION_FROM_PLUGSALES',
@@ -1814,8 +1828,15 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
         showToast(`🚀 Disparando automação para ${tabCount} aba(s) na Infobip...`);
 
         setTimeout(() => {
-            setAutomationModalData(prev => prev ? ({ ...prev, isExecuting: false, statusText: 'Comando enviado! Verifique as abas da Infobip abertas no navegador.' }) : null);
-        }, 1500);
+            setAutomationModalData(prev => {
+                if (!prev) return null;
+                // Só altera se ainda estiver executando sem retorno da extensão
+                if (prev.isExecuting) {
+                    return { ...prev, isExecuting: false, statusText: 'Comando enviado! Verifique as abas da Infobip abertas no navegador.' };
+                }
+                return prev;
+            });
+        }, 2000);
     };
 
     // -------------------------------------------------------------
@@ -7010,15 +7031,20 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: isExtensionInstalled ? '#166534' : '#92400E' }}>
                                 <span style={{
-                                    width: '7px',
-                                    height: '7px',
+                                    width: '8px',
+                                    height: '8px',
                                     borderRadius: '50%',
-                                    background: isExtensionInstalled ? '#16A34A' : '#D97706'
+                                    background: isExtensionInstalled ? '#16A34A' : '#D97706',
+                                    boxShadow: isExtensionInstalled ? '0 0 6px #16A34A' : 'none'
                                 }} />
-                                <strong>{isExtensionInstalled ? 'Extensão Chrome Detectada e Pronta' : 'Extensão Pronta para Disparo'}</strong>
+                                <strong>
+                                    {isExtensionInstalled 
+                                        ? 'Extensão Chrome Conectada e Pronta' 
+                                        : 'Extensão em espera (Se recarregou agora, aperte F5 nesta página)'}
+                                </strong>
                             </div>
                             <span style={{ color: '#64748B', fontSize: '10px' }}>
-                                v2.0 PlugSales Pro
+                                v2.1 PlugSales Pro
                             </span>
                         </div>
 
