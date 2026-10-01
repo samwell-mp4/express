@@ -470,6 +470,63 @@ function googleSheetsProxyPlugin(): Plugin {
           res.end(JSON.stringify({ error: error.message || 'Falha ao buscar templates Meta' }));
         }
       });
+
+      // Dev middleware for /api/client-submissions (evita erro 502 no Vite dev quando backend 3000 não está ativo)
+      const devSubmissionsList: any[] = [];
+
+      server.middlewares.use((req, res, next) => {
+        const rawUrl = req.url || '';
+        if (rawUrl.startsWith('/api/client-submissions')) {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204;
+            res.end();
+            return;
+          }
+
+          if (req.method === 'GET') {
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify(devSubmissionsList));
+            return;
+          }
+
+          if (req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', () => {
+              try {
+                const parsed = JSON.parse(body || '{}');
+                const newCard = {
+                  id: Date.now(),
+                  ...parsed,
+                  status: parsed.status || 'GERADO',
+                  origin: parsed.origin || 'TEMPLATE_CREATOR',
+                  created_at: new Date().toISOString()
+                };
+                devSubmissionsList.unshift(newCard);
+                res.statusCode = 201;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify(newCard));
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: e.message }));
+              }
+            });
+            return;
+          }
+
+          if (req.method === 'PUT' || req.method === 'DELETE') {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({ success: true }));
+            return;
+          }
+        }
+        next();
+      });
     }
   };
 }

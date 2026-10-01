@@ -924,17 +924,19 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                 templateService.saveCached([...createdTemplatesToCache, ...currentCache.templates]);
             }
 
-            // Criar novos cards no Upload de Clientes para cada campanha gerada (como na Plug & Sales)
+            // Criar novos cards no Upload de Clientes para cada template gerado em massa
             for (const camp of campaigns) {
-                const campaignAds: SubmissionAd[] = [];
                 for (const row of camp.rows) {
                     const fullTemplateName = `${camp.prefix}${row.suffix}`;
                     const rowHeaderType: 'TEXT' | 'IMAGE' | 'VIDEO' = row.headerType === 'NONE' ? 'TEXT' : row.headerType;
                     const rowMedia = row.headerType !== 'NONE' ? row.mediaUrl : '';
                     const rowBtnUrl = (row.hasButtons && row.buttonUrls && row.buttonUrls[0]) ? row.buttonUrls[0] : '';
                     const rowSender = (row.sender || globalSender || selectedSender || '').trim().replace(/\D/g, '');
+                    const ddd = rowSender.length >= 4 && rowSender.startsWith('55')
+                        ? rowSender.slice(2, 4)
+                        : (rowSender.slice(0, 2) || '11');
 
-                    campaignAds.push({
+                    const adItem: SubmissionAd = {
                         id: `ad_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
                         ad_name: fullTemplateName,
                         template_type: rowHeaderType,
@@ -947,40 +949,28 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                         sender_number: rowSender,
                         origin: 'TEMPLATE_CREATOR',
                         delivered_leads: 0
-                    });
-                }
-
-                if (campaignAds.length > 0) {
-                    const campaignName = camp.prefix.endsWith('_') ? camp.prefix.slice(0, -1) : camp.prefix;
-                    const firstSender = (camp.rows[0]?.sender || globalSender || selectedSender || '').trim().replace(/\D/g, '');
-                    const ddd = firstSender.length >= 4 && firstSender.startsWith('55')
-                        ? firstSender.slice(2, 4)
-                        : (firstSender.slice(0, 2) || '11');
-
-                    const firstRowHeaderType = camp.rows[0]?.headerType === 'NONE' ? 'TEXT' : (camp.rows[0]?.headerType || 'TEXT');
-                    const firstRowMedia = camp.rows[0]?.headerType !== 'NONE' ? (camp.rows[0]?.mediaUrl || '') : '';
-                    const firstRowBtnUrl = (camp.rows[0]?.hasButtons && camp.rows[0]?.buttonUrls && camp.rows[0]?.buttonUrls[0]) || '';
+                    };
 
                     const submissionData: Partial<ClientSubmission> = {
-                        campaign_name: campaignName,
-                        profile_name: campaignName,
-                        client_name: firstSender ? `Remetente ${firstSender}` : `Campanha ${campaignName}`,
+                        campaign_name: fullTemplateName,
+                        profile_name: fullTemplateName,
+                        client_name: rowSender ? `Remetente ${rowSender}` : `Template ${fullTemplateName}`,
                         ddd: ddd,
-                        template_type: firstRowHeaderType,
-                        media_url: firstRowMedia,
+                        template_type: rowHeaderType,
+                        media_url: rowMedia,
                         ad_copy: bodyText,
-                        button_link: firstRowBtnUrl,
+                        button_link: rowBtnUrl,
                         status: 'GERADO',
                         origin: 'TEMPLATE_CREATOR',
-                        sender_phone: firstSender,
-                        sender_number: firstSender,
+                        sender_phone: rowSender,
+                        sender_number: rowSender,
                         timestamp: new Date().toISOString(),
-                        ads: campaignAds,
+                        ads: [adItem],
                         contacts: [],
                         headers: ['Telefone', 'Nome'],
                         validCount: 0,
                         totalRows: 0,
-                        notes: `Campanha em lote gerada via Criador de Templates (${campaignAds.length} variações). Remetente: ${firstSender}`
+                        notes: `Template gerado em lote (${fullTemplateName}). Remetente: ${rowSender}`
                     };
 
                     try {
@@ -992,7 +982,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
             }
             window.dispatchEvent(new CustomEvent('client_submissions_updated'));
 
-            alert(`✅ Concluído! ${successCount} de ${totalRows} templates criados e registrados.\n\nOs cards das campanhas foram adicionados no Upload de Clientes!`);
+            alert(`✅ Concluído! ${successCount} de ${totalRows} templates criados e registrados.\n\nOs cards de cada template foram adicionados no Upload de Clientes!`);
         } catch (err: any) {
             console.error('Erro na criação em lote:', err);
             alert(`Erro na criação em lote: ${err.message}`);

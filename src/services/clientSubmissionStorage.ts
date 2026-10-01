@@ -6,29 +6,7 @@ const LEGACY_STORAGE_KEY = 'express_dispatch_client_batches_v1';
 export const clientSubmissionStorage = {
     // Retrieve all submissions with local fallback and legacy batch migration
     async getSubmissions(): Promise<ClientSubmission[]> {
-        const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-        let remoteList: ClientSubmission[] = [];
-
-        if (token) {
-            try {
-                const res = await fetch('/api/client-submissions', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data)) {
-                        remoteList = data.map(item => ({
-                            ...item,
-                            ads: typeof item.ads === 'string' ? JSON.parse(item.ads) : (item.ads || [])
-                        }));
-                    }
-                }
-            } catch (err) {
-                console.warn('[clientSubmissionStorage] Remote fetch failed, using local storage:', err);
-            }
-        }
-
-        // Local storage data
+        // 1. Read local storage first (instant, guaranteed)
         let localList: ClientSubmission[] = [];
         try {
             const raw = localStorage.getItem(STORAGE_SUBMISSIONS_KEY);
@@ -74,14 +52,44 @@ export const clientSubmissionStorage = {
             console.error('Error reading local submissions:', e);
         }
 
-        if (remoteList.length > 0) {
-            // Merge remote with local contacts if available
-            const merged = remoteList.map(rem => {
-                const loc = localList.find(l => String(l.id) === String(rem.id));
-                return loc ? { ...rem, contacts: loc.contacts, headers: loc.headers } : rem;
-            });
-            localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(merged));
-            return merged;
+        // 2. Try fetching from remote server with a quick timeout (1.5s)
+        const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+        if (token) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 1500);
+                const res = await fetch('/api/client-submissions', {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data) && data.length > 0) {
+                        const remoteList: ClientSubmission[] = data.map(item => ({
+                            ...item,
+                            ads: typeof item.ads === 'string' ? JSON.parse(item.ads) : (item.ads || [])
+                        }));
+
+                        // SAFE MERGE: Keep ALL local items that are not in remoteList
+                        const remoteIds = new Set(remoteList.map(r => String(r.id)));
+                        const localOnly = localList.filter(l => !remoteIds.has(String(l.id)));
+
+                        const merged = [
+                            ...localOnly,
+                            ...remoteList.map(rem => {
+                                const loc = localList.find(l => String(l.id) === String(rem.id));
+                                return loc ? { ...rem, contacts: loc.contacts, headers: loc.headers } : rem;
+                            })
+                        ];
+                        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(merged));
+                        return merged;
+                    }
+                }
+            } catch (err) {
+                // If remote fetch fails or times out, safely return localList
+            }
         }
 
         return localList;
@@ -89,109 +97,119 @@ export const clientSubmissionStorage = {
 
     // Save a new submission
     async createSubmission(payload: Partial<ClientSubmission>): Promise<ClientSubmission> {
-        const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-        let created: ClientSubmission | null = null;
+        const id = payload.id || `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const localCreated: ClientSubmission = {
+            id,
+            campaign_name: payload.campaign_name || payload.profile_name || 'Campanha Sem Título',
+            profile_photo: payload.profile_photo || '',
+            profile_name: payload.profile_name || payload.campaign_name || 'Atendimento Geral',
+            client_name: payload.client_name || payload.campaign_name || payload.profile_name || 'Cliente',
+            ddd: payload.ddd || '11',
+            template_type: payload.template_type || 'TEXT',
+            media_url: payload.media_url || '',
+            ad_copy: payload.ad_copy || '',
+            button_link: payload.button_link || '',
+            spreadsheet_url: payload.spreadsheet_url || '',
+            status: payload.status || (payload.dispatch_date ? 'AGENDADO' : 'PENDENTE'),
+            timestamp: payload.timestamp || new Date().toISOString(),
+            dispatch_date: payload.dispatch_date || '',
+            notes: payload.notes || '',
+            sender_phone: payload.sender_phone || payload.sender_number || '',
+            sender_number: payload.sender_number || payload.sender_phone || '',
+            origin: payload.origin || 'CLIENT_FORM',
+            ads: payload.ads || [{
+                id: '1',
+                ad_name: payload.campaign_name || payload.profile_name || 'Anúncio 1',
+                template_type: payload.template_type || 'TEXT',
+                message_mode: 'manual',
+                media_url: payload.media_url,
+                ad_copy: payload.ad_copy || '',
+                variables: ['', '', '', '', ''],
+                button_link: payload.button_link
+            }],
+            contacts: payload.contacts || [],
+            headers: payload.headers || [],
+            fileName: payload.fileName || 'contatos.xlsx',
+            validCount: payload.validCount || (payload.contacts ? payload.contacts.length : 0),
+            totalRows: payload.totalRows || (payload.contacts ? payload.contacts.length : 0)
+        };
 
+        // 1. Persist directly to local storage IMMEDIATELY (synchronous, 100% reliable)
+        let localList: ClientSubmission[] = [];
+        try {
+            const raw = localStorage.getItem(STORAGE_SUBMISSIONS_KEY);
+            if (raw) localList = JSON.parse(raw);
+        } catch (e) {
+            console.error('Error reading local submissions:', e);
+        }
+
+        const updated = [localCreated, ...localList.filter(s => String(s.id) !== String(localCreated.id))];
+        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(updated));
+
+        // 2. Dispatch event so UI updates instantly
+        window.dispatchEvent(new CustomEvent('client_submissions_updated'));
+
+        // 3. Sync to backend asynchronously if token is present
+        const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
         if (token) {
             try {
-                const res = await fetch('/api/client-submissions', {
+                fetch('/api/client-submissions', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
-                        profile_photo: payload.profile_photo || '',
-                        profile_name: payload.profile_name || 'Atendimento Geral',
-                        campaign_name: payload.campaign_name || payload.profile_name || 'Nova Campanha',
-                        client_name: payload.client_name || payload.campaign_name || payload.profile_name || 'Cliente',
-                        ddd: payload.ddd || '11',
-                        template_type: payload.template_type || 'TEXT',
-                        media_url: payload.media_url || '',
-                        ad_copy: payload.ad_copy || '',
-                        button_link: payload.button_link || '',
-                        original_button_link: payload.button_link || '',
-                        spreadsheet_url: payload.spreadsheet_url || '',
-                        status: payload.status || 'PENDENTE',
-                        notes: payload.notes || '',
-                        dispatch_date: payload.dispatch_date || null,
-                        sender_phone: payload.sender_phone || payload.sender_number || '',
-                        sender_number: payload.sender_number || payload.sender_phone || '',
-                        ads: payload.ads || [],
-                        origin: payload.origin || 'CLIENT_FORM',
-                        contacts: payload.contacts || [],
-                        headers: payload.headers || [],
-                        fileName: payload.fileName || '',
-                        validCount: payload.validCount || 0,
-                        totalRows: payload.totalRows || 0
+                        profile_photo: localCreated.profile_photo,
+                        profile_name: localCreated.profile_name,
+                        campaign_name: localCreated.campaign_name,
+                        client_name: localCreated.client_name,
+                        ddd: localCreated.ddd,
+                        template_type: localCreated.template_type,
+                        media_url: localCreated.media_url,
+                        ad_copy: localCreated.ad_copy,
+                        button_link: localCreated.button_link,
+                        original_button_link: localCreated.button_link,
+                        spreadsheet_url: localCreated.spreadsheet_url,
+                        status: localCreated.status,
+                        notes: localCreated.notes,
+                        dispatch_date: localCreated.dispatch_date || null,
+                        sender_phone: localCreated.sender_phone,
+                        sender_number: localCreated.sender_number,
+                        ads: localCreated.ads,
+                        origin: localCreated.origin,
+                        contacts: localCreated.contacts,
+                        headers: localCreated.headers,
+                        fileName: localCreated.fileName,
+                        validCount: localCreated.validCount,
+                        totalRows: localCreated.totalRows
                     })
+                }).then(async res => {
+                    if (res.ok) {
+                        const remoteData = await res.json();
+                        if (remoteData && remoteData.id) {
+                            try {
+                                const rawNow = localStorage.getItem(STORAGE_SUBMISSIONS_KEY);
+                                if (rawNow) {
+                                    const list = JSON.parse(rawNow);
+                                    const idx = list.findIndex((s: any) => String(s.id) === String(localCreated.id));
+                                    if (idx !== -1) {
+                                        list[idx] = { ...list[idx], id: remoteData.id };
+                                        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(list));
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }).catch(err => {
+                    console.warn('[clientSubmissionStorage] Remote sync failed (saved locally):', err);
                 });
-                if (res.ok) {
-                    const data = await res.json();
-                    created = {
-                        ...data,
-                        campaign_name: data.campaign_name || payload.campaign_name || payload.profile_name,
-                        client_name: data.client_name || payload.client_name || payload.profile_name,
-                        sender_phone: data.sender_phone || payload.sender_phone || payload.sender_number,
-                        sender_number: data.sender_number || payload.sender_number || payload.sender_phone,
-                        origin: data.origin || payload.origin || 'CLIENT_FORM',
-                        ads: typeof data.ads === 'string' ? JSON.parse(data.ads) : (data.ads || payload.ads || []),
-                        contacts: payload.contacts || [],
-                        headers: payload.headers || []
-                    };
-                }
             } catch (err) {
-                console.warn('[clientSubmissionStorage] Remote creation failed:', err);
+                console.warn('[clientSubmissionStorage] Remote call failed:', err);
             }
         }
 
-        if (!created) {
-            // Local fallback creation
-            created = {
-                id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-                campaign_name: payload.campaign_name || payload.profile_name || 'Campanha Sem Título',
-                profile_photo: payload.profile_photo || '',
-                profile_name: payload.profile_name || 'Atendimento Geral',
-                client_name: payload.client_name || payload.campaign_name || payload.profile_name || 'Cliente',
-                ddd: payload.ddd || '11',
-                template_type: payload.template_type || 'TEXT',
-                media_url: payload.media_url || '',
-                ad_copy: payload.ad_copy || '',
-                button_link: payload.button_link || '',
-                spreadsheet_url: payload.spreadsheet_url || '',
-                status: payload.status || (payload.dispatch_date ? 'AGENDADO' : 'PENDENTE'),
-                timestamp: new Date().toISOString(),
-                dispatch_date: payload.dispatch_date || '',
-                notes: payload.notes || '',
-                sender_phone: payload.sender_phone || payload.sender_number || '',
-                sender_number: payload.sender_number || payload.sender_phone || '',
-                origin: payload.origin || 'CLIENT_FORM',
-                ads: payload.ads || [{
-                    id: '1',
-                    ad_name: payload.campaign_name || payload.profile_name || 'Anúncio 1',
-                    template_type: payload.template_type || 'TEXT',
-                    message_mode: 'manual',
-                    media_url: payload.media_url,
-                    ad_copy: payload.ad_copy || '',
-                    variables: ['', '', '', '', ''],
-                    button_link: payload.button_link
-                }],
-                contacts: payload.contacts || [],
-                headers: payload.headers || [],
-                fileName: payload.fileName || 'contatos.xlsx',
-                validCount: payload.validCount || (payload.contacts ? payload.contacts.length : 0),
-                totalRows: payload.totalRows || (payload.contacts ? payload.contacts.length : 0)
-            };
-        } else if (payload.campaign_name) {
-            created.campaign_name = payload.campaign_name;
-        }
-
-        // Persist locally
-        const existing = await clientSubmissionStorage.getSubmissions();
-        const updated = [created, ...existing.filter(s => String(s.id) !== String(created!.id))];
-        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(updated));
-
-        return created;
+        return localCreated;
     },
 
     // Update an existing submission
