@@ -18,7 +18,8 @@ import {
     Layers,
     Sliders,
     Tag,
-    Hash
+    Hash,
+    CheckSquare
 } from 'lucide-react';
 
 interface CleanedContact {
@@ -31,8 +32,11 @@ interface CleanedContact {
 }
 
 interface BatchResult {
+    batchNumber: number;
     tag: string;
     count: number;
+    startIndex: number;
+    endIndex: number;
 }
 
 interface SpreadsheetCleanerProps {
@@ -41,7 +45,7 @@ interface SpreadsheetCleanerProps {
 }
 
 export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedded, onClose }) => {
-    // Configurações do UploadContacts
+    // Configurações do Módulo
     const [file, setFile] = useState<File | null>(null);
     const [baseTag, setBaseTag] = useState('clientes');
     const [batchSize, setBatchSize] = useState<number>(5000);
@@ -63,27 +67,42 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
 
     // Paginação dos lotes gerados
     const [currentResultsPage, setCurrentResultsPage] = useState(1);
-    const resultsPerPage = 5;
+    const resultsPerPage = 6;
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // 1. Normalização de Telefone exata do UploadContacts
-    const normalizePhone = (input: string) => {
-        if (!input) return '';
-        // 1. Remove non-digits
-        let cleaned = String(input).replace(/\D/g, '');
-
-        // 1b. Remove leading zero if present (common in manually typed DDDs)
-        if (cleaned.startsWith('0')) {
-            cleaned = cleaned.substring(1);
+    // 1. Normalização de Telefone Estrita (Padrão WhatsApp / Meta)
+    const normalizePhone = (input: any): string => {
+        if (!input && input !== 0) return '';
+        
+        let cleaned = '';
+        if (typeof input === 'number') {
+            try {
+                cleaned = BigInt(Math.floor(input)).toString();
+            } catch {
+                cleaned = Math.floor(input).toString();
+            }
+        } else {
+            cleaned = String(input).trim().replace(/\.0+$/, '');
+            if (/^\d+(\.\d+)?[eE]\+\d+$/.test(cleaned)) {
+                try {
+                    cleaned = BigInt(Math.floor(Number(cleaned))).toString();
+                } catch {}
+            }
         }
 
-        // 2. Add 55 if missing (assuming Brazil if 10 or 11 digits)
+        // Remove tudo que não for dígito
+        cleaned = cleaned.replace(/\D/g, '');
+
+        // Remove zeros à esquerda (ex: 011988887777 -> 11988887777)
+        cleaned = cleaned.replace(/^0+/, '');
+
+        // Adiciona DDI 55 se faltar (10 dígitos = DDD + 8 dígitos; 11 dígitos = DDD + 9 dígitos)
         if (cleaned.length === 10 || cleaned.length === 11) {
             cleaned = '55' + cleaned;
         }
 
-        // 3. Handle missing 9th digit for 12-digit numbers starting with 55 (55 + 2 DD + 8 digits)
+        // Adiciona 9º dígito se for celular BR com 12 dígitos começando com 55 (55 + 2 DDD + 8 dígitos)
         if (cleaned.length === 12 && cleaned.startsWith('55')) {
             cleaned = cleaned.slice(0, 4) + '9' + cleaned.slice(4);
         }
@@ -91,7 +110,7 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
         return cleaned;
     };
 
-    // 2. SmartParseRow heurístico do UploadContacts
+    // 2. Parser heurístico (Smart Parse) para linhas cruas sem cabeçalho
     const smartParseRow = (input: string) => {
         if (!input || !input.trim()) return null;
 
@@ -110,20 +129,17 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
             const cleanPart = part.trim();
             if (!cleanPart) return;
 
-            // 1. Check for Email
             if (emailRegex.test(cleanPart)) {
                 email = cleanPart;
                 return;
             }
 
-            // 2. Check for CPF
             const cpfMatch = cleanPart.match(cpfRegex);
             if (cleanPart.toUpperCase().includes('CPF:') || (cpfMatch && !normalizePhone(cleanPart).startsWith('55') && cleanPart.length <= 15)) {
                 cpf = cleanPart.replace(/CPF:/i, '').replace(/[^\d.-]/g, '').trim();
                 return;
             }
 
-            // 3. Check for Phone
             const normalized = normalizePhone(cleanPart);
             if (normalized.length >= 10 && normalized.length <= 15 && !phone) {
                 phone = normalized;
@@ -171,7 +187,6 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
         return { telefone: phone, nome: name, cpf, email };
     };
 
-    // 3. Processamento idêntico ao UploadContacts
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             setFile(e.target.files[0]);
@@ -185,6 +200,7 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
         }
     };
 
+    // 3. Processamento Completo de Todas as Abas e Linhas da Planilha
     const processFile = async () => {
         if (!file) {
             alert('Por favor, selecione sua planilha ou arquivo TXT/CSV primeiro!');
@@ -194,10 +210,7 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
             alert('Por favor, digite uma Etiqueta Base para identificar os contatos!');
             return;
         }
-        if (!batchSize || batchSize < 1) {
-            alert('Por favor, defina um tamanho de lote válido (ex: 5000)!');
-            return;
-        }
+        const effectiveBatchSize = Math.max(1, Number(batchSize) || 5000);
 
         setIsProcessing(true);
         setDuplicateCount(0);
@@ -208,34 +221,38 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
         reader.onload = async (e) => {
             try {
                 let extractedContacts: any[] = [];
+                let totalInputRows = 0;
                 const fileName = file.name.toLowerCase();
 
                 if (fileName.endsWith('.txt') || fileName.endsWith('.csv')) {
+                    // Leitura de CSV ou TXT
                     const textData = new TextDecoder('utf-8').decode(e.target?.result as ArrayBuffer);
                     const lines = textData.split(/\r?\n/).filter(line => line.trim().length > 0);
+                    totalInputRows = lines.length;
 
                     let phoneColIndex = 0;
+                    const separator = lines[0].includes(';') ? ';' : lines[0].includes('\t') ? '\t' : ',';
+
                     if (lines.length > 0 && !smartSplit) {
-                        const separator = lines[0].includes(';') ? ';' : lines[0].includes('\t') ? '\t' : ',';
                         const firstDataLine = (lines.length > 1 && isNaN(Number(lines[0].split(separator)[0]))) ? lines[1] : lines[0];
                         const parts = firstDataLine.split(separator);
-                        for (let col = 0; col < Math.min(parts.length, 6); col++) {
+                        for (let col = 0; col < Math.min(parts.length, 8); col++) {
                             const raw = String(parts[col] || '');
-                            if (normalizePhone(raw).length === 13) {
+                            if (normalizePhone(raw).length >= 10 && normalizePhone(raw).length <= 15) {
                                 phoneColIndex = col;
                                 break;
                             }
                         }
                     }
 
-                    const separator = lines[0].includes(';') ? ';' : lines[0].includes('\t') ? '\t' : ',';
                     const headerRow = (lines.length > 1 && isNaN(Number(lines[0].split(separator)[0]))) 
                         ? lines[0].split(separator).map(h => h.trim()) 
                         : null;
 
-                    extractedContacts = lines.map((line, idx) => {
+                    for (let idx = 0; idx < lines.length; idx++) {
+                        if (idx === 0 && headerRow) continue;
+                        const line = lines[idx];
                         const rowSeparator = line.includes(';') ? ';' : line.includes('\t') ? '\t' : ',';
-                        if (idx === 0 && headerRow) return null;
 
                         let contact: any = null;
                         if (smartSplit) {
@@ -263,68 +280,83 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                                     }
                                 });
                             }
-                            return contact;
+                            extractedContacts.push(contact);
                         }
-                        return null;
-                    }).filter(Boolean);
-
-                    setInvalidCount(lines.length - extractedContacts.length);
-                } else {
-                    // Excel (.xlsx, .xls)
-                    const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const json: any[][] = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-                    const startIndex = (json[0] && typeof json[0][0] === 'string' && isNaN(Number(json[0][0]))) ? 1 : 0;
-
-                    const headers = startIndex === 1 && json[0] ? json[0].map((h: any) => String(h || '').trim()) : null;
-                    const lowerHeaders = headers ? headers.map((h: string) => h.toLowerCase()) : [];
-
-                    let phoneColIndex = -1;
-                    let cpfColIndex = -1;
-                    let nameColIndex = -1;
-                    let emailColIndex = -1;
-
-                    if (lowerHeaders.length > 0) {
-                        phoneColIndex = lowerHeaders.findIndex((h: string) => 
-                            h.includes('celular') || h.includes('telefone') || h.includes('whatsapp') || h.includes('numero') || h.includes('número') || h.includes('phone')
-                        );
-                        cpfColIndex = lowerHeaders.findIndex((h: string) => h === 'cpf' || h === 'cnpj' || h.includes('cpf') || h.includes('cnpj'));
-                        nameColIndex = lowerHeaders.findIndex((h: string) => h === 'nome' || h === 'name' || h.includes('nome') || h === 'info_2' || h.includes('cliente'));
-                        emailColIndex = lowerHeaders.findIndex((h: string) => h === 'email' || h === 'e-mail');
                     }
 
-                    // Auto-detect phone column (0 to 5) se não achou no header
-                    if (json.length > startIndex && phoneColIndex === -1) {
-                        const firstDataRow = json[startIndex];
-                        for (let col = 0; col < Math.min(firstDataRow.length, 6); col++) {
-                            if (col === cpfColIndex) continue;
-                            const raw = String(firstDataRow[col] || '');
-                            if (normalizePhone(raw).length === 13) {
-                                phoneColIndex = col;
-                                break;
-                            }
-                            if (smartSplit) {
-                                const parsed = smartParseRow(raw);
-                                if (parsed && parsed.telefone?.length >= 10 && parsed.telefone?.length <= 15) {
+                    setInvalidCount(Math.max(0, totalInputRows - extractedContacts.length));
+                } else {
+                    // Leitura de Excel (.xlsx, .xls)
+                    // IMPORTANTE: Lê TODAS as abas (SheetNames) para unificar planilhas com múltiplas abas
+                    const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true, dense: true });
+
+                    for (const sheetName of workbook.SheetNames) {
+                        const sheet = workbook.Sheets[sheetName];
+                        if (!sheet) continue;
+
+                        // Recalcular range real caso o !ref do arquivo esteja truncado por exportadores
+                        let maxRow = 0;
+                        let maxCol = 0;
+                        for (const cellAddress in sheet) {
+                            if (cellAddress[0] === '!') continue;
+                            const dec = XLSX.utils.decode_cell(cellAddress);
+                            if (dec.r > maxRow) maxRow = dec.r;
+                            if (dec.c > maxCol) maxCol = dec.c;
+                        }
+                        if (maxRow > 0) {
+                            sheet['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxRow, c: maxCol } });
+                        }
+
+                        const json: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                        if (!json || json.length === 0) continue;
+
+                        const hasHeader = typeof json[0][0] === 'string' && isNaN(Number(json[0][0]));
+                        const startIndex = hasHeader ? 1 : 0;
+                        totalInputRows += (json.length - startIndex);
+
+                        const headers = hasHeader && json[0] ? json[0].map((h: any) => String(h || '').trim()) : null;
+                        const lowerHeaders = headers ? headers.map((h: string) => h.toLowerCase()) : [];
+
+                        let phoneColIndex = -1;
+                        let cpfColIndex = -1;
+                        let nameColIndex = -1;
+                        let emailColIndex = -1;
+
+                        if (lowerHeaders.length > 0) {
+                            phoneColIndex = lowerHeaders.findIndex((h: string) => 
+                                h.includes('celular') || h.includes('telefone') || h.includes('whatsapp') || h.includes('numero') || h.includes('número') || h.includes('phone')
+                            );
+                            cpfColIndex = lowerHeaders.findIndex((h: string) => h === 'cpf' || h === 'cnpj' || h.includes('cpf') || h.includes('cnpj'));
+                            nameColIndex = lowerHeaders.findIndex((h: string) => h === 'nome' || h === 'name' || h.includes('nome') || h === 'info_2' || h.includes('cliente'));
+                            emailColIndex = lowerHeaders.findIndex((h: string) => h === 'email' || h === 'e-mail');
+                        }
+
+                        // Auto-detect coluna de telefone caso não tenha cabeçalho explícito
+                        if (json.length > startIndex && phoneColIndex === -1) {
+                            const firstDataRow = json[startIndex];
+                            for (let col = 0; col < Math.min(firstDataRow.length, 8); col++) {
+                                if (col === cpfColIndex) continue;
+                                const raw = String(firstDataRow[col] || '');
+                                if (normalizePhone(raw).length >= 10 && normalizePhone(raw).length <= 15) {
                                     phoneColIndex = col;
                                     break;
                                 }
                             }
                         }
-                    }
 
-                    if (phoneColIndex === -1) phoneColIndex = 0;
+                        if (phoneColIndex === -1) phoneColIndex = 0;
 
-                    for (let i = startIndex; i < json.length; i++) {
-                        const row = json[i];
-                        if (row && row.length > 0) {
-                            const rawCell = String(row[phoneColIndex] || '');
+                        for (let i = startIndex; i < json.length; i++) {
+                            const row = json[i];
+                            if (!row || row.length === 0) continue;
+
+                            const rawCell = row[phoneColIndex];
                             let contact: any = null;
 
                             if (smartSplit) {
-                                const parsed = smartParseRow(rawCell);
+                                const parsed = smartParseRow(String(rawCell || ''));
                                 if (parsed && parsed.telefone?.length >= 10 && parsed.telefone?.length <= 15) {
                                     contact = parsed;
                                 }
@@ -390,13 +422,13 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                         }
                     }
 
-                    setInvalidCount((json.length - startIndex) - extractedContacts.length);
+                    setInvalidCount(Math.max(0, totalInputRows - extractedContacts.length));
                 }
 
-                // Deduplicação e filtros
+                // Deduplicação estrita de telefones
                 let filtered = [...extractedContacts];
                 if (removeDuplicates) {
-                    const seen = new Set();
+                    const seen = new Set<string>();
                     const beforeDedup = filtered.length;
                     filtered = filtered.filter(item => {
                         const duplicate = seen.has(item.telefone);
@@ -412,29 +444,32 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
 
                 const total = filtered.length;
                 if (total === 0) {
-                    alert('Nenhum número válido foi encontrado na planilha.');
+                    alert('Nenhum número de telefone válido foi encontrado na planilha.');
                     setIsProcessing(false);
                     return;
                 }
 
                 setTotalContacts(total);
 
-                // Formatação exata do UploadContacts com etiqueta por lote na mesma planilha
+                // ETAPAS DE ETIQUETAGEM SEQUENCIAL POR LOTE NA MESMA PLANILHA UNIFICADA
+                // Exemplo:
+                // Índice 0 a 4999 (Linhas 1 a 5000): lote 1 -> etiqueta_1
+                // Índice 5000 a 9999 (Linhas 5001 a 10000): lote 2 -> etiqueta_2
+                // Índice 10000 a 14999 (Linhas 10001 a 15000): lote 3 -> etiqueta_3...
                 const cleanBaseTag = baseTag.trim() || 'lote';
                 const formattedList: CleanedContact[] = filtered.map((item, index) => {
-                    const batchNumber = Math.floor(index / batchSize) + 1;
+                    const batchNumber = Math.floor(index / effectiveBatchSize) + 1;
                     const tag = `${cleanBaseTag}_${batchNumber}`;
                     const { telefone, nome, cpf, email, ...rest } = item;
 
                     const cleanRest: any = {};
                     Object.keys(rest).forEach(k => {
                         const kl = k.toLowerCase().trim();
-                        if (!['telefone', 'nome', 'cpf', 'email', 'numero', 'e-mail', 'celular', 'whatsapp'].includes(kl)) {
+                        if (!['telefone', 'nome', 'cpf', 'email', 'numero', 'e-mail', 'celular', 'whatsapp', 'etiquetas', 'info_2', 'info_3'].includes(kl)) {
                             cleanRest[k] = rest[k];
                         }
                     });
 
-                    // Nome final com sufixo de etiqueta se solicitado pelo usuário
                     let finalName = nome || '';
                     if (appendTagToName) {
                         finalName = finalName ? `${finalName}_${tag}` : tag;
@@ -450,14 +485,23 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                     };
                 });
 
+                // Armazena a lista 100% COMPLETA de contatos
                 setProcessedData(formattedList);
 
-                // Cálculo dos lotes para o resumo
-                const batchCount = Math.ceil(total / batchSize);
+                // Resumo dos Lotes Calculados
+                const batchCount = Math.ceil(total / effectiveBatchSize);
                 const resultsList: BatchResult[] = [];
                 for (let i = 0; i < batchCount; i++) {
-                    const count = (i === batchCount - 1) ? total % batchSize || batchSize : batchSize;
-                    resultsList.push({ tag: `${cleanBaseTag}_${i + 1}`, count });
+                    const sIdx = i * effectiveBatchSize;
+                    const eIdx = Math.min((i + 1) * effectiveBatchSize, total);
+                    const count = eIdx - sIdx;
+                    resultsList.push({
+                        batchNumber: i + 1,
+                        tag: `${cleanBaseTag}_${i + 1}`,
+                        count,
+                        startIndex: sIdx,
+                        endIndex: eIdx
+                    });
                 }
 
                 setResults(resultsList);
@@ -474,20 +518,72 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
         reader.readAsArrayBuffer(file);
     };
 
-    // 4. Exportação Unificada (CSV e XLSX)
-    const exportFile = (format: 'csv' | 'xlsx') => {
+    // 4. Download da Planilha Completa Unificada (TODAS as 80k na mesma planilha com lotes etiquetados)
+    const exportCompleteFile = (format: 'csv' | 'xlsx') => {
         if (processedData.length === 0) {
             alert('Nenhum dado processado para exportar.');
             return;
         }
 
         const cleanBaseTag = baseTag.trim() || 'planilha';
-        const worksheet = XLSX.utils.json_to_sheet(processedData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Contatos');
+        const total = processedData.length;
+        const fileName = `${cleanBaseTag}_unificado_total_${total}_contatos.${format}`;
 
-        const fileName = `${cleanBaseTag}_unificado.${format}`;
-        XLSX.writeFile(workbook, fileName, { bookType: format === 'csv' ? 'csv' : 'xlsx' });
+        if (format === 'csv') {
+            // CSV com UTF-8 BOM e separador ";" padrão Excel Brasil
+            const keys = Object.keys(processedData[0]);
+            const headerLine = keys.map(k => `"${String(k).replace(/"/g, '""')}"`).join(';');
+            const csvRows = processedData.map(row => 
+                keys.map(k => `"${String(row[k] ?? '').replace(/"/g, '""')}"`).join(';')
+            );
+            const csvContent = '\uFEFF' + [headerLine, ...csvRows].join('\r\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } else {
+            // Excel (.xlsx) com todas as linhas unificadas
+            const worksheet = XLSX.utils.json_to_sheet(processedData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Contatos_Unificados');
+            XLSX.writeFile(workbook, fileName, { bookType: 'xlsx' });
+        }
+    };
+
+    // 5. Download Opcional de um Lote Específico
+    const exportSingleBatch = (batch: BatchResult, format: 'csv' | 'xlsx') => {
+        const batchSlice = processedData.slice(batch.startIndex, batch.endIndex);
+        if (batchSlice.length === 0) return;
+
+        const fileName = `${batch.tag}_lote_${batch.batchNumber}_${batch.count}_contatos.${format}`;
+
+        if (format === 'csv') {
+            const keys = Object.keys(batchSlice[0]);
+            const headerLine = keys.map(k => `"${String(k).replace(/"/g, '""')}"`).join(';');
+            const csvRows = batchSlice.map(row => 
+                keys.map(k => `"${String(row[k] ?? '').replace(/"/g, '""')}"`).join(';')
+            );
+            const csvContent = '\uFEFF' + [headerLine, ...csvRows].join('\r\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } else {
+            const worksheet = XLSX.utils.json_to_sheet(batchSlice);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, batch.tag);
+            XLSX.writeFile(workbook, fileName, { bookType: 'xlsx' });
+        }
     };
 
     const handleCopyPreview = (phone: string, index: number) => {
@@ -512,11 +608,11 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                                 Higienizador de Planilhas
                             </h2>
                             <span className="badge badge-approved" style={{ fontSize: '11px', padding: '2px 8px' }}>
-                                Motor Plug &amp; Sales PRO
+                                Motor Fast Dispatch PRO
                             </span>
                         </div>
                         <p style={{ margin: '3px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-                            Formatação de números (55+DDD+9 dígitos), etiquetas automáticas por lote na mesma planilha e colunas oficiais Meta / Infobip.
+                            Normalização no padrão 55 + DDD + 9 dígitos, unificação total em 1 planilha e particionamento sequencial de etiquetas.
                         </p>
                     </div>
                 </div>
@@ -585,7 +681,7 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                                 />
                             </div>
                             <span style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px', display: 'block' }}>
-                                Padrão: 5.000 contatos. A cada 5.000, o número da etiqueta incrementa na mesma planilha.
+                                A cada <strong>{Number(batchSize || 5000).toLocaleString('pt-BR')}</strong> contatos, o número da etiqueta incrementa na mesma planilha unificada.
                             </span>
                         </div>
 
@@ -628,7 +724,7 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                                     onChange={e => setSmartSplit(e.target.checked)}
                                     style={{ accentColor: 'var(--primary-color)', width: '15px', height: '15px' }}
                                 />
-                                <span>Smart Split Heurístico (para textos brutos sem cabeçalho)</span>
+                                <span>Smart Split Heurístico (para arquivos de texto sem cabeçalho)</span>
                             </label>
                         </div>
 
@@ -679,9 +775,9 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                             disabled={isProcessing}
                             style={{
                                 width: '100%',
-                                height: '44px',
+                                height: '46px',
                                 fontSize: '14px',
-                                fontWeight: 700,
+                                fontWeight: 800,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -691,24 +787,24 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                             {isProcessing ? (
                                 <>
                                     <Activity className="animate-spin" size={18} />
-                                    <span>Processando e Formatando...</span>
+                                    <span>Processando todas as linhas...</span>
                                 </>
                             ) : (
                                 <>
                                     <Sparkles size={18} />
-                                    <span>PROCESSAR E HIGIENIZAR AGORA</span>
+                                    <span>PROCESSAR E FORMATAR TODAS AS LINHAS</span>
                                 </>
                             )}
                         </button>
                     </div>
                 </div>
 
-                {/* CARD 2: Resultados & Download */}
+                {/* CARD 2: Resumo de Lotes & Exportação */}
                 <div className="glass-panel" style={{ padding: '24px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
                         <Layers size={18} color="var(--primary-color)" />
                         <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-main)' }}>
-                            2. Resumo de Lotes &amp; Exportação
+                            2. Planilha Unificada &amp; Lotes
                         </h3>
                     </div>
 
@@ -717,10 +813,15 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                             {/* Card de Estatísticas */}
                             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                                 <div>
-                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Contatos Higienizados</span>
-                                    <span style={{ fontSize: '28px', fontWeight: 800, color: 'var(--primary-color)', lineHeight: 1.1 }}>
-                                        {totalContacts.toLocaleString('pt-BR')}
-                                    </span>
+                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Total Unificado em 1 Planilha</span>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                        <span style={{ fontSize: '28px', fontWeight: 800, color: 'var(--primary-color)', lineHeight: 1.1 }}>
+                                            {totalContacts.toLocaleString('pt-BR')}
+                                        </span>
+                                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                            contatos ({results.length} lotes de {Number(batchSize || 5000).toLocaleString('pt-BR')})
+                                        </span>
+                                    </div>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'right' }}>
                                     {duplicateCount > 0 && (
@@ -736,11 +837,62 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                                 </div>
                             </div>
 
-                            {/* Lotes Gerados com Tags */}
+                            {/* BOTÕES PRINCIPAIS: BAIXAR PLANILHA COMPLETA COM TODAS AS LINHAS UNIFICADAS */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                                    Lotes Particionados na Planilha ({results.length}):
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                                    Baixar Planilha Completa (Todas as {totalContacts.toLocaleString('pt-BR')} linhas unificadas):
                                 </span>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => exportCompleteFile('xlsx')}
+                                        className="btn-primary"
+                                        style={{
+                                            height: '46px',
+                                            fontSize: '13.5px',
+                                            fontWeight: 800,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        <Download size={16} />
+                                        <span>Baixar Excel (.xlsx)</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => exportCompleteFile('csv')}
+                                        className="btn-secondary"
+                                        style={{
+                                            height: '46px',
+                                            fontSize: '13.5px',
+                                            fontWeight: 800,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            background: 'rgba(255,255,255,0.06)'
+                                        }}
+                                    >
+                                        <Download size={16} />
+                                        <span>Baixar CSV</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Lotes Gerados com Tags */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                                        Distribuição dos Lotes na Planilha ({results.length}):
+                                    </span>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                                        Pág. {currentResultsPage} de {totalResultsPages}
+                                    </span>
+                                </div>
 
                                 {results.slice((currentResultsPage - 1) * resultsPerPage, currentResultsPage * resultsPerPage).map((r, i) => (
                                     <div
@@ -749,21 +901,36 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'space-between',
-                                            padding: '10px 14px',
-                                            background: 'rgba(172, 248, 0, 0.04)',
-                                            border: '1px solid rgba(172, 248, 0, 0.15)',
-                                            borderRadius: '8px'
+                                            padding: '8px 12px',
+                                            background: 'rgba(172, 248, 0, 0.03)',
+                                            border: '1px solid rgba(172, 248, 0, 0.12)',
+                                            borderRadius: '6px'
                                         }}
                                     >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <Tag size={13} color="var(--primary-color)" />
-                                            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '13px', color: 'var(--text-main)' }}>
+                                            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '12.5px', color: 'var(--text-main)' }}>
                                                 {r.tag}
                                             </span>
+                                            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                                                (Linhas {r.startIndex + 1} a {r.endIndex})
+                                            </span>
                                         </div>
-                                        <span style={{ background: 'var(--primary-color)', color: '#000000', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 800 }}>
-                                            {r.count.toLocaleString('pt-BR')} leads
-                                        </span>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ background: 'var(--primary-color)', color: '#000000', padding: '2px 8px', borderRadius: '4px', fontSize: '11.5px', fontWeight: 800 }}>
+                                                {r.count.toLocaleString('pt-BR')} leads
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => exportSingleBatch(r, 'csv')}
+                                                title={`Baixar apenas o lote ${r.tag} em CSV`}
+                                                className="btn-secondary"
+                                                style={{ height: '24px', padding: '0 6px', fontSize: '10.5px' }}
+                                            >
+                                                CSV
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
 
@@ -793,45 +960,6 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                                     </div>
                                 )}
                             </div>
-
-                            {/* Botões de Download Unificado */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '6px' }}>
-                                <button
-                                    type="button"
-                                    onClick={() => exportFile('xlsx')}
-                                    className="btn-primary"
-                                    style={{
-                                        height: '42px',
-                                        fontSize: '13px',
-                                        fontWeight: 700,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '6px'
-                                    }}
-                                >
-                                    <Download size={15} />
-                                    <span>Baixar Excel (.xlsx)</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => exportFile('csv')}
-                                    className="btn-secondary"
-                                    style={{
-                                        height: '42px',
-                                        fontSize: '13px',
-                                        fontWeight: 700,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '6px'
-                                    }}
-                                >
-                                    <Download size={15} />
-                                    <span>Baixar CSV</span>
-                                </button>
-                            </div>
                         </div>
                     ) : (
                         <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
@@ -840,7 +968,7 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                                 Aguardando Planilha
                             </h4>
                             <p style={{ margin: '6px 0 0 0', fontSize: '12.5px', lineHeight: 1.4 }}>
-                                Selecione uma lista ao lado e clique em "Processar" para visualizar os lotes formatados e baixar a planilha completa.
+                                Selecione uma lista ao lado e clique em "Processar" para unificar todas as linhas e particionar as etiquetas.
                             </p>
                         </div>
                     )}
@@ -853,14 +981,14 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                         <div>
                             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-main)' }}>
-                                Pré-visualização da Planilha Formatada
+                                Pré-visualização da Planilha Unificada
                             </h3>
                             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                Mostrando os primeiros {Math.min(processedData.length, 10)} contatos do total de {totalContacts.toLocaleString('pt-BR')} (Colunas oficiais Infobip &amp; Meta)
+                                Exibindo as primeiras {Math.min(processedData.length, 10)} linhas do total de {totalContacts.toLocaleString('pt-BR')} contatos unificados
                             </span>
                         </div>
                         <span className="badge badge-approved" style={{ fontSize: '11px' }}>
-                            Tudo na mesma planilha com lotes sequenciais
+                            {results.length} lotes de {Number(batchSize || 5000).toLocaleString('pt-BR')} na mesma planilha
                         </span>
                     </div>
 
