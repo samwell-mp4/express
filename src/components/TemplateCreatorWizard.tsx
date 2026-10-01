@@ -90,7 +90,8 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     const [creationMode, setCreationMode] = useState<'WIZARD' | 'BULK'>('WIZARD');
 
     // Quick Tools Drawer: 'cleaner' (Higienizar Planilha) | 'media' (Upload de Mídias) | null
-    const [activeToolDrawer, setActiveToolDrawer] = useState<'cleaner' | 'media' | null>(null);
+    // Add drawer state for Rotator PRO
+    const [activeToolDrawer, setActiveToolDrawer] = useState<'cleaner' | 'media' | 'rotator' | null>(null);
 
     // Individual Wizard Steps: 1, 2, 3, 4
     const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
@@ -860,6 +861,16 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                         {activeToolDrawer === 'media' ? 'Fechar Mídias' : 'Upload de Mídias'}
                     </button>
 
+                    <button
+                        type="button"
+                        onClick={() => setActiveToolDrawer(activeToolDrawer === 'rotator' ? null : 'rotator')}
+                        className={activeToolDrawer === 'rotator' ? 'btn-primary' : 'btn-secondary'}
+                        style={{ height: '34px', fontSize: '12.5px', gap: '6px' }}
+                    >
+                        <Zap size={15} />
+                        {activeToolDrawer === 'rotator' ? 'Fechar Rotacionador' : 'Rotacionador PRO'}
+                    </button>
+
                     {/* Mode Selector Tabs (Segmented Control) */}
                     <div className="segmented-control">
                         <button
@@ -899,6 +910,22 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                             setMediaUrl(url);
                             setGlobalMediaUrl(url);
                             setHeaderType(type);
+                            setActiveToolDrawer(null);
+                        }}
+                    />
+                </div>
+            )}
+
+            {/* EXPANDABLE DRAWER: ROTACIONADOR PRO */}
+            {activeToolDrawer === 'rotator' && (
+                <div>
+                    <LinkRotatorManager
+                        isEmbedded
+                        onClose={() => setActiveToolDrawer(null)}
+                        onSelectRotator={(url) => {
+                            setShortenerOriginal('');
+                            setShortenerResult(url);
+                            setGlobalLinkInput(url);
                             setActiveToolDrawer(null);
                         }}
                     />
@@ -1585,7 +1612,17 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                             disabled={isShortening || !shortenerOriginal.trim()}
                                         >
                                             <Scissors size={14} />
-                                            {isShortening ? 'Encurtando...' : 'Encurtar Link'}
+                                            {isShortening ? 'Encurtando...' : 'Encurtar'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveToolDrawer(activeToolDrawer === 'rotator' ? null : 'rotator')}
+                                            className="btn-secondary"
+                                            style={{ height: '36px', fontSize: '12.5px', gap: '6px' }}
+                                            title="Usar Rotacionador PRO"
+                                        >
+                                            <Zap size={14} color="#16A34A" />
+                                            Rotacionador PRO
                                         </button>
                                     </div>
 

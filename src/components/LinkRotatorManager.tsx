@@ -7,7 +7,13 @@ import {
 import { ProRotator, RotatorTarget, RotatorStats } from '../types';
 import { rotatorStorage } from '../services/rotatorStorage';
 
-export const LinkRotatorManager: React.FC = () => {
+export interface LinkRotatorManagerProps {
+    isEmbedded?: boolean;
+    onClose?: () => void;
+    onSelectRotator?: (url: string) => void;
+}
+
+export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedded, onClose, onSelectRotator }) => {
     // Rotators List State
     const [rotators, setRotators] = useState<ProRotator[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -403,6 +409,16 @@ export const LinkRotatorManager: React.FC = () => {
                         <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
                         Atualizar
                     </button>
+                    {isEmbedded && onClose && (
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="btn-secondary"
+                            style={{ height: '34px', padding: '0 12px', fontSize: '13px' }}
+                        >
+                            <X size={14} /> Fechar
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -855,6 +871,16 @@ export const LinkRotatorManager: React.FC = () => {
                                             >
                                                 <Trash2 size={13} />
                                             </button>
+
+                                            {isEmbedded && onSelectRotator && (
+                                                <button
+                                                    onClick={() => onSelectRotator(`${window.location.origin}/r/${r.slug}`)}
+                                                    className="badge badge-approved"
+                                                    style={{ cursor: 'pointer', height: '32px', padding: '0 12px', fontSize: '12px', fontWeight: 600, border: 'none' }}
+                                                >
+                                                    Usar
+                                                </button>
+                                            )}
                                         </div>
 
                                     </div>
