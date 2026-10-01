@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, Smartphone, Activity, Database, ShieldCheck, RefreshCw, Layers, FileText } from 'lucide-react';
+import { Zap, Smartphone, Activity, Database, ShieldCheck, RefreshCw, Layers, FileText, UploadCloud, PlusCircle } from 'lucide-react';
 import { RedisQueueStatus, AppTab } from '../types';
 
 interface SidebarProps {
@@ -53,6 +53,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Navigation Links */}
             <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {/* TAB: UPLOAD CLIENTES (NOVO) */}
+                <button
+                    className={`sidebar-nav-item ${activeTab === 'upload-clientes' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('upload-clientes')}
+                >
+                    <UploadCloud size={18} />
+                    <span style={{ flex: 1 }}>Upload Clientes</span>
+                    <span style={{
+                        background: activeTab === 'upload-clientes' ? 'var(--primary-color)' : '#ecfdf5',
+                        color: activeTab === 'upload-clientes' ? '#fff' : '#059669',
+                        padding: '2px 7px',
+                        borderRadius: '999px',
+                        fontSize: '0.68rem',
+                        fontWeight: 800
+                    }}>
+                        Leads
+                    </span>
+                </button>
+
+                {/* TAB: CRIAR TEMPLATE (PASSO A PASSO NOVO) */}
+                <button
+                    className={`sidebar-nav-item ${activeTab === 'create-template' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('create-template')}
+                >
+                    <PlusCircle size={18} />
+                    <span style={{ flex: 1 }}>Criar Template</span>
+                    <span style={{
+                        background: activeTab === 'create-template' ? 'var(--primary-color)' : '#fef3c7',
+                        color: activeTab === 'create-template' ? '#fff' : '#d97706',
+                        padding: '2px 7px',
+                        borderRadius: '999px',
+                        fontSize: '0.68rem',
+                        fontWeight: 800
+                    }}>
+                        Passo a Passo
+                    </span>
+                </button>
+
                 {/* TAB: TEMPLATES META (WHATSAPP) */}
                 <button
                     className={`sidebar-nav-item ${activeTab === 'templates' ? 'active' : ''}`}

@@ -104,7 +104,20 @@ export interface InfobipQueueMessage {
     _baseUrl: string;
 }
 
-export type AppTab = 'registry' | 'dispatch' | 'records' | 'redis' | 'bms' | 'templates';
+export type AppTab = 'registry' | 'dispatch' | 'records' | 'redis' | 'bms' | 'templates' | 'upload-clientes' | 'create-template';
+
+export interface ClientBatchRecord {
+    id: string;
+    clientName: string;
+    fileName: string;
+    totalRows: number;
+    validCount: number;
+    duplicateCount: number;
+    invalidCount: number;
+    createdAt: string;
+    contacts: ParsedContact[];
+    headers: string[];
+}
 
 export interface InfobipAccountTemplate {
     id: string;

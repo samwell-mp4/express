@@ -8,6 +8,8 @@ import { RedisMonitor } from './components/RedisMonitor';
 import { DispatchRecords } from './components/DispatchRecords';
 import { BmControl } from './components/BmControl';
 import { TemplateGallery } from './components/TemplateGallery';
+import { ClientUpload } from './components/ClientUpload';
+import { TemplateCreatorWizard } from './components/TemplateCreatorWizard';
 import { ParsedContact, SenderConfig, PlaceholderMapping, RedisQueueStatus, AppTab } from './types';
 import { api } from './services/api';
 import { wabaStorage } from './services/wabaStorage';
@@ -181,6 +183,13 @@ export const App: React.FC = () => {
         setActiveTab('dispatch');
     };
 
+    const handleContactsFromUpload = (loadedContacts: ParsedContact[], loadedHeaders: string[], clientName: string) => {
+        setContacts(loadedContacts);
+        setHeaders(loadedHeaders);
+        setSelectedClient(clientName || 'Lista de Clientes Sanitizada');
+        setActiveTab('dispatch');
+    };
+
     const savedWabas = wabaStorage.getSavedWabas();
 
     return (
@@ -199,6 +208,21 @@ export const App: React.FC = () => {
 
             {/* Main Content Area */}
             <main className="main-content">
+                {/* TAB: UPLOAD DE CLIENTES */}
+                {activeTab === 'upload-clientes' && (
+                    <ClientUpload 
+                        onSendToDispatch={handleContactsFromUpload}
+                    />
+                )}
+
+                {/* TAB: CRIAR TEMPLATE (WIZARD OBJETIVO) */}
+                {activeTab === 'create-template' && (
+                    <TemplateCreatorWizard 
+                        onCreated={(tplName) => handleSelectTemplateForDispatch(tplName)}
+                        onCancel={() => setActiveTab('templates')}
+                    />
+                )}
+
                 {/* TAB: TEMPLATES META (WHATSAPP) */}
                 {activeTab === 'templates' && (
                     <TemplateGallery 
