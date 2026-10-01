@@ -1,5 +1,5 @@
-import React from 'react';
-import { Zap, Smartphone, Activity, Database, ShieldCheck, RefreshCw, Layers, FileText, UploadCloud, PlusCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Zap, Smartphone, Activity, Layers, UploadCloud, PlusCircle, FileSpreadsheet, Image as ImageIcon, Link as LinkIcon, User, LogOut } from 'lucide-react';
 import { RedisQueueStatus, AppTab } from '../types';
 
 interface SidebarProps {
@@ -20,93 +20,160 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onRefreshRedis,
     contactCount,
     wabaCount,
-    bmCount = 0,
-    templatesCount = 0
+    bmCount = 0
 }) => {
+    // Current user profile state
+    const [user] = useState<{ name: string; email: string }>(() => {
+        try {
+            const raw = localStorage.getItem('auth_user') || localStorage.getItem('pns_user');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                return {
+                    name: parsed.name || parsed.nome || 'Meu Perfil',
+                    email: parsed.email || 'operador@plugesales.com'
+                };
+            }
+        } catch {}
+        return {
+            name: 'Meu Perfil',
+            email: 'operador@plugesales.com'
+        };
+    });
+
+    const handleLogout = () => {
+        if (!window.confirm('Deseja realmente sair da sua conta?')) return;
+        localStorage.removeItem('auth_user');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('pns_user');
+        if (window.location.pathname.startsWith('/')) {
+            window.location.href = '/login';
+        } else {
+            window.location.reload();
+        }
+    };
+
     return (
         <aside className="sidebar">
             {/* Brand Logo & Name */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px', padding: '0 4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', padding: '4px 6px' }}>
                 <div style={{
-                    background: 'var(--primary-color)',
-                    color: '#ffffff',
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '10px',
+                    background: '#f2f7f5',
+                    border: '1px solid #bbf7d0',
+                    color: '#059669',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 4px 12px var(--primary-glow)',
                     flexShrink: 0
                 }}>
-                    <Zap size={22} strokeWidth={2.6} />
+                    <Zap size={16} strokeWidth={2.2} />
                 </div>
-                <div>
-                    <h1 style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-0.5px', lineHeight: 1.1 }}>
+                <div style={{ overflow: 'hidden' }}>
+                    <div style={{ fontSize: '14.5px', fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1.2, color: 'var(--text-main)' }}>
                         Plug &amp; Sales
-                    </h1>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)', fontWeight: 600 }}>
-                        Disparador &amp; Gestão Meta
+                    </div>
+                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 400 }}>
+                        Operacional Meta
                     </span>
                 </div>
             </div>
 
             {/* Navigation Links */}
-            <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {/* TAB: UPLOAD CLIENTES (NOVO) */}
+            <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {/* TAB: UPLOAD CLIENTES */}
                 <button
                     className={`sidebar-nav-item ${activeTab === 'upload-clientes' ? 'active' : ''}`}
                     onClick={() => setActiveTab('upload-clientes')}
                 >
-                    <UploadCloud size={18} />
+                    <UploadCloud size={16} />
                     <span style={{ flex: 1 }}>Upload Clientes</span>
                     <span style={{
-                        background: activeTab === 'upload-clientes' ? 'var(--primary-color)' : '#ecfdf5',
-                        color: activeTab === 'upload-clientes' ? '#fff' : '#059669',
-                        padding: '2px 7px',
-                        borderRadius: '999px',
-                        fontSize: '0.68rem',
-                        fontWeight: 800
+                        background: '#f3f4f6',
+                        color: '#4b5563',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 500
                     }}>
                         Leads
                     </span>
                 </button>
 
-                {/* TAB: CRIAR TEMPLATE (PASSO A PASSO NOVO) */}
+                {/* TAB: CRIAR TEMPLATE */}
                 <button
                     className={`sidebar-nav-item ${activeTab === 'create-template' ? 'active' : ''}`}
                     onClick={() => setActiveTab('create-template')}
                 >
-                    <PlusCircle size={18} />
+                    <PlusCircle size={16} />
                     <span style={{ flex: 1 }}>Criar Template</span>
                     <span style={{
-                        background: activeTab === 'create-template' ? 'var(--primary-color)' : '#fef3c7',
-                        color: activeTab === 'create-template' ? '#fff' : '#d97706',
-                        padding: '2px 7px',
-                        borderRadius: '999px',
-                        fontSize: '0.68rem',
-                        fontWeight: 800
+                        background: '#fef3c7',
+                        color: '#92400e',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 500
                     }}>
-                        Passo a Passo
+                        Novo
                     </span>
                 </button>
 
-                {/* TAB: TEMPLATES META (WHATSAPP) */}
+                {/* TAB: HIGIENIZADOR DE PLANILHAS */}
                 <button
-                    className={`sidebar-nav-item ${activeTab === 'templates' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('templates')}
+                    className={`sidebar-nav-item ${activeTab === 'spreadsheet-cleaner' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('spreadsheet-cleaner')}
                 >
-                    <FileText size={18} />
-                    <span style={{ flex: 1 }}>Templates Meta</span>
+                    <FileSpreadsheet size={16} />
+                    <span style={{ flex: 1 }}>Higienizar Planilha</span>
                     <span style={{
-                        background: activeTab === 'templates' ? 'var(--primary-color)' : '#ecfdf5',
-                        color: activeTab === 'templates' ? '#fff' : '#059669',
-                        padding: '2px 7px',
-                        borderRadius: '999px',
-                        fontSize: '0.68rem',
-                        fontWeight: 800
+                        background: '#f3f4f6',
+                        color: '#4b5563',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 500
                     }}>
-                        {templatesCount > 0 ? templatesCount : 'Recentes'}
+                        Limpador
+                    </span>
+                </button>
+
+                {/* TAB: UPLOAD DE MÍDIAS (MEDIA HOSTING) */}
+                <button
+                    className={`sidebar-nav-item ${activeTab === 'media-hosting' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('media-hosting')}
+                >
+                    <ImageIcon size={16} />
+                    <span style={{ flex: 1 }}>Upload de Mídias</span>
+                    <span style={{
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 500
+                    }}>
+                        Hosting
+                    </span>
+                </button>
+
+                {/* TAB: ENCURTADOR & ROTATOR PRO */}
+                <button
+                    className={`sidebar-nav-item ${activeTab === 'rotator' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('rotator')}
+                >
+                    <LinkIcon size={16} />
+                    <span style={{ flex: 1 }}>Encurtador &amp; Rotator</span>
+                    <span style={{
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 500
+                    }}>
+                        PRO
                     </span>
                 </button>
 
@@ -115,173 +182,171 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={`sidebar-nav-item ${activeTab === 'bms' ? 'active' : ''}`}
                     onClick={() => setActiveTab('bms')}
                 >
-                    <Layers size={18} />
+                    <Layers size={16} />
                     <span style={{ flex: 1 }}>Controle de BMs</span>
-                    {bmCount > 0 ? (
-                        <span style={{
-                            background: activeTab === 'bms' ? 'var(--primary-color)' : '#e0f2fe',
-                            color: activeTab === 'bms' ? '#fff' : '#0369a1',
-                            padding: '2px 8px',
-                            borderRadius: '999px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700
-                        }}>
-                            {bmCount}
-                        </span>
-                    ) : (
-                        <span style={{
-                            background: activeTab === 'bms' ? 'var(--primary-color)' : '#f1f5f9',
-                            color: activeTab === 'bms' ? '#fff' : '#64748b',
-                            padding: '1px 6px',
-                            borderRadius: '6px',
-                            fontSize: '0.66rem',
-                            fontWeight: 700
-                        }}>
-                            14 abas
-                        </span>
-                    )}
+                    <span style={{
+                        background: bmCount > 0 ? '#eff6ff' : '#f3f4f6',
+                        color: bmCount > 0 ? '#1d4ed8' : '#6b7280',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 500
+                    }}>
+                        {bmCount > 0 ? bmCount : '14 abas'}
+                    </span>
                 </button>
 
+                {/* TAB: REGISTRAR WABA */}
                 <button
                     className={`sidebar-nav-item ${activeTab === 'registry' ? 'active' : ''}`}
                     onClick={() => setActiveTab('registry')}
                 >
-                    <Smartphone size={18} />
+                    <Smartphone size={16} />
                     <span style={{ flex: 1 }}>Registrar WABA</span>
                     {wabaCount > 0 && (
                         <span style={{
-                            background: activeTab === 'registry' ? 'var(--primary-color)' : '#e2e8f0',
-                            color: activeTab === 'registry' ? '#fff' : 'var(--text-main)',
-                            padding: '2px 8px',
-                            borderRadius: '999px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700
+                            background: '#f3f4f6',
+                            color: '#4b5563',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 500
                         }}>
                             {wabaCount}
                         </span>
                     )}
                 </button>
 
+                {/* TAB: MULTI-REMETENTE */}
                 <button
                     className={`sidebar-nav-item ${activeTab === 'dispatch' ? 'active' : ''}`}
                     onClick={() => setActiveTab('dispatch')}
                 >
-                    <Activity size={18} />
+                    <Activity size={16} />
                     <span style={{ flex: 1 }}>Multi-Remetente</span>
                     {contactCount > 0 && (
                         <span style={{
-                            background: activeTab === 'dispatch' ? 'var(--primary-color)' : '#e2e8f0',
-                            color: activeTab === 'dispatch' ? '#fff' : 'var(--text-main)',
-                            padding: '2px 8px',
-                            borderRadius: '999px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700
+                            background: '#f3f4f6',
+                            color: '#4b5563',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 500
                         }}>
                             {contactCount}
                         </span>
                     )}
                 </button>
 
+                {/* TAB: MONITOR (FILA REDIS + REGISTRO UNIFICADOS) */}
                 <button
-                    className={`sidebar-nav-item ${activeTab === 'records' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('records')}
+                    className={`sidebar-nav-item ${activeTab === 'monitor' || activeTab === 'records' || activeTab === 'redis' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('monitor')}
                 >
+                    <Activity size={16} />
+                    <span style={{ flex: 1 }}>Monitor</span>
                     <span style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#10b981',
-                        boxShadow: '0 0 8px #10b981'
-                    }} />
-                    <span style={{ flex: 1 }}>Registro (Ao Vivo)</span>
-                    <span style={{
-                        background: activeTab === 'records' ? 'var(--primary-color)' : '#ecfdf5',
-                        color: activeTab === 'records' ? '#fff' : '#059669',
-                        padding: '2px 7px',
-                        borderRadius: '999px',
-                        fontSize: '0.68rem',
-                        fontWeight: 800
+                        background: redisStatus.isRunning ? '#ecfdf5' : '#f3f4f6',
+                        color: redisStatus.isRunning ? '#059669' : '#4b5563',
+                        border: `1px solid ${redisStatus.isRunning ? '#a7f3d0' : '#e5e7eb'}`,
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
                     }}>
-                        LIVE
-                    </span>
-                </button>
-
-                <button
-                    className={`sidebar-nav-item ${activeTab === 'redis' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('redis')}
-                >
-                    <Database size={18} />
-                    <span style={{ flex: 1 }}>Fila Redis</span>
-                    {redisStatus.queueLength > 0 && (
                         <span style={{
-                            background: '#dcfce7',
-                            color: '#15803d',
-                            padding: '2px 8px',
-                            borderRadius: '999px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700
-                        }}>
-                            {redisStatus.queueLength}
-                        </span>
-                    )}
+                            width: '5px',
+                            height: '5px',
+                            borderRadius: '50%',
+                            background: redisStatus.isRunning ? '#10b981' : '#9ca3af'
+                        }} />
+                        {redisStatus.queueLength > 0 ? `${redisStatus.queueLength}` : (redisStatus.isRunning ? 'LIVE' : 'Ativo')}
+                    </span>
                 </button>
             </nav>
 
-            {/* Bottom Meta & BM Card */}
-            <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* BM Luiz Info */}
+            {/* Bottom: Meu Perfil & Botão Sair */}
+            <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
                 <div style={{
-                    background: '#f8fafc',
+                    background: '#ffffff',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: '12px',
-                    padding: '12px 14px',
+                    borderRadius: '6px',
+                    padding: '8px 10px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px'
+                    justifyContent: 'space-between',
+                    gap: '8px'
                 }}>
-                    <ShieldCheck size={20} color="var(--primary-color)" />
-                    <div style={{ fontSize: '0.78rem' }}>
-                        <span style={{ color: 'var(--text-dim)', display: 'block' }}>Conta Oficial</span>
-                        <strong style={{ color: 'var(--text-main)' }}>BM do Luiz</strong>
-                    </div>
-                </div>
-
-                {/* Redis Real-time Status Card */}
-                <div style={{
-                    background: redisStatus.isRunning ? '#ecfdf5' : '#f8fafc',
-                    border: `1px solid ${redisStatus.isRunning ? '#a7f3d0' : 'var(--border-subtle)'}`,
-                    borderRadius: '12px',
-                    padding: '12px 14px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                        <div style={{
+                            width: '30px',
+                            height: '30px',
+                            borderRadius: '6px',
+                            background: '#f3f4f6',
+                            border: '1px solid var(--border-subtle)',
+                            color: 'var(--text-muted)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                        }}>
+                            <User size={15} />
+                        </div>
+                        <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                            <div style={{
+                                fontSize: '12.5px',
+                                fontWeight: 600,
+                                color: 'var(--text-main)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                lineHeight: 1.2
+                            }}>
+                                {user.name}
+                            </div>
                             <span style={{
-                                width: '8px',
-                                height: '8px',
-                                borderRadius: '50%',
-                                background: redisStatus.isRunning ? 'var(--status-approved)' : (redisStatus.queueLength > 0 ? 'var(--status-pending)' : '#94a3b8'),
-                                boxShadow: redisStatus.isRunning ? '0 0 8px #16a34a' : 'none'
-                            }} />
-                            <span style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                                Fila Redis:
+                                fontSize: '10.5px',
+                                color: 'var(--text-dim)',
+                                display: 'block',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                            }}>
+                                {user.email}
                             </span>
                         </div>
-                        <button
-                            onClick={onRefreshRedis}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}
-                            title="Atualizar status do Redis"
-                        >
-                            <RefreshCw size={12} />
-                        </button>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)' }}>
-                            {redisStatus.queueLength}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', color: redisStatus.isRunning ? 'var(--status-approved)' : 'var(--text-dim)', fontWeight: 600 }}>
-                            {redisStatus.isRunning ? 'Processando' : 'Ocioso'}
-                        </span>
-                    </div>
+
+                    <button
+                        onClick={handleLogout}
+                        title="Sair da conta"
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            transition: 'all 0.15s'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#dc2626';
+                            e.currentTarget.style.background = '#fef2f2';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.color = 'var(--text-muted)';
+                            e.currentTarget.style.background = 'transparent';
+                        }}
+                    >
+                        <LogOut size={15} />
+                    </button>
                 </div>
             </div>
         </aside>

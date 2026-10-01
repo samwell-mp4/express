@@ -10,15 +10,20 @@ import { BmControl } from './components/BmControl';
 import { TemplateGallery } from './components/TemplateGallery';
 import { ClientUpload } from './components/ClientUpload';
 import { TemplateCreatorWizard } from './components/TemplateCreatorWizard';
+import { SpreadsheetCleaner } from './components/SpreadsheetCleaner';
+import { MediaHostingManager } from './components/MediaHostingManager';
+import { LinkRotatorManager } from './components/LinkRotatorManager';
 import { ParsedContact, SenderConfig, PlaceholderMapping, RedisQueueStatus, AppTab } from './types';
 import { api } from './services/api';
 import { wabaStorage } from './services/wabaStorage';
 import { bmSheetService } from './services/bmSheetService';
 import { templateService } from './services/templateService';
+import { Login } from './components/Login';
 
 export const App: React.FC = () => {
-    // Current Active View Tab: 'registry' | 'dispatch' | 'records' | 'redis' | 'bms' | 'templates'
-    const [activeTab, setActiveTab] = useState<AppTab>('templates');
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!localStorage.getItem('auth_token'));
+    // Current Active View Tab: 'upload-clientes' | 'create-template' | 'spreadsheet-cleaner' | 'media-hosting' | 'bms' | 'registry' | 'dispatch' | 'monitor'
+    const [activeTab, setActiveTab] = useState<AppTab>('upload-clientes');
 
     // Active Campaign / Contacts State
     const [contacts, setContacts] = useState<ParsedContact[]>([]);
@@ -141,7 +146,7 @@ export const App: React.FC = () => {
 
     const handleQueueSuccess = () => {
         setShowConfirmModal(false);
-        setActiveTab('records');
+        setActiveTab('monitor');
         refreshRedisStatus();
     };
 
@@ -192,6 +197,14 @@ export const App: React.FC = () => {
 
     const savedWabas = wabaStorage.getSavedWabas();
 
+    if (!isAuthenticated) {
+        return (
+            <Login onLoginSuccess={() => {
+                setIsAuthenticated(true);
+            }} />
+        );
+    }
+
     return (
         <div className="app-layout">
             {/* Sidebar Navigation */}
@@ -223,6 +236,26 @@ export const App: React.FC = () => {
                     />
                 )}
 
+                {/* TAB: HIGIENIZADOR DE PLANILHAS (COM PURGA AUTOMÁTICA NO DOWNLOAD) */}
+                {activeTab === 'spreadsheet-cleaner' && (
+                    <SpreadsheetCleaner />
+                )}
+
+                {/* TAB: UPLOAD DE MÍDIAS (MEDIA HOSTING - ÚLTIMOS 5 COM COPYBOARD) */}
+                {activeTab === 'media-hosting' && (
+                    <MediaHostingManager 
+                        onSelectMedia={(url) => {
+                            setMediaUrl(url);
+                            setActiveTab('create-template');
+                        }}
+                    />
+                )}
+
+                {/* TAB: ENCURTADOR & ROTATOR PRO */}
+                {activeTab === 'rotator' && (
+                    <LinkRotatorManager />
+                )}
+
                 {/* TAB: TEMPLATES META (WHATSAPP) */}
                 {activeTab === 'templates' && (
                     <TemplateGallery 
@@ -246,32 +279,35 @@ export const App: React.FC = () => {
                 {/* TAB 2: MULTI-REMETENTE DISPATCHER */}
                 {activeTab === 'dispatch' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        
-                        {/* Header Bar */}
-                        <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+                                              {/* Header Bar */}
+                        <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px', borderRadius: '8px', border: '1px solid var(--border-subtle)', background: '#fff' }}>
                             <div>
-                                <span className="badge badge-approved" style={{ marginBottom: '6px' }}>Painel de Disparo</span>
-                                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-main)' }}>
-                                    {selectedClient}
-                                </h2>
-                                <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                    <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)', margin: 0, letterSpacing: '-0.01em' }}>
+                                        {selectedClient}
+                                    </h2>
+                                    <span className="badge badge-approved" style={{ fontSize: '11px', height: '20px', padding: '0 6px', borderRadius: '4px', fontWeight: 500 }}>Painel de Disparo</span>
+                                </div>
+                                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
                                     {contacts.length > 0 
                                         ? `${contacts.length} contatos carregados e prontos para envio na BM do Luiz.` 
                                         : 'Carregue sua planilha abaixo ou defina seus remetentes para iniciar.'}
                                 </p>
                             </div>
 
-                            <div style={{ display: 'flex', gap: '10px' }}>
+                            <div style={{ display: 'flex', gap: '8px' }}>
                                 <button 
                                     className="btn-secondary" 
                                     onClick={() => setActiveTab('registry')}
+                                    style={{ height: '34px', fontSize: '13px', padding: '0 12px', borderRadius: '6px' }}
                                 >
                                     Gerenciar WABAs
                                 </button>
                                 <button 
-                                    className="btn-primary"
+                                    className="btn-primary" 
                                     onClick={() => setShowConfirmModal(true)}
                                     disabled={contacts.length === 0}
+                                    style={{ height: '34px', fontSize: '13px', padding: '0 14px', borderRadius: '6px' }}
                                 >
                                     Revisar & Enfileirar
                                 </button>
@@ -301,17 +337,15 @@ export const App: React.FC = () => {
                     </div>
                 )}
 
-                {/* TAB 3: REGISTRO DE ENVIOS EM TEMPO REAL */}
-                {activeTab === 'records' && (
-                    <DispatchRecords />
-                )}
-
-                {/* TAB 4: FILA REDIS (HUD MONITOR) */}
-                {activeTab === 'redis' && (
-                    <RedisMonitor 
-                        status={redisStatus}
-                        onRefresh={refreshRedisStatus}
-                    />
+                {/* TAB: MONITOR (Fila Redis & Registros de Envios Unificados em uma página só) */}
+                {(activeTab === 'monitor' || activeTab === 'records' || activeTab === 'redis') && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <RedisMonitor 
+                            status={redisStatus}
+                            onRefresh={refreshRedisStatus}
+                        />
+                        <DispatchRecords />
+                    </div>
                 )}
 
                 {/* MODAL: Review & Redis Queue Confirmation */}

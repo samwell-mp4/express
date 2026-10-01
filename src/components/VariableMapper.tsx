@@ -29,13 +29,12 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
     const updateMapping = (id: number, updates: Partial<PlaceholderMapping>) => {
         setMappings(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
     };
-
     return (
-        <div className="glass-panel" style={{ padding: '20px 24px', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+        <div className="glass-panel" style={{ padding: '16px 20px', marginBottom: '16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', background: '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Type size={18} color="var(--primary-color)" />
-                    <h4 style={{ fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                    <Type size={16} color="var(--primary-color)" />
+                    <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
                         Mapeamento de Variáveis ({`{{1}}, {{2}}...`})
                     </h4>
                 </div>
@@ -43,18 +42,18 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
                 <button 
                     className="btn-secondary"
                     onClick={addPlaceholder}
-                    style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                    style={{ height: '32px', fontSize: '12.5px', padding: '0 10px', borderRadius: '6px' }}
                 >
-                    <Plus size={14} />
+                    <Plus size={13} />
                     Adicionar Variável
                 </button>
             </div>
 
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 14px 0' }}>
                 Associe cada variável do corpo do template a uma coluna da planilha (ex: Nome do Cliente) ou digite um texto estático.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {mappings.map((m, idx) => {
                     const previewVal = m.type === 'column'
                         ? (sampleContact ? (sampleContact[m.columnName] || sampleContact.nome || '') : 'Exemplo')
@@ -64,20 +63,21 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
                         <div key={m.id} style={{ 
                             display: 'flex', 
                             alignItems: 'center', 
-                            gap: '12px', 
+                            gap: '10px', 
                             background: '#f8fafc', 
-                            padding: '10px 14px', 
-                            borderRadius: '10px',
+                            padding: '8px 12px', 
+                            borderRadius: '6px',
                             border: '1px solid var(--border-subtle)',
                             flexWrap: 'wrap'
                         }}>
                             <span style={{ 
                                 background: 'var(--primary-color)', 
                                 color: '#ffffff', 
-                                fontWeight: 800, 
-                                fontSize: '0.78rem', 
-                                padding: '3px 8px', 
-                                borderRadius: '6px' 
+                                fontWeight: 600, 
+                                fontSize: '11px', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px',
+                                fontFamily: 'monospace'
                             }}>
                                 {`{{${idx + 1}}}`}
                             </span>
@@ -86,7 +86,7 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
                                 className="form-select"
                                 value={m.type}
                                 onChange={(e: any) => updateMapping(m.id, { type: e.target.value })}
-                                style={{ width: '130px', padding: '6px 10px', fontSize: '0.82rem' }}
+                                style={{ width: '120px', height: '34px', padding: '0 8px', fontSize: '12.5px', borderRadius: '6px' }}
                             >
                                 <option value="column">Coluna</option>
                                 <option value="fixed">Texto Fixo</option>
@@ -97,7 +97,7 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
                                     className="form-select"
                                     value={m.columnName}
                                     onChange={(e) => updateMapping(m.id, { columnName: e.target.value })}
-                                    style={{ flex: 1, minWidth: '150px', padding: '6px 10px', fontSize: '0.82rem' }}
+                                    style={{ flex: 1, minWidth: '150px', height: '34px', padding: '0 8px', fontSize: '12.5px', borderRadius: '6px' }}
                                 >
                                     <option value="">Selecione a Coluna...</option>
                                     {availableColumns.map(col => (
@@ -111,21 +111,22 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
                                     className="form-input"
                                     value={m.fixedValue}
                                     onChange={(e) => updateMapping(m.id, { fixedValue: e.target.value })}
-                                    style={{ flex: 1, minWidth: '150px', padding: '6px 10px', fontSize: '0.82rem' }}
+                                    style={{ flex: 1, minWidth: '150px', height: '34px', padding: '0 8px', fontSize: '12.5px', borderRadius: '6px' }}
                                 />
                             )}
 
                             {/* Live preview value */}
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', minWidth: '140px' }}>
-                                Valor: <strong style={{ color: 'var(--primary-color)' }}>{previewVal || '—'}</strong>
+                            <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', minWidth: '130px' }}>
+                                Valor: <strong style={{ color: 'var(--text-main)', fontWeight: 600 }}>{previewVal || '—'}</strong>
                             </div>
 
                             {mappings.length > 1 && (
                                 <button 
                                     onClick={() => removePlaceholder(m.id)}
-                                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+                                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}
+                                    title="Remover"
                                 >
-                                    <Trash2 size={15} />
+                                    <Trash2 size={14} />
                                 </button>
                             )}
                         </div>

@@ -6,7 +6,7 @@ import {
     ArrowRight, CheckSquare, Eye
 } from 'lucide-react';
 import { SenderConfig, ParsedContact, SavedWaba, InfobipTemplateSummary } from '../types';
-import { api, LUIS_KEY, LUIS_BASE } from '../services/api';
+import { api, LUIS_BASE } from '../services/api';
 import { excelService, SpreadsheetAnalysis } from '../services/excelService';
 import { wabaStorage } from '../services/wabaStorage';
 
@@ -488,7 +488,7 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
     const totalAllocated = senders.reduce((acc, s) => acc + (s.limit || 0), 0);
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
             {/* Notification Toast */}
             {bannerMessage && (
@@ -496,43 +496,42 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                     background: '#ecfdf5',
                     border: '1px solid #a7f3d0',
                     color: '#065f46',
-                    padding: '12px 18px',
-                    borderRadius: '12px',
+                    padding: '10px 16px',
+                    borderRadius: '6px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
+                    gap: '8px',
+                    fontSize: '13px',
+                    fontWeight: 500,
                     boxShadow: 'var(--shadow-subtle)'
                 }}>
-                    <CheckCircle2 size={18} color="#059669" />
+                    <CheckCircle2 size={16} color="#059669" />
                     <span>{bannerMessage}</span>
                 </div>
             )}
 
             {/* DIRECT SPREADSHEET UPLOADER PANEL */}
-            <div className="glass-panel" style={{ padding: '22px 26px', background: '#fff' }}>
+            <div className="glass-panel" style={{ padding: '18px 22px', background: '#fff', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ 
                             background: '#ecfdf5', 
                             color: 'var(--primary-color)', 
-                            width: '42px', 
-                            height: '42px', 
-                            borderRadius: '10px', 
+                            width: '36px', 
+                            height: '36px', 
+                            borderRadius: '6px', 
                             display: 'flex', 
                             alignItems: 'center', 
-                            justifyContent: 'center',
-                            boxShadow: '0 2px 8px rgba(5, 150, 105, 0.15)'
+                            justifyContent: 'center'
                         }}>
-                            <FileSpreadsheet size={24} />
+                            <FileSpreadsheet size={18} />
                         </div>
                         <div>
-                            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1.2 }}>
+                            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
                                 Planilha de Contatos (Excel / CSV)
                             </h3>
-                            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                Envie sua lista de contatos em formato .xlsx ou .csv com higienização automática para 13 dígitos Brasil (55 + DDD + 9 + 8 dígitos).
+                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px', margin: 0 }}>
+                                Envie sua lista de contatos (.xlsx ou .csv) com higienização automática para 13 dígitos Brasil (55 + DDD + 9 + 8 dígitos).
                             </p>
                         </div>
                     </div>
@@ -541,10 +540,10 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                         <button 
                             className="btn-secondary"
                             onClick={() => setShowManualPasteModal(true)}
-                            style={{ fontSize: '0.8rem', padding: '7px 12px' }}
+                            style={{ fontSize: '12.5px', height: '34px', padding: '0 12px', borderRadius: '6px' }}
                             title="Colar lista de telefones do clipboard"
                         >
-                            <Sparkles size={14} />
+                            <Sparkles size={13} />
                             Colar Telefones
                         </button>
 
@@ -553,15 +552,15 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                 <button 
                                     className="btn-secondary"
                                     onClick={handleDownloadCleanCsv}
-                                    style={{ fontSize: '0.8rem', padding: '7px 12px' }}
+                                    style={{ fontSize: '12.5px', height: '34px', padding: '0 12px', borderRadius: '6px' }}
                                     title="Baixar arquivo higienizado"
                                 >
-                                    <Download size={14} />
+                                    <Download size={13} />
                                     Baixar CSV (13D)
                                 </button>
                                 <button 
                                     onClick={handleClearSpreadsheet}
-                                    style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '7px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                                    style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', height: '34px', padding: '0 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 500 }}
                                     title="Remover planilha atual"
                                 >
                                     Trocar Planilha
@@ -578,13 +577,13 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                     onDrop={handleDrop}
                     onClick={() => fileInputRef.current?.click()}
                     style={{
-                        border: `2px dashed ${isDraggingFile ? 'var(--primary-color)' : '#cbd5e1'}`,
-                        borderRadius: '14px',
-                        padding: '24px 20px',
+                        border: `1.5px dashed ${isDraggingFile ? 'var(--primary-color)' : '#cbd5e1'}`,
+                        borderRadius: '8px',
+                        padding: '20px 16px',
                         textAlign: 'center',
                         background: isDraggingFile ? '#ecfdf5' : '#f8fafc',
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
+                        transition: 'all 0.15s ease',
                         position: 'relative'
                     }}
                 >
@@ -597,15 +596,15 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                     />
                     
                     <FileSpreadsheet 
-                        size={36} 
+                        size={28} 
                         color={isDraggingFile ? 'var(--primary-color)' : '#64748b'} 
-                        style={{ margin: '0 auto 10px' }} 
+                        style={{ margin: '0 auto 8px' }} 
                     />
                     
-                    <p style={{ fontWeight: 800, fontSize: '0.96rem', color: 'var(--text-main)' }}>
+                    <p style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-main)', margin: '0 0 4px 0' }}>
                         {uploadedFileName ? `Arquivo Carregado: ${uploadedFileName}` : 'Clique para selecionar ou arraste uma planilha Excel (.xlsx) ou CSV aqui'}
                     </p>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+                    <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: 0 }}>
                         {isParsingExcel 
                             ? 'Lendo linhas e higienizando telefones para 13 dígitos...' 
                             : 'Identifica colunas de telefone e nome automaticamente em qualquer posição'}
@@ -614,25 +613,25 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
 
                 {/* Metrics & Column Selectors Bar if spreadsheet loaded */}
                 {contacts.length > 0 && excelAnalysis && (
-                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         
                         {/* Statistics Badges */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
-                            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-                                <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)', display: 'block' }}>Total de Linhas</span>
-                                <strong style={{ fontSize: '1.25rem', color: 'var(--text-main)' }}>{excelAnalysis.stats.totalRows}</strong>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
+                            <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                                <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total de Linhas</span>
+                                <strong style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)' }}>{excelAnalysis.stats.totalRows}</strong>
                             </div>
-                            <div style={{ background: '#ecfdf5', padding: '10px 14px', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
-                                <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700, display: 'block' }}>Válidos (13D Brasil)</span>
-                                <strong style={{ fontSize: '1.25rem', color: 'var(--primary-color)' }}>{contacts.length}</strong>
+                            <div style={{ background: '#ecfdf5', padding: '8px 12px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                                <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600, display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Válidos (13D)</span>
+                                <strong style={{ fontSize: '18px', fontWeight: 600, color: 'var(--primary-color)' }}>{contacts.length}</strong>
                             </div>
-                            <div style={{ background: '#fefce8', padding: '10px 14px', borderRadius: '10px', border: '1px solid #fef08a' }}>
-                                <span style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 700, display: 'block' }}>Duplicados Removidos</span>
-                                <strong style={{ fontSize: '1.25rem', color: '#d97706' }}>{excelAnalysis.stats.duplicateCount}</strong>
+                            <div style={{ background: '#fefce8', padding: '8px 12px', borderRadius: '6px', border: '1px solid #fef08a' }}>
+                                <span style={{ fontSize: '11px', color: '#b45309', fontWeight: 600, display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Duplicados</span>
+                                <strong style={{ fontSize: '18px', fontWeight: 600, color: '#d97706' }}>{excelAnalysis.stats.duplicateCount}</strong>
                             </div>
-                            <div style={{ background: '#fef2f2', padding: '10px 14px', borderRadius: '10px', border: '1px solid #fecaca' }}>
-                                <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 700, display: 'block' }}>Inválidos Descartados</span>
-                                <strong style={{ fontSize: '1.25rem', color: '#dc2626' }}>{excelAnalysis.stats.invalidCount}</strong>
+                            <div style={{ background: '#fef2f2', padding: '8px 12px', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                                <span style={{ fontSize: '11px', color: '#dc2626', fontWeight: 600, display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Inválidos</span>
+                                <strong style={{ fontSize: '18px', fontWeight: 600, color: '#dc2626' }}>{excelAnalysis.stats.invalidCount}</strong>
                             </div>
                         </div>
 
@@ -641,29 +640,29 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                             <div style={{ 
                                 background: '#f8fafc', 
                                 border: '1px solid var(--border-subtle)', 
-                                borderRadius: '10px', 
-                                padding: '12px 16px',
+                                borderRadius: '6px', 
+                                padding: '10px 14px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
                                 flexWrap: 'wrap',
-                                gap: '12px'
+                                gap: '10px'
                             }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Sliders size={16} color="var(--primary-color)" />
-                                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Sliders size={14} color="var(--primary-color)" />
+                                    <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-main)' }}>
                                         Mapeamento de Colunas da Planilha:
                                     </span>
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Coluna Telefone:</label>
+                                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Coluna Telefone:</label>
                                         <select 
                                             className="form-select"
                                             value={selectedPhoneCol}
                                             onChange={(e) => handleColumnChange(Number(e.target.value), selectedNameCol)}
-                                            style={{ padding: '4px 8px', fontSize: '0.8rem', minWidth: '130px' }}
+                                            style={{ height: '32px', padding: '0 8px', fontSize: '12.5px', minWidth: '130px', borderRadius: '6px' }}
                                         >
                                             {excelAnalysis.headers.map((h, idx) => (
                                                 <option key={idx} value={idx}>{h || `Coluna ${idx + 1}`}</option>
@@ -672,12 +671,12 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                     </div>
 
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Coluna Nome / Info 2:</label>
+                                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Coluna Nome / Info 2:</label>
                                         <select 
                                             className="form-select"
                                             value={selectedNameCol}
                                             onChange={(e) => handleColumnChange(selectedPhoneCol, Number(e.target.value))}
-                                            style={{ padding: '4px 8px', fontSize: '0.8rem', minWidth: '130px' }}
+                                            style={{ height: '32px', padding: '0 8px', fontSize: '12.5px', minWidth: '130px', borderRadius: '6px' }}
                                         >
                                             <option value={-1}>Nenhuma (Vazio)</option>
                                             {excelAnalysis.headers.map((h, idx) => (
@@ -690,35 +689,35 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                         )}
 
                         {/* Sample Preview Table */}
-                        <div style={{ border: '1px solid var(--border-subtle)', borderRadius: '10px', overflow: 'hidden' }}>
-                            <div style={{ padding: '8px 14px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                        <div style={{ border: '1px solid var(--border-subtle)', borderRadius: '6px', overflow: 'hidden' }}>
+                            <div style={{ padding: '6px 12px', background: '#f8fafc', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <Eye size={14} />
+                                    <Eye size={13} />
                                     Amostra dos Primeiros Contatos Higienizados (Padrão 13D Brasil):
                                 </span>
-                                <span>Mostrando {Math.min(5, contacts.length)} de {contacts.length}</span>
+                                <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Mostrando {Math.min(5, contacts.length)} de {contacts.length}</span>
                             </div>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left', background: '#fff' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px', textAlign: 'left', background: '#fff' }}>
                                 <thead>
-                                    <tr style={{ borderBottom: '1px solid #e2e8f0', color: 'var(--text-dim)' }}>
-                                        <th style={{ padding: '8px 14px' }}>#</th>
-                                        <th style={{ padding: '8px 14px' }}>TELEFONE (13 DÍGITOS)</th>
-                                        <th style={{ padding: '8px 14px' }}>NOME / INFO 2</th>
-                                        <th style={{ padding: '8px 14px' }}>STATUS</th>
+                                    <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', background: '#F8FAFC' }}>
+                                        <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>#</th>
+                                        <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>TELEFONE (13 DÍGITOS)</th>
+                                        <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>NOME / INFO 2</th>
+                                        <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>STATUS</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {contacts.slice(0, 5).map((c, idx) => (
                                         <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                            <td style={{ padding: '8px 14px', color: 'var(--text-dim)' }}>{idx + 1}</td>
-                                            <td style={{ padding: '8px 14px', fontWeight: 700, color: 'var(--text-main)', fontFamily: 'monospace' }}>
+                                            <td style={{ padding: '8px 12px', color: 'var(--text-dim)' }}>{idx + 1}</td>
+                                            <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'monospace' }}>
                                                 {c.telefone}
                                             </td>
-                                            <td style={{ padding: '8px 14px', color: 'var(--text-muted)' }}>
+                                            <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>
                                                 {c.nome || '—'}
                                             </td>
-                                            <td style={{ padding: '8px 14px' }}>
-                                                <span className="badge badge-approved" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                                            <td style={{ padding: '8px 12px' }}>
+                                                <span className="badge badge-approved" style={{ fontSize: '11px', height: '20px', padding: '0 6px', borderRadius: '4px', fontWeight: 500 }}>
                                                     ✓ Válido (13D)
                                                 </span>
                                             </td>
@@ -733,10 +732,10 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
             </div>
 
             {/* ACTION TOOLBAR: ADD SENDER, SAVED WABAS, CARDS/LIST SWITCHER */}
-            <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', background: '#fff' }}>
+            <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', background: '#fff', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                 
                 {/* Left Action Buttons */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     
                     {/* NOVO REMETENTE (Opens the requested Modal to pick saved BMs or create new) */}
                     <button 
@@ -745,95 +744,96 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                             setAddSenderTab('saved');
                             setShowAddSenderModal(true);
                         }}
-                        style={{ fontSize: '0.86rem', padding: '8px 16px', gap: '6px' }}
+                        style={{ fontSize: '13px', height: '34px', padding: '0 12px', gap: '5px', borderRadius: '6px' }}
                     >
-                        <Plus size={16} strokeWidth={2.4} />
+                        <Plus size={15} />
                         Novo Remetente
                     </button>
 
                     <button 
                         className="btn-secondary" 
                         onClick={handleReplicateTemplate} 
-                        style={{ fontSize: '0.82rem', padding: '8px 12px' }}
+                        style={{ fontSize: '12.5px', height: '34px', padding: '0 10px', borderRadius: '6px' }}
                         title="Replicar o template do Remetente 1 para todos"
                     >
-                        <Copy size={14} />
+                        <Copy size={13} />
                         Replicar Template 1
                     </button>
 
                     <button 
                         className="btn-secondary" 
                         onClick={handleDistributeEqually} 
-                        style={{ fontSize: '0.82rem', padding: '8px 12px' }}
+                        style={{ fontSize: '12.5px', height: '34px', padding: '0 10px', borderRadius: '6px' }}
                         title="Dividir total de contatos igualmente entre os remetentes"
                     >
-                        <Split size={14} />
+                        <Split size={13} />
                         Dividir Igualmente
                     </button>
 
                     <button 
                         className="btn-secondary" 
                         onClick={() => handleAutoPartitionQuota(250)} 
-                        style={{ fontSize: '0.82rem', padding: '8px 12px' }}
+                        style={{ fontSize: '12.5px', height: '34px', padding: '0 10px', borderRadius: '6px' }}
                         title="Ajustar limites para 250 mensagens cada"
                     >
-                        <Layers size={14} />
+                        <Layers size={13} />
                         Cotas de 250
                     </button>
                 </div>
 
                 {/* Right: View Switcher (Card / List) & Allocation Progress */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     
                     {/* CARD & LIST VIEW TOGGLE */}
-                    <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', padding: '2px', borderRadius: '6px' }}>
                         <button 
                             onClick={() => setViewMode('card')}
                             style={{
-                                padding: '5px 12px',
-                                borderRadius: '6px',
+                                padding: '5px 10px',
+                                borderRadius: '4px',
                                 background: viewMode === 'card' ? '#ffffff' : 'transparent',
-                                color: viewMode === 'card' ? 'var(--primary-color)' : 'var(--text-muted)',
+                                color: viewMode === 'card' ? 'var(--text-main)' : 'var(--text-muted)',
                                 border: 'none',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '5px',
-                                fontSize: '0.78rem',
-                                fontWeight: 700,
-                                boxShadow: viewMode === 'card' ? 'var(--shadow-subtle)' : 'none'
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                boxShadow: viewMode === 'card' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
                             }}
                         >
-                            <LayoutGrid size={14} />
+                            <LayoutGrid size={13} />
                             Cards
                         </button>
                         <button 
                             onClick={() => setViewMode('list')}
                             style={{
-                                padding: '5px 12px',
-                                borderRadius: '6px',
+                                padding: '5px 10px',
+                                borderRadius: '4px',
                                 background: viewMode === 'list' ? '#ffffff' : 'transparent',
-                                color: viewMode === 'list' ? 'var(--primary-color)' : 'var(--text-muted)',
+                                color: viewMode === 'list' ? 'var(--text-main)' : 'var(--text-muted)',
                                 border: 'none',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '5px',
-                                fontSize: '0.78rem',
-                                fontWeight: 700,
-                                boxShadow: viewMode === 'list' ? 'var(--shadow-subtle)' : 'none'
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                boxShadow: viewMode === 'list' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
                             }}
                         >
-                            <ListIcon size={14} />
+                            <ListIcon size={13} />
                             Lista
                         </button>
                     </div>
 
                     {/* Capacity Allocated */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem' }}>
-                        <span style={{ color: 'var(--text-dim)' }}>Alocação:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Alocação:</span>
                         <strong style={{ 
-                            color: contacts.length > 0 && totalAllocated >= contacts.length ? 'var(--status-approved)' : 'var(--status-pending)' 
+                            color: contacts.length > 0 && totalAllocated >= contacts.length ? 'var(--status-approved)' : 'var(--status-pending)',
+                            fontWeight: 600
                         }}>
                             {totalAllocated} / {contacts.length}
                         </strong>
@@ -846,47 +846,48 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
             {/* SENDERS VIEW: CARDS OR LIST */}
             {viewMode === 'card' ? (
                 /* CARD VIEW */
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '18px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '14px' }}>
                     {senders.map((s, idx) => (
                         <div 
                             key={s.id} 
                             className="glass-card" 
                             style={{ 
-                                padding: '22px', 
+                                padding: '16px', 
                                 display: 'flex', 
                                 flexDirection: 'column', 
-                                gap: '14px', 
-                                borderTop: '4px solid var(--primary-color)',
+                                gap: '12px', 
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-subtle)',
                                 background: '#ffffff'
                             }}
                         >
                             
                             {/* Card Header */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Smartphone size={18} color="var(--primary-color)" />
-                                    <strong style={{ color: 'var(--text-main)', fontSize: '1.02rem' }}>{s.label}</strong>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                                    <Smartphone size={16} color="var(--primary-color)" />
+                                    <strong style={{ color: 'var(--text-main)', fontSize: '14px', fontWeight: 600 }}>{s.label}</strong>
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     {/* DUPLICAR REMETENTE BUTTON */}
                                     <button
                                         className="btn-secondary"
                                         onClick={() => handleDuplicateSender(s.id)}
                                         title="Duplicar este remetente"
-                                        style={{ padding: '5px 10px', fontSize: '0.76rem', gap: '4px' }}
+                                        style={{ height: '28px', padding: '0 8px', fontSize: '12px', gap: '4px', borderRadius: '4px' }}
                                     >
-                                        <Copy size={13} />
+                                        <Copy size={12} />
                                         Duplicar
                                     </button>
 
                                     {senders.length > 1 && (
                                         <button 
                                             onClick={() => handleRemoveSender(s.id)}
-                                            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '5px', borderRadius: '6px' }}
+                                            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', height: '28px', width: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
                                             title="Remover remetente"
                                         >
-                                            <Trash2 size={16} />
+                                            <Trash2 size={14} />
                                         </button>
                                     )}
                                 </div>
@@ -894,7 +895,7 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
 
                             {/* Remetente Phone Number Input */}
                             <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
                                     Número do Remetente (WABA Oficial)
                                 </label>
                                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -902,6 +903,7 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                         type="text"
                                         placeholder="Ex: 5511999990001"
                                         className="form-input"
+                                        style={{ height: '36px', fontSize: '13.5px', borderRadius: '6px' }}
                                         value={s.senderNumber}
                                         onChange={(e) => {
                                             const cleanVal = e.target.value;
@@ -918,9 +920,9 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                         onClick={() => loadTemplatesForSender(s.id, s.senderNumber)}
                                         title="Buscar templates aprovados na Infobip para este número"
                                         disabled={s.isLoadingTemplates || !s.senderNumber}
-                                        style={{ padding: '8px 14px', whiteSpace: 'nowrap', fontSize: '0.8rem' }}
+                                        style={{ height: '36px', padding: '0 12px', whiteSpace: 'nowrap', fontSize: '12.5px', borderRadius: '6px' }}
                                     >
-                                        <RefreshCw size={14} className={s.isLoadingTemplates ? 'animate-spin' : ''} />
+                                        <RefreshCw size={13} className={s.isLoadingTemplates ? 'animate-spin' : ''} />
                                         {s.isLoadingTemplates ? 'Buscando...' : 'Buscar'}
                                     </button>
                                 </div>
@@ -929,11 +931,11 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                             {/* Template Select Dropdown */}
                             <div>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
                                         Template Aprovado (Meta / Infobip)
                                     </label>
                                     {s.templates && s.templates.length > 0 && (
-                                        <span style={{ fontSize: '0.72rem', color: 'var(--status-approved)', fontWeight: 700 }}>
+                                        <span style={{ fontSize: '11px', color: 'var(--status-approved)', fontWeight: 600 }}>
                                             {s.templates.length} disponíveis
                                         </span>
                                     )}
@@ -943,15 +945,15 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                     <div style={{
                                         background: '#f8fafc',
                                         border: '1px solid var(--border-subtle)',
-                                        borderRadius: '10px',
-                                        padding: '10px 14px',
-                                        fontSize: '0.82rem',
+                                        borderRadius: '6px',
+                                        padding: '8px 12px',
+                                        fontSize: '12px',
                                         color: 'var(--text-muted)',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '8px'
+                                        gap: '6px'
                                     }}>
-                                        <RefreshCw size={14} className="animate-spin" color="var(--primary-color)" />
+                                        <RefreshCw size={13} className="animate-spin" color="var(--primary-color)" />
                                         <span>Carregando templates da Meta...</span>
                                     </div>
                                 ) : s.templates && s.templates.length > 0 ? (
@@ -972,7 +974,7 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                                 headerType: hType
                                             });
                                         }}
-                                        style={{ fontWeight: 600 }}
+                                        style={{ height: '36px', fontSize: '13px', borderRadius: '6px', fontWeight: 500 }}
                                     >
                                         <option value="">Selecione um template aprovado...</option>
                                         {s.templates.map(t => (
@@ -982,15 +984,16 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                         ))}
                                     </select>
                                 ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                         <input 
                                             type="text"
                                             placeholder="Nome do template ou clique em 'Buscar' acima"
                                             className="form-input"
+                                            style={{ height: '36px', fontSize: '13px', borderRadius: '6px' }}
                                             value={s.templateName}
                                             onChange={(e) => updateSender(s.id, { templateName: e.target.value })}
                                         />
-                                        <span style={{ fontSize: '0.72rem', color: '#b45309' }}>
+                                        <span style={{ fontSize: '11px', color: '#b45309' }}>
                                             ⚠️ Digite o número acima e clique em "Buscar" para listar os templates da Meta.
                                         </span>
                                     </div>
@@ -1000,7 +1003,7 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                             {/* Cota e Cabeçalho */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                 <div>
-                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
                                         Cota / Limite
                                     </label>
                                     <input 
@@ -1009,18 +1012,19 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                         className="form-input"
                                         value={s.limit}
                                         onChange={(e) => updateSender(s.id, { limit: parseInt(e.target.value, 10) || 0 })}
-                                        style={{ fontWeight: 700 }}
+                                        style={{ height: '36px', fontSize: '13.5px', borderRadius: '6px', fontWeight: 600 }}
                                     />
                                 </div>
 
                                 <div>
-                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
                                         Cabeçalho
                                     </label>
                                     <select 
                                         className="form-select"
                                         value={s.headerType}
                                         onChange={(e: any) => updateSender(s.id, { headerType: e.target.value })}
+                                        style={{ height: '36px', fontSize: '13px', borderRadius: '6px' }}
                                     >
                                         <option value="NONE">Sem Mídia</option>
                                         <option value="IMAGE">Imagem</option>
@@ -1032,15 +1036,15 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                             {/* Footer indicator */}
                             <div style={{ 
                                 marginTop: 'auto', 
-                                paddingTop: '12px', 
+                                paddingTop: '10px', 
                                 borderTop: '1px solid var(--border-subtle)', 
                                 display: 'flex', 
                                 alignItems: 'center', 
                                 justifyContent: 'space-between', 
-                                fontSize: '0.82rem' 
+                                fontSize: '12px' 
                             }}>
-                                <span style={{ color: 'var(--text-dim)' }}>Capacidade Alocada:</span>
-                                <span style={{ color: 'var(--primary-color)', fontWeight: 800 }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Capacidade Alocada:</span>
+                                <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}>
                                     Até {s.limit} mensagens
                                 </span>
                             </div>
@@ -1050,50 +1054,50 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                 </div>
             ) : (
                 /* LIST VIEW */
-                <div className="glass-panel" style={{ overflowX: 'auto', padding: '8px', background: '#fff' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem', textAlign: 'left' }}>
+                <div className="glass-panel" style={{ overflowX: 'auto', padding: 0, background: '#fff', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
                         <thead>
-                            <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-dim)' }}>
-                                <th style={{ padding: '12px 16px' }}>REMETENTE</th>
-                                <th style={{ padding: '12px 16px' }}>NÚMERO WABA</th>
-                                <th style={{ padding: '12px 16px' }}>TEMPLATE META</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'right' }}>COTA</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center' }}>AÇÕES</th>
+                            <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', background: '#F8FAFC' }}>
+                                <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>REMETENTE</th>
+                                <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>NÚMERO WABA</th>
+                                <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>TEMPLATE META</th>
+                                <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>COTA</th>
+                                <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>AÇÕES</th>
                             </tr>
                         </thead>
                         <tbody>
                             {senders.map(s => (
-                                <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                    <td style={{ padding: '14px 16px', fontWeight: 700, color: 'var(--text-main)' }}>
+                                <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}>
+                                    <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-main)' }}>
                                         {s.label}
                                     </td>
-                                    <td style={{ padding: '14px 16px', fontWeight: 600 }}>
+                                    <td style={{ padding: '10px 14px', fontWeight: 500, fontFamily: 'monospace' }}>
                                         {s.senderNumber || <span style={{ color: 'var(--text-dim)' }}>Pendente</span>}
                                     </td>
-                                    <td style={{ padding: '14px 16px', color: 'var(--text-muted)' }}>
+                                    <td style={{ padding: '10px 14px', color: 'var(--text-muted)' }}>
                                         {s.templateName || <span style={{ color: 'var(--text-dim)' }}>Nenhum selecionado</span>}
                                     </td>
-                                    <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--primary-color)' }}>
+                                    <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: 'var(--text-main)' }}>
                                         {s.limit}
                                     </td>
-                                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                    <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                             <button 
-                                                className="btn-secondary"
+                                                className="btn-secondary" 
                                                 onClick={() => handleDuplicateSender(s.id)}
-                                                style={{ padding: '4px 10px', fontSize: '0.74rem' }}
+                                                style={{ height: '28px', padding: '0 8px', fontSize: '12px', borderRadius: '4px' }}
                                                 title="Duplicar remetente"
                                             >
-                                                <Copy size={12} />
+                                                <Copy size={11} />
                                                 Duplicar
                                             </button>
                                             {senders.length > 1 && (
                                                 <button 
                                                     onClick={() => handleRemoveSender(s.id)}
-                                                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+                                                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', height: '28px', width: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                     title="Excluir"
                                                 >
-                                                    <Trash2 size={15} />
+                                                    <Trash2 size={13} />
                                                 </button>
                                             )}
                                         </div>
@@ -1106,11 +1110,11 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
             )}
 
             {/* Bottom Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                 <button 
                     className="btn-primary"
                     onClick={onAdvanceToReview}
-                    style={{ padding: '12px 28px', fontSize: '0.95rem' }}
+                    style={{ height: '38px', padding: '0 20px', fontSize: '13.5px', borderRadius: '6px', fontWeight: 600 }}
                     disabled={contacts.length === 0}
                 >
                     Revisar & Enfileirar no Redis
@@ -1124,45 +1128,46 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                 <div style={{
                     position: 'fixed',
                     inset: 0,
-                    background: 'rgba(15, 23, 42, 0.65)',
-                    backdropFilter: 'blur(5px)',
+                    background: 'rgba(15, 23, 42, 0.45)',
+                    backdropFilter: 'blur(3px)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 1150,
-                    padding: '20px'
+                    padding: '16px'
                 }}>
-                    <div className="glass-panel" style={{ width: '100%', maxWidth: '720px', padding: '26px', background: '#fff', maxHeight: '90vh', overflowY: 'auto' }}>
+                    <div className="glass-panel" style={{ width: '100%', maxWidth: '680px', padding: '22px', background: '#fff', borderRadius: '8px', border: '1px solid var(--border-subtle)', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}>
                         
                         {/* Modal Header */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                             <div>
-                                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                                <h3 style={{ fontSize: '17px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
                                     Adicionar Remetente (WABA)
                                 </h3>
-                                <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+                                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
                                     Selecione das BMs salvas no navegador ou registre uma nova para salvar permanentemente.
                                 </p>
                             </div>
                             <button 
                                 onClick={() => setShowAddSenderModal(false)}
-                                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}
                             >
-                                <X size={16} />
+                                <X size={15} />
                             </button>
                         </div>
 
                         {/* Modal Tabs Header */}
-                        <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px', marginBottom: '18px' }}>
+                        <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px', marginBottom: '16px' }}>
                             <button
                                 onClick={() => setAddSenderTab('saved')}
                                 style={{
-                                    padding: '8px 16px',
-                                    borderRadius: '8px',
+                                    height: '34px',
+                                    padding: '0 12px',
+                                    borderRadius: '6px',
                                     background: addSenderTab === 'saved' ? 'var(--primary-color)' : '#f1f5f9',
                                     color: addSenderTab === 'saved' ? '#ffffff' : 'var(--text-main)',
-                                    fontWeight: 700,
-                                    fontSize: '0.84rem',
+                                    fontWeight: 500,
+                                    fontSize: '13px',
                                     border: 'none',
                                     cursor: 'pointer',
                                     display: 'flex',
@@ -1170,19 +1175,20 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                     gap: '6px'
                                 }}
                             >
-                                <FolderPlus size={15} />
+                                <FolderPlus size={14} />
                                 WABAs / BMs Salvas ({savedWabas.length})
                             </button>
 
                             <button
                                 onClick={() => setAddSenderTab('create_new')}
                                 style={{
-                                    padding: '8px 16px',
-                                    borderRadius: '8px',
+                                    height: '34px',
+                                    padding: '0 12px',
+                                    borderRadius: '6px',
                                     background: addSenderTab === 'create_new' ? 'var(--primary-color)' : '#f1f5f9',
                                     color: addSenderTab === 'create_new' ? '#ffffff' : 'var(--text-main)',
-                                    fontWeight: 700,
-                                    fontSize: '0.84rem',
+                                    fontWeight: 500,
+                                    fontSize: '13px',
                                     border: 'none',
                                     cursor: 'pointer',
                                     display: 'flex',
@@ -1190,19 +1196,20 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                     gap: '6px'
                                 }}
                             >
-                                <Plus size={15} />
+                                <Plus size={14} />
                                 Criar Nova WABA
                             </button>
 
                             <button
                                 onClick={handleAddBlankSender}
                                 style={{
-                                    padding: '8px 16px',
-                                    borderRadius: '8px',
+                                    height: '34px',
+                                    padding: '0 12px',
+                                    borderRadius: '6px',
                                     background: '#f1f5f9',
                                     color: 'var(--text-muted)',
-                                    fontWeight: 600,
-                                    fontSize: '0.84rem',
+                                    fontWeight: 500,
+                                    fontSize: '12.5px',
                                     border: 'none',
                                     cursor: 'pointer',
                                     marginLeft: 'auto'
@@ -1215,9 +1222,9 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                         {/* TAB 1: SAVED WABAS (With CARD and LIST view mode) */}
                         {addSenderTab === 'saved' && (
                             <div>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                                    <span style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-                                        WABAs cadastradas na BM do Luiz (salvas no navegador permanentemente):
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                        WABAs cadastradas na BM do Luiz (salvas no navegador):
                                     </span>
 
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1229,17 +1236,17 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                                     padding: '4px 8px',
                                                     borderRadius: '4px',
                                                     background: savedWabaViewMode === 'card' ? '#ffffff' : 'transparent',
-                                                    color: savedWabaViewMode === 'card' ? 'var(--primary-color)' : 'var(--text-muted)',
+                                                    color: savedWabaViewMode === 'card' ? 'var(--text-main)' : 'var(--text-muted)',
                                                     border: 'none',
                                                     cursor: 'pointer',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     gap: '4px',
-                                                    fontSize: '0.74rem',
-                                                    fontWeight: 600
+                                                    fontSize: '12px',
+                                                    fontWeight: 500
                                                 }}
                                             >
-                                                <LayoutGrid size={13} />
+                                                <LayoutGrid size={12} />
                                                 Cards
                                             </button>
                                             <button 
@@ -1248,23 +1255,23 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                                     padding: '4px 8px',
                                                     borderRadius: '4px',
                                                     background: savedWabaViewMode === 'list' ? '#ffffff' : 'transparent',
-                                                    color: savedWabaViewMode === 'list' ? 'var(--primary-color)' : 'var(--text-muted)',
+                                                    color: savedWabaViewMode === 'list' ? 'var(--text-main)' : 'var(--text-muted)',
                                                     border: 'none',
                                                     cursor: 'pointer',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     gap: '4px',
-                                                    fontSize: '0.74rem',
-                                                    fontWeight: 600
+                                                    fontSize: '12px',
+                                                    fontWeight: 500
                                                 }}
                                             >
-                                                <ListIcon size={13} />
+                                                <ListIcon size={12} />
                                                 Lista
                                             </button>
                                         </div>
 
                                         {savedWabas.length > 0 && (
-                                            <button className="btn-secondary" onClick={handleImportAllSavedWabas} style={{ fontSize: '0.76rem', padding: '5px 10px' }}>
+                                            <button className="btn-secondary" onClick={handleImportAllSavedWabas} style={{ height: '28px', fontSize: '12px', padding: '0 8px', borderRadius: '4px' }}>
                                                 Importar Todas ({savedWabas.length})
                                             </button>
                                         )}
@@ -1272,60 +1279,58 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                 </div>
 
                                 {savedWabas.length === 0 ? (
-                                    <div style={{ textAlign: 'center', padding: '40px 10px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-                                        <Smartphone size={32} color="#94a3b8" style={{ margin: '0 auto 10px' }} />
-                                        <p style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.96rem' }}>Nenhuma WABA salva encontrada no navegador</p>
-                                        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: '380px', margin: '4px auto 14px' }}>
+                                    <div style={{ textAlign: 'center', padding: '36px 10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                                        <Smartphone size={28} color="#94a3b8" style={{ margin: '0 auto 8px' }} />
+                                        <p style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '14px', margin: '0 0 4px 0' }}>Nenhuma WABA salva encontrada no navegador</p>
+                                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '380px', margin: '0 auto 12px' }}>
                                             Você pode cadastrar uma agora mesmo clicando na aba "Criar Nova WABA" acima ou acessando o menu "Registrar WABA".
                                         </p>
-                                        <button className="btn-primary" onClick={() => setAddSenderTab('create_new')} style={{ fontSize: '0.82rem', padding: '6px 14px' }}>
-                                            <Plus size={14} />
+                                        <button className="btn-primary" onClick={() => setAddSenderTab('create_new')} style={{ height: '32px', fontSize: '12.5px', padding: '0 12px', borderRadius: '6px' }}>
+                                            <Plus size={13} />
                                             Cadastrar Agora
                                         </button>
                                     </div>
                                 ) : savedWabaViewMode === 'card' ? (
                                     /* CARDS MODE IN MODAL */
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px', maxHeight: '380px', overflowY: 'auto' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '10px', maxHeight: '380px', overflowY: 'auto' }}>
                                         {savedWabas.map(w => (
                                             <div 
                                                 key={w.id}
                                                 style={{
                                                     background: '#ffffff',
                                                     border: '1px solid var(--border-subtle)',
-                                                    borderLeft: '4px solid var(--primary-color)',
-                                                    borderRadius: '10px',
-                                                    padding: '14px',
+                                                    borderRadius: '6px',
+                                                    padding: '12px',
                                                     display: 'flex',
                                                     flexDirection: 'column',
-                                                    gap: '10px',
-                                                    boxShadow: 'var(--shadow-subtle)'
+                                                    gap: '8px'
                                                 }}
                                             >
                                                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                                                     <div>
-                                                        <strong style={{ fontSize: '0.94rem', color: 'var(--text-main)', display: 'block' }}>{w.label}</strong>
-                                                        <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                            <ShieldCheck size={12} color="var(--primary-color)" />
+                                                        <strong style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-main)', display: 'block' }}>{w.label}</strong>
+                                                        <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+                                                            <ShieldCheck size={11} color="var(--primary-color)" />
                                                             {w.accountName || 'BM do Luiz'}
                                                         </span>
                                                     </div>
-                                                    <span style={{ fontSize: '0.72rem', background: '#ecfdf5', color: 'var(--primary-color)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                                    <span style={{ fontSize: '11px', background: '#ecfdf5', color: 'var(--primary-color)', padding: '2px 6px', borderRadius: '4px', fontWeight: 500 }}>
                                                         Cota: {w.defaultLimit}
                                                     </span>
                                                 </div>
 
-                                                <div style={{ background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: 700 }}>
+                                                <div style={{ background: '#f8fafc', padding: '5px 8px', borderRadius: '4px', fontSize: '12.5px', fontFamily: 'monospace', fontWeight: 600, border: '1px solid var(--border-subtle)' }}>
                                                     {w.number}
                                                 </div>
 
-                                                <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                                                     Template: <strong>{w.templateName || 'Não definido'}</strong>
                                                 </div>
 
                                                 <button 
                                                     className="btn-primary"
                                                     onClick={() => handleAddSavedWabaToDispatches(w)}
-                                                    style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px', justifyContent: 'center' }}
+                                                    style={{ width: '100%', height: '32px', fontSize: '12.5px', padding: '0 8px', justifyContent: 'center', borderRadius: '6px' }}
                                                 >
                                                     <Plus size={13} />
                                                     Usar este Remetente
@@ -1335,29 +1340,29 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                     </div>
                                 ) : (
                                     /* LIST MODE IN MODAL */
-                                    <div style={{ maxHeight: '380px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+                                    <div style={{ maxHeight: '380px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '6px' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px', textAlign: 'left' }}>
                                             <thead>
-                                                <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-dim)' }}>
-                                                    <th style={{ padding: '10px 12px' }}>RÓTULO</th>
-                                                    <th style={{ padding: '10px 12px' }}>NÚMERO</th>
-                                                    <th style={{ padding: '10px 12px' }}>CONTA</th>
-                                                    <th style={{ padding: '10px 12px' }}>COTA</th>
-                                                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>AÇÃO</th>
+                                                <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+                                                    <th style={{ padding: '8px 12px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>RÓTULO</th>
+                                                    <th style={{ padding: '8px 12px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>NÚMERO</th>
+                                                    <th style={{ padding: '8px 12px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>CONTA</th>
+                                                    <th style={{ padding: '8px 12px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>COTA</th>
+                                                    <th style={{ padding: '8px 12px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>AÇÃO</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {savedWabas.map(w => (
                                                     <tr key={w.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                        <td style={{ padding: '10px 12px', fontWeight: 700 }}>{w.label}</td>
-                                                        <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontWeight: 600 }}>{w.number}</td>
-                                                        <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{w.accountName || 'BM do Luiz'}</td>
-                                                        <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--primary-color)' }}>{w.defaultLimit}</td>
-                                                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                                        <td style={{ padding: '8px 12px', fontWeight: 600 }}>{w.label}</td>
+                                                        <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 500 }}>{w.number}</td>
+                                                        <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>{w.accountName || 'BM do Luiz'}</td>
+                                                        <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--primary-color)' }}>{w.defaultLimit}</td>
+                                                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
                                                             <button 
                                                                 className="btn-secondary"
                                                                 onClick={() => handleAddSavedWabaToDispatches(w)}
-                                                                style={{ padding: '4px 10px', fontSize: '0.74rem' }}
+                                                                style={{ height: '28px', padding: '0 8px', fontSize: '12px', borderRadius: '4px' }}
                                                             >
                                                                 + Usar
                                                             </button>
@@ -1373,22 +1378,23 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
 
                         {/* TAB 2: CREATE NEW WABA AND SAVE */}
                         {addSenderTab === 'create_new' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 <div>
-                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                                         Nome / Rótulo da Nova WABA
                                     </label>
                                     <input 
                                         type="text"
                                         placeholder="Ex: WABA Vendas 02"
                                         className="form-input"
+                                        style={{ height: '36px', fontSize: '13.5px', borderRadius: '6px' }}
                                         value={newWabaLabel}
                                         onChange={(e) => setNewWabaLabel(e.target.value)}
                                     />
                                 </div>
 
                                 <div>
-                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                                         Número de WhatsApp Oficial (com DDD)
                                     </label>
                                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -1396,6 +1402,7 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                             type="text"
                                             placeholder="Ex: 5511999990002"
                                             className="form-input"
+                                            style={{ height: '36px', fontSize: '13.5px', borderRadius: '6px' }}
                                             value={newWabaNumber}
                                             onChange={(e) => {
                                                 setNewWabaNumber(e.target.value);
@@ -1409,20 +1416,20 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                             className="btn-secondary"
                                             onClick={handleFetchTemplatesForNewWaba}
                                             disabled={isLoadingNewWabaTemplates || !newWabaNumber}
-                                            style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', padding: '8px 14px' }}
+                                            style={{ whiteSpace: 'nowrap', fontSize: '12.5px', height: '36px', padding: '0 12px', borderRadius: '6px' }}
                                         >
-                                            <RefreshCw size={14} className={isLoadingNewWabaTemplates ? 'animate-spin' : ''} />
+                                            <RefreshCw size={13} className={isLoadingNewWabaTemplates ? 'animate-spin' : ''} />
                                             {isLoadingNewWabaTemplates ? 'Buscando...' : 'Buscar Templates'}
                                         </button>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                                         Template Aprovado (Meta / Infobip)
                                     </label>
                                     {isLoadingNewWabaTemplates ? (
-                                        <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '8px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                                        <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
                                             Carregando templates da Meta...
                                         </div>
                                     ) : newWabaTemplatesList.length > 0 ? (
@@ -1430,7 +1437,7 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                             className="form-select"
                                             value={newWabaTemplate}
                                             onChange={(e) => setNewWabaTemplate(e.target.value)}
-                                            style={{ fontWeight: 600 }}
+                                            style={{ height: '36px', fontSize: '13px', borderRadius: '6px', fontWeight: 500 }}
                                         >
                                             <option value="">Selecione um template aprovado...</option>
                                             {newWabaTemplatesList.map(t => (
@@ -1444,34 +1451,37 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                             type="text"
                                             placeholder="Digite o nome do template aprovado"
                                             className="form-input"
+                                            style={{ height: '36px', fontSize: '13.5px', borderRadius: '6px' }}
                                             value={newWabaTemplate}
                                             onChange={(e) => setNewWabaTemplate(e.target.value)}
                                         />
                                     )}
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                     <div>
-                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                                        <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                                             Cota Padrão
                                         </label>
                                         <input 
                                             type="number"
                                             min="1"
                                             className="form-input"
+                                            style={{ height: '36px', fontSize: '13.5px', borderRadius: '6px' }}
                                             value={newWabaLimit}
                                             onChange={(e) => setNewWabaLimit(Number(e.target.value))}
                                         />
                                     </div>
 
                                     <div>
-                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                                        <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                                             Cabeçalho
                                         </label>
                                         <select 
                                             className="form-select"
                                             value={newWabaHeaderType}
                                             onChange={(e: any) => setNewWabaHeaderType(e.target.value)}
+                                            style={{ height: '36px', fontSize: '13px', borderRadius: '6px' }}
                                         >
                                             <option value="NONE">Sem Mídia</option>
                                             <option value="IMAGE">Imagem</option>
@@ -1480,24 +1490,24 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                     </div>
                                 </div>
 
-                                <div style={{ background: '#ecfdf5', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 14px', fontSize: '0.8rem', color: '#065f46' }}>
+                                <div style={{ background: '#ecfdf5', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '8px 12px', fontSize: '12.5px', color: '#065f46' }}>
                                     ✓ Esta WABA será salva no navegador permanentemente (sobrevive ao F5) e já ficará disponível na lista de remetentes.
                                 </div>
 
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                                    <button className="btn-secondary" onClick={() => setShowAddSenderModal(false)}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                                    <button className="btn-secondary" onClick={() => setShowAddSenderModal(false)} style={{ height: '34px', fontSize: '13px', borderRadius: '6px' }}>
                                         Cancelar
                                     </button>
-                                    <button className="btn-primary" onClick={handleSaveNewWabaAndAdd}>
-                                        <Plus size={15} />
-                                        Salvar WABA e Adicionar ao Disparo
+                                    <button className="btn-primary" onClick={handleSaveNewWabaAndAdd} style={{ height: '34px', fontSize: '13px', borderRadius: '6px' }}>
+                                        <Plus size={14} />
+                                        Salvar WABA e Adicionar
                                     </button>
                                 </div>
                             </div>
                         )}
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-                            <button className="btn-secondary" onClick={() => setShowAddSenderModal(false)}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+                            <button className="btn-secondary" onClick={() => setShowAddSenderModal(false)} style={{ height: '34px', fontSize: '13px', borderRadius: '6px' }}>
                                 Fechar
                             </button>
                         </div>
@@ -1512,19 +1522,19 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                 <div style={{
                     position: 'fixed',
                     inset: 0,
-                    background: 'rgba(15, 23, 42, 0.65)',
-                    backdropFilter: 'blur(5px)',
+                    background: 'rgba(15, 23, 42, 0.45)',
+                    backdropFilter: 'blur(3px)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 1150,
-                    padding: '20px'
+                    padding: '16px'
                 }}>
-                    <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', padding: '24px', background: '#fff' }}>
-                        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '6px' }}>
+                    <div className="glass-panel" style={{ width: '100%', maxWidth: '480px', padding: '22px', background: '#fff', borderRadius: '8px', border: '1px solid var(--border-subtle)', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+                        <h3 style={{ fontSize: '17px', fontWeight: 600, color: 'var(--text-main)', margin: '0 0 4px 0' }}>
                             Colar Lista de Telefones
                         </h3>
-                        <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 14px 0' }}>
                             Cole os telefones abaixo (um por linha ou separados por vírgula/ponto e vírgula). Telefones no formato "Telefone, Nome" também são suportados.
                         </p>
 
@@ -1534,14 +1544,14 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                             placeholder="5511999990001, João Silva&#10;11988887777, Maria Oliveira&#10;5521977776666"
                             value={manualPasteText}
                             onChange={(e) => setManualPasteText(e.target.value)}
-                            style={{ fontFamily: 'monospace', fontSize: '0.85rem', marginBottom: '18px' }}
+                            style={{ fontFamily: 'monospace', fontSize: '13px', marginBottom: '14px', borderRadius: '6px', padding: '10px' }}
                         />
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                            <button className="btn-secondary" onClick={() => setShowManualPasteModal(false)}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            <button className="btn-secondary" onClick={() => setShowManualPasteModal(false)} style={{ height: '36px', fontSize: '13px', borderRadius: '6px' }}>
                                 Cancelar
                             </button>
-                            <button className="btn-primary" onClick={handleApplyManualPaste}>
+                            <button className="btn-primary" onClick={handleApplyManualPaste} style={{ height: '36px', fontSize: '13px', borderRadius: '6px' }}>
                                 Processar e Higienizar (13D)
                             </button>
                         </div>

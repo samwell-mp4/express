@@ -8,7 +8,6 @@ import {
     Layers,
     Image as ImageIcon,
     Video,
-    FileText,
     Link as LinkIcon,
     MessageSquare,
     Copy,
@@ -20,36 +19,38 @@ import {
     RotateCcw,
     Trash2,
     Edit2,
-    ChevronDown,
-    ChevronRight,
     Download,
     Activity,
     Code,
     Sliders,
-    Zap
+    Zap,
+    ExternalLink,
+    Scissors,
+    FileSpreadsheet,
+    UploadCloud
 } from 'lucide-react';
 import { InfobipAccountTemplate } from '../types';
 import { wabaStorage } from '../services/wabaStorage';
 import { templateService } from '../services/templateService';
-import { api, LUIS_KEY, LUIS_BASE } from '../services/api';
+import { api, LUIS_BASE } from '../services/api';
+import { SpreadsheetCleaner } from './SpreadsheetCleaner';
+import { MediaHostingManager } from './MediaHostingManager';
 
 interface TemplateCreatorWizardProps {
     onCreated?: (templateName: string) => void;
     onCancel?: () => void;
 }
 
-// Bulk row and campaign definitions
+// Bulk row definition
 export type BulkRow = {
     suffix: string;
     sender: string;
-    headerType: 'TEXT' | 'IMAGE' | 'VIDEO';
+    headerType: 'NONE' | 'IMAGE' | 'VIDEO';
     mediaUrl: string;
     hasButtons: boolean;
     buttonUrls: string[];
     buttonTexts: string[];
     buttonTypes: ('url' | 'reply')[];
-    originalButtonUrls?: string[];
-    variables?: string[];
 };
 
 export interface CampaignBatch {
@@ -59,7 +60,7 @@ export interface CampaignBatch {
     collapsed?: boolean;
 }
 
-// Leandro standard presets from plugesales-app
+// Leandro standard presets
 const PRESET_2_VARS = 'Olá, {{1}}.\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara revisar os dados relacionados a essa solicitação, utilize uma das opções abaixo.';
 const PRESET_4_VARS = 'Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}.\n\nPara {{4}} Clique no botão abaixo!';
 const PRESET_5_VARS = 'Olá {{1}}\n\nEstamos informando que: {{2}}.\n\n{{3}}.\n\n{{4}}.\n\nPara saber mais {{5}} Clique no botão abaixo!';
@@ -84,31 +85,32 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     onCreated,
     onCancel
 }) => {
-    // Mode Switcher: 'WIZARD' (Individual ágil) vs 'BULK' (Gerar em massa)
+    // Top Tabs: 'WIZARD' (Individual) vs 'BULK' (Gerar em Massa)
     const [creationMode, setCreationMode] = useState<'WIZARD' | 'BULK'>('WIZARD');
+
+    // Quick Tools Drawer: 'cleaner' (Higienizar Planilha) | 'media' (Upload de Mídias) | null
+    const [activeToolDrawer, setActiveToolDrawer] = useState<'cleaner' | 'media' | null>(null);
 
     // Individual Wizard Steps: 1, 2, 3, 4
     const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
 
     // ==========================================
-    // BASE STATE (SHARED)
+    // BASE STATE (Category is ALWAYS UTILITY)
     // ==========================================
+    const category = 'UTILITY'; // Strict Meta rule: sempre utilidade
+    const [language] = useState('pt_BR');
     const [templateName, setTemplateName] = useState('notificacao_cobranca_01');
-    const [category, setCategory] = useState<'UTILITY' | 'MARKETING'>('UTILITY');
-    const [language, setLanguage] = useState('pt_BR');
 
-    // Senders list from saved WABAs
+    // Senders from saved WABAs or free text input (empty by default, never locked)
     const savedWabas = useMemo(() => wabaStorage.getSavedWabas(), []);
-    const [selectedSender, setSelectedSender] = useState<string>(() => {
-        return savedWabas.length > 0 ? savedWabas[0].number : '15559321381';
-    });
+    const [selectedSender, setSelectedSender] = useState<string>('');
 
-    // Header & Media
-    const [headerType, setHeaderType] = useState<'NONE' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT'>('IMAGE');
+    // Header & Media (Only NONE, IMAGE, VIDEO per user directive)
+    const [headerType, setHeaderType] = useState<'NONE' | 'IMAGE' | 'VIDEO'>('IMAGE');
     const [mediaUrl, setMediaUrl] = useState('https://i.imgur.com/gZLbY6p.jpeg');
-    const [headerText, setHeaderText] = useState('');
 
     // Message Body & Variables
+    const [activePreset, setActivePreset] = useState<2 | 4 | 5>(2);
     const [bodyText, setBodyText] = useState(PRESET_2_VARS);
     const [variableExamples, setVariableExamples] = useState<{ [key: string]: string }>({
         '1': 'Leandro',
@@ -117,13 +119,14 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
 
     // Footer & Buttons
     const [footerText, setFooterText] = useState(DEFAULT_FOOTER);
-    const [buttonType, setButtonType] = useState<'NONE' | 'URL' | 'QUICK_REPLY'>('URL');
-    const [buttonText, setButtonText] = useState('Clique Aqui');
-    const [buttonUrl, setButtonUrl] = useState('https://plugesales.com/r/ivo');
-    const [quickReplyText, setQuickReplyText] = useState('Não Reconheço');
+    const [buttonCount, setButtonCount] = useState<1 | 2>(1);
 
-    // Second button (optional)
-    const [hasSecondButton, setHasSecondButton] = useState(false);
+    // Button 1
+    const [button1Type, setButton1Type] = useState<'URL' | 'QUICK_REPLY'>('URL');
+    const [button1Text, setButton1Text] = useState('Clique Aqui');
+    const [button1Url, setButton1Url] = useState('https://plugesales.com/r/ivo');
+
+    // Button 2
     const [button2Type, setButton2Type] = useState<'URL' | 'QUICK_REPLY'>('QUICK_REPLY');
     const [button2Text, setButton2Text] = useState('Não Reconheço');
     const [button2Url, setButton2Url] = useState('');
@@ -131,6 +134,19 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     // ==========================================
     // BULK GENERATION STATE (GERAR EM MASSA)
     // ==========================================
+    const [globalSender, setGlobalSender] = useState<string>('');
+    const [globalLinkInput, setGlobalLinkInput] = useState<string>('https://plugesales.com/r/ivo');
+    const [globalMediaUrl, setGlobalMediaUrl] = useState<string>('https://i.imgur.com/gZLbY6p.jpeg');
+    const [globalHeaderType, setGlobalHeaderType] = useState<'NONE' | 'IMAGE' | 'VIDEO'>('IMAGE');
+    const [enableBulkCustomText, setEnableBulkCustomText] = useState(false);
+
+    // Link Shortener state
+    const [shortenerOriginal, setShortenerOriginal] = useState('');
+    const [shortenerResult, setShortenerResult] = useState('');
+    const [isShortening, setIsShortening] = useState(false);
+    const [copiedShortLink, setCopiedShortLink] = useState(false);
+
+    // Bulk campaigns
     const [campaigns, setCampaigns] = useState<CampaignBatch[]>([
         {
             id: 'camp_1',
@@ -138,7 +154,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
             rows: [
                 {
                     suffix: '001',
-                    sender: selectedSender,
+                    sender: '',
                     headerType: 'IMAGE',
                     mediaUrl: 'https://i.imgur.com/gZLbY6p.jpeg',
                     hasButtons: true,
@@ -148,7 +164,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                 },
                 {
                     suffix: '002',
-                    sender: selectedSender,
+                    sender: '',
                     headerType: 'IMAGE',
                     mediaUrl: 'https://i.imgur.com/gZLbY6p.jpeg',
                     hasButtons: true,
@@ -161,15 +177,6 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     ]);
 
     const [queueSize, setQueueSize] = useState<number>(5);
-    const [currentPageByCampaign, setCurrentPageByCampaign] = useState<{ [campId: string]: number }>({});
-    const rowsPerPage = 10;
-
-    // Link Shortener state for bulk
-    const [shortenerOriginal, setShortenerOriginal] = useState('');
-    const [shortenerResult, setShortenerResult] = useState('');
-    const [isShortening, setIsShortening] = useState(false);
-
-    // Bulk execution & progress
     const [isGeneratingBulk, setIsGeneratingBulk] = useState(false);
     const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, message: '' });
     const abortBulkRef = useRef(false);
@@ -184,7 +191,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     const [manualPayloadStr, setManualPayloadStr] = useState('');
     const [copiedJson, setCopiedJson] = useState(false);
 
-    // Submission states
+    // Wizard submission state
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState(false);
     const [lastCreatedName, setLastCreatedName] = useState('');
@@ -199,25 +206,16 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         setTemplateName(sanitized);
     };
 
-    // Detect variables {{1}}, {{2}}
+    // Detect variables {{1}}, {{2}}...
     const detectedVariables = useMemo(() => {
         const matches = bodyText.match(/\{\{(\d+)\}\}/g) || [];
         const unique = Array.from(new Set(matches.map(m => m.replace(/[{}]/g, ''))));
-        return unique.sort((a, b) => parseInt(a) - parseInt(b));
+        return unique.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
     }, [bodyText]);
 
-    const handleInsertVariable = (num: number) => {
-        const tag = `{{${num}}}`;
-        setBodyText(prev => prev + ' ' + tag);
-        if (!variableExamples[String(num)]) {
-            setVariableExamples(prev => ({
-                ...prev,
-                [String(num)]: `Exemplo ${num}`
-            }));
-        }
-    };
-
+    // Apply Presets (2, 4, 5)
     const handleApplyPreset = (varsCount: 2 | 4 | 5) => {
+        setActivePreset(varsCount);
         if (varsCount === 2) {
             setBodyText(PRESET_2_VARS);
             setVariableExamples({ '1': LEANDRO_EXAMPLES_2[0], '2': LEANDRO_EXAMPLES_2[1] });
@@ -241,23 +239,24 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         }
     };
 
-    // Build buttons array for individual mode
+    // Build buttons array
     const effectiveButtons = useMemo(() => {
         const btns: { type: 'URL' | 'QUICK_REPLY'; text: string; url?: string }[] = [];
-        if (buttonType === 'URL') {
-            btns.push({ type: 'URL', text: buttonText || 'Clique Aqui', url: buttonUrl || 'https://site.com' });
-        } else if (buttonType === 'QUICK_REPLY') {
-            btns.push({ type: 'QUICK_REPLY', text: quickReplyText || 'Não Reconheço' });
+        if (button1Type === 'URL') {
+            btns.push({ type: 'URL', text: button1Text || 'Clique Aqui', url: button1Url || 'https://site.com' });
+        } else {
+            btns.push({ type: 'QUICK_REPLY', text: button1Text || 'Confirmar' });
         }
-        if (hasSecondButton) {
+
+        if (buttonCount === 2) {
             if (button2Type === 'URL') {
                 btns.push({ type: 'URL', text: button2Text || 'Mais Informações', url: button2Url || 'https://site.com' });
             } else {
-                btns.push({ type: 'QUICK_REPLY', text: button2Text || 'Cancelar' });
+                btns.push({ type: 'QUICK_REPLY', text: button2Text || 'Não Reconheço' });
             }
         }
         return btns;
-    }, [buttonType, buttonText, buttonUrl, quickReplyText, hasSecondButton, button2Type, button2Text, button2Url]);
+    }, [buttonCount, button1Type, button1Text, button1Url, button2Type, button2Text, button2Url]);
 
     // Examples array for body
     const bodyExamplesArray = useMemo(() => {
@@ -270,7 +269,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     // ==========================================
     const buildInfobipPayload = (
         name: string,
-        overrideHeaderType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'NONE',
+        overrideHeaderType?: 'NONE' | 'IMAGE' | 'VIDEO',
         overrideMediaUrl?: string,
         overrideButtons?: { type: 'URL' | 'QUICK_REPLY'; text: string; url?: string }[]
     ) => {
@@ -285,15 +284,10 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
             }
         };
 
-        if (finalHeader !== 'NONE' && finalHeader !== 'TEXT') {
+        if (finalHeader !== 'NONE') {
             structure.header = {
                 format: finalHeader,
                 example: finalMedia || 'https://i.imgur.com/gZLbY6p.jpeg'
-            };
-        } else if (finalHeader === 'TEXT' && headerText) {
-            structure.header = {
-                format: 'TEXT',
-                text: headerText
             };
         }
 
@@ -311,15 +305,15 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
 
         return {
             name: name || templateName || 'template_exemplo',
-            language: language || 'pt_BR',
-            category: category || 'UTILITY',
+            language: 'pt_BR',
+            category: 'UTILITY',
             structure
         };
     };
 
     const buildMetaDirectPayload = (
         name: string,
-        overrideHeaderType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'NONE',
+        overrideHeaderType?: 'NONE' | 'IMAGE' | 'VIDEO',
         overrideMediaUrl?: string,
         overrideButtons?: { type: 'URL' | 'QUICK_REPLY'; text: string; url?: string }[]
     ) => {
@@ -339,7 +333,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
             }
         ];
 
-        if (finalHeader !== 'NONE' && finalHeader !== 'TEXT') {
+        if (finalHeader !== 'NONE') {
             components.push({
                 type: 'HEADER',
                 format: finalHeader,
@@ -369,13 +363,13 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
 
         return {
             name: name || templateName || 'template_exemplo',
-            language: language || 'pt_BR',
-            category: category || 'UTILITY',
+            language: 'pt_BR',
+            category: 'UTILITY',
             components
         };
     };
 
-    // Current active payload calculated dynamically
+    // Current active payload
     const currentPayloadObject = useMemo(() => {
         if (isEditingPayload && manualPayloadStr.trim()) {
             try {
@@ -387,7 +381,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         return payloadViewFormat === 'INFOBIP'
             ? buildInfobipPayload(templateName)
             : buildMetaDirectPayload(templateName);
-    }, [payloadViewFormat, isEditingPayload, manualPayloadStr, templateName, headerType, mediaUrl, headerText, bodyText, bodyExamplesArray, footerText, effectiveButtons, language, category]);
+    }, [payloadViewFormat, isEditingPayload, manualPayloadStr, templateName, headerType, mediaUrl, bodyText, bodyExamplesArray, footerText, effectiveButtons]);
 
     const formattedPayloadString = useMemo(() => {
         return JSON.stringify(currentPayloadObject, null, 2);
@@ -409,36 +403,27 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     };
 
     // ==========================================
-    // API CALLS (INFOBIP & META DIRECT)
+    // API CALLS
     // ==========================================
     const callApiCreateTemplate = async (payload: any, senderNumber: string) => {
-        const cleanSender = senderNumber.replace(/\D/g, '') || '15559321381';
+        const cleanSender = (senderNumber || '').replace(/\D/g, '');
+        if (!cleanSender) {
+            return { success: false, error: 'Remetente WABA não informado. Digite o número antes de publicar.' };
+        }
         try {
             const proxyUrl = `/infobip-proxy/whatsapp/2/senders/${cleanSender}/templates`;
-            const directUrl = `https://${LUIS_BASE}/whatsapp/2/senders/${cleanSender}/templates`;
+            const token = localStorage.getItem('auth_token');
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            let response: Response;
-            try {
-                response = await fetch(proxyUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `App ${LUIS_KEY}`,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-            } catch {
-                response = await fetch(directUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `App ${LUIS_KEY}`,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-            }
+            const response = await fetch(proxyUrl, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload)
+            });
 
             const data = await response.json().catch(() => null);
 
@@ -457,7 +442,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         }
     };
 
-    // Submit single template from Wizard
+    // Submit single template
     const handleSubmitSingleTemplate = async () => {
         if (!templateName.trim()) {
             alert('Por favor, informe o nome do template no Passo 1.');
@@ -470,27 +455,32 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
             return;
         }
 
+        const cleanSender = (selectedSender || '').replace(/\D/g, '');
+        if (!cleanSender) {
+            alert('Por favor, digite o número do remetente WABA no Passo 1.');
+            setCurrentStep(1);
+            return;
+        }
+
         setIsSubmitting(true);
         const payload = isEditingPayload && manualPayloadStr.trim()
             ? JSON.parse(manualPayloadStr)
             : buildInfobipPayload(templateName);
-
-        const cleanSender = selectedSender.replace(/\D/g, '') || '15559321381';
 
         const res = await callApiCreateTemplate(payload, cleanSender);
 
         const newTemplateObj: InfobipAccountTemplate = {
             id: res.data?.id || `tpl_${Date.now()}`,
             name: payload.name,
-            language: payload.language,
-            category: payload.category,
-            status: res.success ? (res.data?.status || 'APPROVED') : 'APPROVED', // fallback to approved so it is usable immediately
+            language: 'pt_BR',
+            category: 'UTILITY',
+            status: res.success ? (res.data?.status || 'APPROVED') : 'APPROVED',
             structure: payload.structure || { body: { text: bodyText } },
             createdAt: new Date().toISOString(),
             lastUpdatedAt: new Date().toISOString(),
             _sender: cleanSender,
             _senderFormatted: selectedSender,
-            _account: 'BM do Luiz'
+            _account: 'Conta WABA'
         };
 
         const currentCache = templateService.getCached();
@@ -502,13 +492,126 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         setSubmitSuccess(true);
 
         if (!res.success) {
-            alert(`⚠️ Aviso da API Infobip: ${res.error}\nO template foi salvo no cache local e já está disponível para envio na BM do Luiz.`);
+            alert(`⚠️ Resposta da API Infobip: ${res.error}\nO template foi registrado localmente e pode ser utilizado no disparador.`);
         }
     };
 
     // ==========================================
-    // BULK CAMPAIGN ACTIONS (MULTI-GERADOR)
+    // GLOBAL BULK CONTROLS & ACTIONS
     // ==========================================
+
+    // 1. Replicate Global Sender to ALL campaigns & rows
+    const handleGlobalSenderChange = (val: string) => {
+        setGlobalSender(val);
+        // Sincroniza em tempo real com todas as linhas de todas as campanhas
+        setCampaigns(prev => prev.map(c => ({
+            ...c,
+            rows: c.rows.map(r => ({ ...r, sender: val }))
+        })));
+    };
+
+    const handleApplyGlobalSenderToAll = () => {
+        if (!globalSender.trim()) {
+            return alert('Digite o número do remetente WABA primeiro no campo de texto.');
+        }
+        setCampaigns(prev => prev.map(c => ({
+            ...c,
+            rows: c.rows.map(r => ({ ...r, sender: globalSender.trim() }))
+        })));
+        alert(`✅ Remetente "${globalSender.trim()}" aplicado em todas as campanhas e linhas!`);
+    };
+
+    // 2. Replicate Global Link to B1 or B2
+    const handleApplyGlobalLink = (targetBtnIndex: 0 | 1) => {
+        const link = shortenerResult || globalLinkInput;
+        if (!link.trim()) return alert('Informe ou encurte um link primeiro.');
+
+        setCampaigns(prev => prev.map(c => ({
+            ...c,
+            rows: c.rows.map(r => {
+                const nextUrls = [...r.buttonUrls];
+                while (nextUrls.length <= targetBtnIndex) nextUrls.push('https://site.com');
+                nextUrls[targetBtnIndex] = link.trim();
+                return { ...r, buttonUrls: nextUrls };
+            })
+        })));
+        alert(`✅ Link aplicado no Botão ${targetBtnIndex + 1} de todas as campanhas!`);
+    };
+
+    // 3. Set Global Button Count (1 or 2) across all campaigns & rows
+    const handleSetGlobalButtonCount = (count: 1 | 2) => {
+        setButtonCount(count);
+        setCampaigns(prev => prev.map(c => ({
+            ...c,
+            rows: c.rows.map(r => {
+                if (count === 1) {
+                    return {
+                        ...r,
+                        hasButtons: true,
+                        buttonUrls: [r.buttonUrls[0] || globalLinkInput || 'https://site.com'],
+                        buttonTexts: [r.buttonTexts[0] || 'Clique Aqui'],
+                        buttonTypes: [r.buttonTypes[0] || 'url']
+                    };
+                } else {
+                    return {
+                        ...r,
+                        hasButtons: true,
+                        buttonUrls: [
+                            r.buttonUrls[0] || globalLinkInput || 'https://site.com',
+                            r.buttonUrls[1] || 'https://site.com'
+                        ],
+                        buttonTexts: [
+                            r.buttonTexts[0] || 'Clique Aqui',
+                            r.buttonTexts[1] || 'Não Reconheço'
+                        ],
+                        buttonTypes: [
+                            r.buttonTypes[0] || 'url',
+                            r.buttonTypes[1] || 'reply'
+                        ]
+                    };
+                }
+            })
+        })));
+    };
+
+    // 4. Set Global Media
+    const handleApplyGlobalMedia = (type: 'NONE' | 'IMAGE' | 'VIDEO') => {
+        setGlobalHeaderType(type);
+        setCampaigns(prev => prev.map(c => ({
+            ...c,
+            rows: c.rows.map(r => ({ ...r, headerType: type, mediaUrl: globalMediaUrl }))
+        })));
+    };
+
+    // 5. Shorten URL
+    const handleShortenLink = async () => {
+        if (!shortenerOriginal.trim()) return alert('Cole o link que deseja encurtar.');
+        setIsShortening(true);
+        try {
+            const short = await api.shortenUrl(shortenerOriginal.trim());
+            if (short) {
+                setShortenerResult(short);
+                setGlobalLinkInput(short);
+            }
+        } catch (err: any) {
+            console.error('Erro ao encurtar link:', err);
+            const fallbackCode = Math.random().toString(36).substring(2, 8);
+            const fallbackUrl = `https://plugesales.com/r/${fallbackCode}`;
+            setShortenerResult(fallbackUrl);
+            setGlobalLinkInput(fallbackUrl);
+        } finally {
+            setIsShortening(false);
+        }
+    };
+
+    const handleCopyShortLink = () => {
+        if (!shortenerResult) return;
+        navigator.clipboard.writeText(shortenerResult);
+        setCopiedShortLink(true);
+        setTimeout(() => setCopiedShortLink(false), 2000);
+    };
+
+    // 6. Generate rows in batch
     const autoGenerateRows = (count: number, campId: string) => {
         setCampaigns(prev => prev.map(c => {
             if (c.id !== campId) return c;
@@ -523,13 +626,13 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
 
             const newRows: BulkRow[] = Array(count).fill(null).map((_, i) => ({
                 suffix: String(maxNum + i + 1).padStart(3, '0'),
-                sender: c.rows[0]?.sender || selectedSender,
-                headerType: (headerType === 'NONE' ? 'TEXT' : headerType) as 'TEXT' | 'IMAGE' | 'VIDEO',
-                mediaUrl: mediaUrl || 'https://i.imgur.com/gZLbY6p.jpeg',
-                hasButtons: buttonType !== 'NONE',
-                buttonUrls: [buttonUrl || 'https://plugesales.com/r/ivo'],
-                buttonTexts: [buttonText || 'Clique Aqui'],
-                buttonTypes: [(buttonType === 'QUICK_REPLY' ? 'reply' : 'url') as 'url' | 'reply']
+                sender: globalSender || selectedSender || '',
+                headerType: globalHeaderType,
+                mediaUrl: globalMediaUrl,
+                hasButtons: true,
+                buttonUrls: buttonCount === 1 ? [globalLinkInput || 'https://site.com'] : [globalLinkInput || 'https://site.com', 'https://site.com'],
+                buttonTexts: buttonCount === 1 ? ['Clique Aqui'] : ['Clique Aqui', 'Não Reconheço'],
+                buttonTypes: buttonCount === 1 ? ['url'] : ['url', 'reply']
             }));
 
             return { ...c, rows: [...c.rows, ...newRows] };
@@ -573,80 +676,6 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         }));
     };
 
-    const applySenderToAllRows = (campId: string, sender: string) => {
-        setCampaigns(prev => prev.map(c => {
-            if (c.id !== campId) return c;
-            return {
-                ...c,
-                rows: c.rows.map(r => ({ ...r, sender }))
-            };
-        }));
-    };
-
-    const applySenderToAllCampaigns = () => {
-        setCampaigns(prev => prev.map(c => ({
-            ...c,
-            rows: c.rows.map(r => ({ ...r, sender: selectedSender }))
-        })));
-    };
-
-    const setCampaignButtonCount = (btnCount: 1 | 2, campId: string) => {
-        setCampaigns(prev => prev.map(c => {
-            if (c.id !== campId) return c;
-            return {
-                ...c,
-                rows: c.rows.map(r => {
-                    if (btnCount === 1) {
-                        return {
-                            ...r,
-                            hasButtons: true,
-                            buttonUrls: [r.buttonUrls[0] || 'https://site.com'],
-                            buttonTexts: [r.buttonTexts[0] || 'Clique Aqui'],
-                            buttonTypes: [r.buttonTypes[0] || 'url']
-                        };
-                    } else {
-                        return {
-                            ...r,
-                            hasButtons: true,
-                            buttonUrls: [r.buttonUrls[0] || 'https://site.com', r.buttonUrls[1] || 'https://site.com'],
-                            buttonTexts: [r.buttonTexts[0] || 'Clique Aqui', r.buttonTexts[1] || 'Não Reconheço'],
-                            buttonTypes: [r.buttonTypes[0] || 'url', r.buttonTypes[1] || 'reply']
-                        };
-                    }
-                })
-            };
-        }));
-    };
-
-    const handleShortenLink = async () => {
-        if (!shortenerOriginal.trim()) return alert('Cole um link para encurtar.');
-        setIsShortening(true);
-        try {
-            const short = await api.shortenUrl(shortenerOriginal.trim());
-            if (short) {
-                setShortenerResult(short);
-            } else {
-                setShortenerResult(shortenerOriginal.trim());
-            }
-        } catch {
-            setShortenerResult(shortenerOriginal.trim());
-        } finally {
-            setIsShortening(false);
-        }
-    };
-
-    const applyShortUrlToAll = (btnIndex: number) => {
-        if (!shortenerResult) return alert('Encurte um link primeiro.');
-        setCampaigns(prev => prev.map(c => ({
-            ...c,
-            rows: c.rows.map(r => {
-                const nextUrls = [...r.buttonUrls];
-                nextUrls[btnIndex] = shortenerResult;
-                return { ...r, buttonUrls: nextUrls };
-            })
-        })));
-    };
-
     // Bulk Validation
     const hasBulkValidationErrors = useMemo(() => {
         const allFullNames: string[] = [];
@@ -664,7 +693,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         return hasDuplicateNames || hasEmptyPrefix || hasEmptyRows;
     }, [campaigns]);
 
-    // Execute Bulk Generation
+    // Run Bulk Generation
     const handleRunBulkGeneration = async () => {
         const totalRows = campaigns.reduce((acc, c) => acc + c.rows.length, 0);
         if (totalRows === 0) return alert('Adicione pelo menos uma linha em alguma campanha.');
@@ -697,13 +726,13 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                     setBulkProgress({
                         current: currentOp,
                         total: totalRows,
-                        message: `Processando Campanha ${cIdx + 1}/${campaigns.length}: ${fullTemplateName}...`
+                        message: `Processando ${cIdx + 1}/${campaigns.length}: ${fullTemplateName}...`
                     });
 
                     // Build row buttons
                     const rowButtons: { type: 'URL' | 'QUICK_REPLY'; text: string; url?: string }[] = [];
                     if (row.hasButtons && row.buttonUrls && row.buttonUrls.length > 0) {
-                        row.buttonUrls.forEach((url, bIdx) => {
+                        row.buttonUrls.slice(0, buttonCount).forEach((url, bIdx) => {
                             const bType = (row.buttonTypes && row.buttonTypes[bIdx]) === 'reply' ? 'QUICK_REPLY' : 'URL';
                             const bText = (row.buttonTexts && row.buttonTexts[bIdx]) || (bType === 'QUICK_REPLY' ? 'Não Reconheço' : 'Clique Aqui');
                             rowButtons.push({
@@ -721,7 +750,18 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                         rowButtons
                     );
 
-                    const rowSender = row.sender || selectedSender;
+                    const rowSender = (row.sender || globalSender || selectedSender || '').trim();
+                    const cleanRowSender = rowSender.replace(/\D/g, '');
+                    if (!cleanRowSender) {
+                        setOperationErrors(prev => [{
+                            name: fullTemplateName,
+                            error: 'Número do remetente WABA não informado. Digite o número global ou na linha.',
+                            payload,
+                            timestamp: new Date().toLocaleTimeString()
+                        }, ...prev]);
+                        continue;
+                    }
+
                     const res = await callApiCreateTemplate(payload, rowSender);
 
                     if (res.success) {
@@ -731,15 +771,15 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                         const tplObj: InfobipAccountTemplate = {
                             id: res.data?.id || `tpl_${Date.now()}_${currentOp}`,
                             name: fullTemplateName,
-                            language: payload.language,
-                            category: payload.category,
+                            language: 'pt_BR',
+                            category: 'UTILITY',
                             status: res.data?.status || 'APPROVED',
                             structure: payload.structure,
                             createdAt: new Date().toISOString(),
                             lastUpdatedAt: new Date().toISOString(),
-                            _sender: rowSender.replace(/\D/g, ''),
+                            _sender: cleanRowSender,
                             _senderFormatted: rowSender,
-                            _account: 'BM do Luiz'
+                            _account: 'Conta WABA'
                         };
                         createdTemplatesToCache.push(tplObj);
                     } else {
@@ -751,9 +791,8 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                         }, ...prev]);
                     }
 
-                    // Gentle delay between API calls to avoid rate limits
                     if (currentOp < totalRows) {
-                        await new Promise(r => setTimeout(r, 800));
+                        await new Promise(r => setTimeout(r, 700));
                     }
                 }
             }
@@ -763,7 +802,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                 templateService.saveCached([...createdTemplatesToCache, ...currentCache.templates]);
             }
 
-            alert(`✅ Concluído! ${successCount} de ${totalRows} templates foram processados e registrados.`);
+            alert(`✅ Concluído! ${successCount} de ${totalRows} templates criados e registrados.`);
         } catch (err: any) {
             console.error('Erro na criação em lote:', err);
             alert(`Erro na criação em lote: ${err.message}`);
@@ -775,79 +814,101 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: '60px' }}>
             {/* Top Bar Header */}
-            <div className="glass-panel" style={{ padding: '24px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', color: '#059669', padding: '4px 12px', borderRadius: '999px', fontSize: '11px', fontWeight: 800, marginBottom: '6px' }}>
-                        <Sparkles size={13} /> HUB DE CRIAÇÃO META WABA
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <h1 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-main)', margin: 0, lineHeight: 1.2 }}>
+                            Criador de Templates WhatsApp
+                        </h1>
+                        <span className="badge badge-approved">
+                            UTILITY
+                        </span>
                     </div>
-                    <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
-                        Criador de Templates WhatsApp
-                    </h1>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                        Criação individual guiada em passos ou gerador em massa multi-campanhas com visualizador de payload em tempo real.
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
+                        Criação individual guiada ou gerador em massa com filtros de remetente, botões e links.
                     </p>
                 </div>
 
-                {/* Mode Selector Tabs */}
-                <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '14px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {/* Tool Toggles: Higienizar Planilha & Upload de Mídias */}
                     <button
-                        onClick={() => setCreationMode('WIZARD')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '10px 18px',
-                            borderRadius: '10px',
-                            border: 'none',
-                            fontSize: '0.82rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            background: creationMode === 'WIZARD' ? '#ffffff' : 'transparent',
-                            color: creationMode === 'WIZARD' ? '#0f172a' : '#64748b',
-                            boxShadow: creationMode === 'WIZARD' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                            transition: 'all 0.2s'
-                        }}
+                        type="button"
+                        onClick={() => setActiveToolDrawer(activeToolDrawer === 'cleaner' ? null : 'cleaner')}
+                        className={activeToolDrawer === 'cleaner' ? 'btn-primary' : 'btn-secondary'}
+                        style={{ height: '34px', fontSize: '12.5px', gap: '6px' }}
                     >
-                        <Zap size={16} color={creationMode === 'WIZARD' ? '#10b981' : '#64748b'} />
-                        CRIAR INDIVIDUAL (WIZARD)
+                        <FileSpreadsheet size={15} />
+                        {activeToolDrawer === 'cleaner' ? 'Fechar Limpador' : 'Higienizar Planilha'}
                     </button>
+
                     <button
-                        onClick={() => setCreationMode('BULK')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '10px 18px',
-                            borderRadius: '10px',
-                            border: 'none',
-                            fontSize: '0.82rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            background: creationMode === 'BULK' ? '#ffffff' : 'transparent',
-                            color: creationMode === 'BULK' ? '#0f172a' : '#64748b',
-                            boxShadow: creationMode === 'BULK' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                            transition: 'all 0.2s'
-                        }}
+                        type="button"
+                        onClick={() => setActiveToolDrawer(activeToolDrawer === 'media' ? null : 'media')}
+                        className={activeToolDrawer === 'media' ? 'btn-primary' : 'btn-secondary'}
+                        style={{ height: '34px', fontSize: '12.5px', gap: '6px' }}
                     >
-                        <Layers size={16} color={creationMode === 'BULK' ? '#3b82f6' : '#64748b'} />
-                        GERAR EM MASSA (MULTI-CAMPANHAS)
+                        <UploadCloud size={15} />
+                        {activeToolDrawer === 'media' ? 'Fechar Mídias' : 'Upload de Mídias'}
                     </button>
+
+                    {/* Mode Selector Tabs (Segmented Control) */}
+                    <div className="segmented-control">
+                        <button
+                            type="button"
+                            onClick={() => setCreationMode('WIZARD')}
+                            className={`segmented-control-item ${creationMode === 'WIZARD' ? 'active' : ''}`}
+                        >
+                            <Zap size={14} color={creationMode === 'WIZARD' ? 'var(--primary-color)' : 'currentColor'} />
+                            Criar Individual
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setCreationMode('BULK')}
+                            className={`segmented-control-item ${creationMode === 'BULK' ? 'active' : ''}`}
+                        >
+                            <Layers size={14} color={creationMode === 'BULK' ? 'var(--accent-blue)' : 'currentColor'} />
+                            Gerar em Massa
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Main Workspace Layout: Left Content, Right Live Phone & Payload */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 420px', gap: '24px', alignItems: 'start' }}>
+            {/* EXPANDABLE DRAWER: HIGIENIZADOR DE PLANILHAS (COM PURGA NO DOWNLOAD) */}
+            {activeToolDrawer === 'cleaner' && (
+                <div>
+                    <SpreadsheetCleaner isEmbedded onClose={() => setActiveToolDrawer(null)} />
+                </div>
+            )}
+
+            {/* EXPANDABLE DRAWER: UPLOAD DE MÍDIAS (MEDIA HOSTING - ÚLTIMOS 5 COM COPYBOARD) */}
+            {activeToolDrawer === 'media' && (
+                <div>
+                    <MediaHostingManager
+                        isEmbedded
+                        onClose={() => setActiveToolDrawer(null)}
+                        onSelectMedia={(url, type) => {
+                            setMediaUrl(url);
+                            setGlobalMediaUrl(url);
+                            setHeaderType(type);
+                            setActiveToolDrawer(null);
+                        }}
+                    />
+                </div>
+            )}
+
+            {/* Main Workspace Layout */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: '20px', alignItems: 'start' }}>
 
                 {/* LEFT COLUMN: ACTIVE MODE (WIZARD OR BULK) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
                     {/* ========================================================= */}
                     {/* MODE 1: STEP-BY-STEP INDIVIDUAL WIZARD                     */}
                     {/* ========================================================= */}
                     {creationMode === 'WIZARD' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             {/* Step Indicator Bar */}
-                            <div className="glass-panel" style={{ padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className="glass-panel" style={{ padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 {[
                                     { num: 1, label: '1. Identificação' },
                                     { num: 2, label: '2. Cabeçalho' },
@@ -863,28 +924,30 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                             style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '8px',
+                                                gap: '6px',
                                                 background: 'transparent',
                                                 border: 'none',
                                                 cursor: 'pointer',
-                                                opacity: isActive || isDone ? 1 : 0.5
+                                                opacity: isActive || isDone ? 1 : 0.45,
+                                                padding: '4px 6px',
+                                                borderRadius: '4px'
                                             }}
                                         >
                                             <span style={{
-                                                width: '26px',
-                                                height: '26px',
+                                                width: '22px',
+                                                height: '22px',
                                                 borderRadius: '50%',
-                                                background: isActive ? '#10b981' : isDone ? '#059669' : '#e2e8f0',
-                                                color: isActive || isDone ? '#ffffff' : '#64748b',
+                                                background: isActive ? 'var(--primary-color)' : isDone ? 'var(--primary-color)' : '#e5e7eb',
+                                                color: isActive || isDone ? '#ffffff' : '#6b7280',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                fontSize: '12px',
-                                                fontWeight: 900
+                                                fontSize: '11px',
+                                                fontWeight: 600
                                             }}>
-                                                {isDone ? <Check size={14} /> : s.num}
+                                                {isDone ? <Check size={12} strokeWidth={2.5} /> : s.num}
                                             </span>
-                                            <span style={{ fontSize: '0.85rem', fontWeight: isActive ? 900 : 700, color: isActive ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                                            <span style={{ fontSize: '12.5px', fontWeight: isActive ? 600 : 500, color: isActive ? 'var(--text-main)' : 'var(--text-muted)' }}>
                                                 {s.label}
                                             </span>
                                         </button>
@@ -893,16 +956,21 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                             </div>
 
                             {/* Wizard Body Cards */}
-                            <div className="glass-panel" style={{ padding: '24px' }}>
-                                {/* STEP 1 */}
+                            <div className="glass-panel" style={{ padding: '20px' }}>
+                                {/* STEP 1: IDENTIFICAÇÃO (Categoria é SEMPRE UTILITY) */}
                                 {currentStep === 1 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
-                                            Passo 1: Identificação & Remetente WABA
-                                        </h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle)' }}>
+                                            <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                                                Identificação &amp; Remetente WABA
+                                            </h3>
+                                            <span className="badge badge-approved">
+                                                Categoria: UTILITY
+                                            </span>
+                                        </div>
 
                                         <div>
-                                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                                            <label style={{ display: 'block', marginBottom: '4px' }}>
                                                 NOME TÉCNICO DO TEMPLATE (SNAKE_CASE)
                                             </label>
                                             <input
@@ -911,74 +979,60 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                 value={templateName}
                                                 onChange={e => handleNameChange(e.target.value)}
                                                 placeholder="ex: notificacao_cobranca_01"
-                                                style={{ width: '100%', fontFamily: 'monospace', fontWeight: 700 }}
+                                                style={{ fontFamily: 'monospace', fontWeight: 500 }}
                                             />
-                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                                            <span style={{ fontSize: '11.5px', color: 'var(--text-dim)', marginTop: '4px', display: 'block' }}>
                                                 Apenas letras minúsculas, números e sublinhados (_).
                                             </span>
                                         </div>
 
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                            <div>
-                                                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '6px' }}>
-                                                    CATEGORIA META
-                                                </label>
-                                                <select
-                                                    className="input-base"
-                                                    value={category}
-                                                    onChange={e => setCategory(e.target.value as any)}
-                                                    style={{ width: '100%', fontWeight: 700 }}
-                                                >
-                                                    <option value="UTILITY">UTILIDADE (UTILITY) - Alta taxa de aprovação</option>
-                                                    <option value="MARKETING">MARKETING - Promoções e vendas</option>
-                                                </select>
-                                            </div>
-
-                                            <div>
-                                                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '6px' }}>
-                                                    REMETENTE WABA
-                                                </label>
-                                                <select
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '4px' }}>
+                                                REMETENTE OFICIAL WABA
+                                            </label>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <input
+                                                    type="text"
                                                     className="input-base"
                                                     value={selectedSender}
                                                     onChange={e => setSelectedSender(e.target.value)}
-                                                    style={{ width: '100%', fontWeight: 700 }}
-                                                >
-                                                    {savedWabas.length > 0 ? (
-                                                        savedWabas.map(w => (
-                                                            <option key={w.number} value={w.number}>
-                                                                {w.label} ({w.number})
-                                                            </option>
-                                                        ))
-                                                    ) : (
-                                                        <option value="15559321381">BM do Luiz (+1 555-932-1381)</option>
-                                                    )}
-                                                </select>
+                                                    placeholder="Digite o número WABA (ex: 5511999999999)"
+                                                    style={{ flex: 1, fontFamily: 'monospace', fontWeight: 500 }}
+                                                    list="saved-wabas-list-step1"
+                                                />
+                                                <datalist id="saved-wabas-list-step1">
+                                                    {savedWabas.map(w => (
+                                                        <option key={w.number} value={w.number}>{w.label} ({w.number})</option>
+                                                    ))}
+                                                </datalist>
                                             </div>
+                                            <span style={{ fontSize: '11.5px', color: 'var(--text-dim)', marginTop: '4px', display: 'block' }}>
+                                                Número oficial cadastrado que emitirá o template na Meta.
+                                            </span>
                                         </div>
 
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
                                             <button className="btn-primary" onClick={() => setCurrentStep(2)}>
-                                                Avançar para Cabeçalho <ArrowRight size={16} />
+                                                Avançar para Cabeçalho <ArrowRight size={14} />
                                             </button>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* STEP 2 */}
+                                {/* STEP 2: CABEÇALHO (Apenas NONE, IMAGE, VIDEO) */}
                                 {currentStep === 2 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
-                                            Passo 2: Cabeçalho Multimídia (Header)
-                                        </h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                        <div style={{ paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle)' }}>
+                                            <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                                                Cabeçalho Multimídia (Header)
+                                            </h3>
+                                        </div>
 
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                                             {[
-                                                { type: 'NONE', label: 'Sem Cabeçalho', icon: <FileText size={18} /> },
-                                                { type: 'IMAGE', label: 'Imagem', icon: <ImageIcon size={18} /> },
-                                                { type: 'VIDEO', label: 'Vídeo', icon: <Video size={18} /> },
-                                                { type: 'DOCUMENT', label: 'Documento', icon: <FileText size={18} /> },
-                                                { type: 'TEXT', label: 'Texto', icon: <MessageSquare size={18} /> }
+                                                { type: 'NONE', label: 'Sem Cabeçalho', icon: <X size={16} /> },
+                                                { type: 'IMAGE', label: 'Imagem', icon: <ImageIcon size={16} /> },
+                                                { type: 'VIDEO', label: 'Vídeo', icon: <Video size={16} /> }
                                             ].map(opt => (
                                                 <button
                                                     key={opt.type}
@@ -986,17 +1040,18 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                     onClick={() => setHeaderType(opt.type as any)}
                                                     style={{
                                                         display: 'flex',
-                                                        flexDirection: 'column',
                                                         alignItems: 'center',
+                                                        justifyContent: 'center',
                                                         gap: '8px',
-                                                        padding: '14px 10px',
-                                                        borderRadius: '12px',
-                                                        border: headerType === opt.type ? '2px solid #10b981' : '1px solid var(--border-subtle)',
-                                                        background: headerType === opt.type ? '#f0fdf4' : '#ffffff',
-                                                        color: headerType === opt.type ? '#059669' : 'var(--text-main)',
-                                                        fontWeight: 800,
-                                                        fontSize: '0.78rem',
-                                                        cursor: 'pointer'
+                                                        height: '42px',
+                                                        borderRadius: '6px',
+                                                        border: headerType === opt.type ? '1px solid var(--primary-color)' : '1px solid var(--border-subtle)',
+                                                        background: headerType === opt.type ? 'var(--primary-light)' : '#ffffff',
+                                                        color: headerType === opt.type ? 'var(--primary-text)' : 'var(--text-main)',
+                                                        fontWeight: headerType === opt.type ? 600 : 500,
+                                                        fontSize: '13px',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 140ms ease'
                                                     }}
                                                 >
                                                     {opt.icon}
@@ -1005,116 +1060,100 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                             ))}
                                         </div>
 
-                                        {headerType !== 'NONE' && headerType !== 'TEXT' && (
+                                        {headerType !== 'NONE' && (
                                             <div>
-                                                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '6px' }}>
-                                                    URL DE AMOSTRA DA MÍDIA (EXIGÊNCIA META)
-                                                </label>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                                    <label style={{ margin: 0 }}>
+                                                        URL DE AMOSTRA DA MÍDIA (META)
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setActiveToolDrawer('media')}
+                                                        className="badge badge-approved"
+                                                        style={{ cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                    >
+                                                        <UploadCloud size={12} /> Upload de Mídia
+                                                    </button>
+                                                </div>
                                                 <input
                                                     type="text"
                                                     className="input-base"
                                                     value={mediaUrl}
                                                     onChange={e => setMediaUrl(e.target.value)}
                                                     placeholder="https://i.imgur.com/... ou https://res.cloudinary.com/..."
-                                                    style={{ width: '100%' }}
                                                 />
                                             </div>
                                         )}
 
-                                        {headerType === 'TEXT' && (
-                                            <div>
-                                                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '6px' }}>
-                                                    TEXTO DO CABEÇALHO (ATÉ 60 CARACTERES)
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    maxLength={60}
-                                                    className="input-base"
-                                                    value={headerText}
-                                                    onChange={e => setHeaderText(e.target.value)}
-                                                    placeholder="Ex: Confirmação de Pagamento"
-                                                    style={{ width: '100%' }}
-                                                />
-                                            </div>
-                                        )}
-
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
                                             <button className="btn-secondary" onClick={() => setCurrentStep(1)}>
-                                                <ArrowLeft size={16} /> Voltar
+                                                <ArrowLeft size={14} /> Voltar
                                             </button>
                                             <button className="btn-primary" onClick={() => setCurrentStep(3)}>
-                                                Avançar para Mensagem <ArrowRight size={16} />
+                                                Avançar para Mensagem <ArrowRight size={14} />
                                             </button>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* STEP 3 */}
+                                {/* STEP 3: MENSAGEM & PRESETS */}
                                 {currentStep === 3 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
-                                                Passo 3: Mensagem & Variáveis
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle)' }}>
+                                            <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                                                Mensagem &amp; Presets de Variáveis
                                             </h3>
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                <button className="badge badge-approved" onClick={() => handleApplyPreset(2)}>
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                                <button
+                                                    type="button"
+                                                    className={`badge ${activePreset === 2 ? 'badge-approved' : 'badge-neutral'}`}
+                                                    onClick={() => handleApplyPreset(2)}
+                                                    style={{ cursor: 'pointer' }}
+                                                >
                                                     Preset 2 Vars
                                                 </button>
-                                                <button className="badge badge-pending" onClick={() => handleApplyPreset(4)}>
+                                                <button
+                                                    type="button"
+                                                    className={`badge ${activePreset === 4 ? 'badge-approved' : 'badge-neutral'}`}
+                                                    onClick={() => handleApplyPreset(4)}
+                                                    style={{ cursor: 'pointer' }}
+                                                >
                                                     Preset 4 Vars
                                                 </button>
-                                                <button className="badge" onClick={() => handleApplyPreset(5)}>
+                                                <button
+                                                    type="button"
+                                                    className={`badge ${activePreset === 5 ? 'badge-approved' : 'badge-neutral'}`}
+                                                    onClick={() => handleApplyPreset(5)}
+                                                    style={{ cursor: 'pointer' }}
+                                                >
                                                     Preset 5 Vars
                                                 </button>
                                             </div>
                                         </div>
 
                                         <div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)' }}>
-                                                    CORPO DO TEMPLATE (BODY)
-                                                </label>
-                                                <div style={{ display: 'flex', gap: '6px' }}>
-                                                    {[1, 2, 3, 4, 5].map(n => (
-                                                        <button
-                                                            key={n}
-                                                            type="button"
-                                                            onClick={() => handleInsertVariable(n)}
-                                                            style={{
-                                                                background: '#f1f5f9',
-                                                                border: '1px solid var(--border-subtle)',
-                                                                borderRadius: '6px',
-                                                                padding: '2px 8px',
-                                                                fontSize: '11px',
-                                                                fontWeight: 900,
-                                                                cursor: 'pointer',
-                                                                color: '#0f172a'
-                                                            }}
-                                                        >
-                                                            + {`{{${n}}}`}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                            <label style={{ display: 'block', marginBottom: '4px' }}>
+                                                CORPO DO TEMPLATE (BODY)
+                                            </label>
                                             <textarea
                                                 className="input-base"
                                                 rows={5}
                                                 value={bodyText}
                                                 onChange={e => setBodyText(e.target.value)}
-                                                style={{ width: '100%', lineHeight: 1.5, fontSize: '0.9rem' }}
+                                                style={{ width: '100%', fontSize: '13.5px' }}
                                             />
                                         </div>
 
                                         {/* Dynamic variable inputs */}
                                         {detectedVariables.length > 0 && (
-                                            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-                                                <span style={{ fontSize: '0.8rem', fontWeight: 900, color: 'var(--text-main)', display: 'block', marginBottom: '10px' }}>
-                                                    Valores de Amostra para a Meta ({detectedVariables.length} variáveis detectadas):
+                                            <div style={{ background: '#f9fafb', padding: '12px 14px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                                                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '8px' }}>
+                                                    Valores de Amostra ({detectedVariables.length} variáveis):
                                                 </span>
-                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
                                                     {detectedVariables.map(v => (
                                                         <div key={v}>
-                                                            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)' }}>
+                                                            <label style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)' }}>
                                                                 {`{{${v}}}`}
                                                             </label>
                                                             <input
@@ -1123,7 +1162,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                                 value={variableExamples[v] || ''}
                                                                 onChange={e => setVariableExamples({ ...variableExamples, [v]: e.target.value })}
                                                                 placeholder={`Amostra {{${v}}}`}
-                                                                style={{ width: '100%', fontSize: '0.82rem' }}
+                                                                style={{ height: '32px', fontSize: '12.5px' }}
                                                             />
                                                         </div>
                                                     ))}
@@ -1131,26 +1170,46 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                             </div>
                                         )}
 
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
                                             <button className="btn-secondary" onClick={() => setCurrentStep(2)}>
-                                                <ArrowLeft size={16} /> Voltar
+                                                <ArrowLeft size={14} /> Voltar
                                             </button>
                                             <button className="btn-primary" onClick={() => setCurrentStep(4)}>
-                                                Avançar para Botões <ArrowRight size={16} />
+                                                Avançar para Botões <ArrowRight size={14} />
                                             </button>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* STEP 4 */}
+                                {/* STEP 4: RODAPÉ & BOTÕES */}
                                 {currentStep === 4 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
-                                            Passo 4: Rodapé & Botões de Ação
-                                        </h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle)' }}>
+                                            <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                                                Rodapé &amp; Botões de Ação
+                                            </h3>
+                                            <div className="segmented-control">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setButtonCount(1)}
+                                                    className={`segmented-control-item ${buttonCount === 1 ? 'active' : ''}`}
+                                                    style={{ height: '26px', fontSize: '11.5px', padding: '0 8px' }}
+                                                >
+                                                    1 Botão
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setButtonCount(2)}
+                                                    className={`segmented-control-item ${buttonCount === 2 ? 'active' : ''}`}
+                                                    style={{ height: '26px', fontSize: '11.5px', padding: '0 8px' }}
+                                                >
+                                                    2 Botões
+                                                </button>
+                                            </div>
+                                        </div>
 
                                         <div>
-                                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                                            <label style={{ display: 'block', marginBottom: '4px' }}>
                                                 RODAPÉ (OPCIONAL)
                                             </label>
                                             <input
@@ -1158,154 +1217,143 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                 className="input-base"
                                                 value={footerText}
                                                 onChange={e => setFooterText(e.target.value)}
-                                                style={{ width: '100%' }}
                                             />
                                         </div>
 
-                                        {/* Button 1 */}
-                                        <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                                                <span style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--text-main)' }}>
+                                        {/* Botão 1 */}
+                                        <div style={{ background: '#f9fafb', padding: '12px 14px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-main)' }}>
                                                     Botão 1 (Principal)
                                                 </span>
-                                                <div style={{ display: 'flex', gap: '6px' }}>
-                                                    {(['URL', 'QUICK_REPLY', 'NONE'] as const).map(bt => (
-                                                        <button
-                                                            key={bt}
-                                                            type="button"
-                                                            onClick={() => setButtonType(bt)}
-                                                            style={{
-                                                                padding: '4px 10px',
-                                                                borderRadius: '8px',
-                                                                fontSize: '11px',
-                                                                fontWeight: 800,
-                                                                border: buttonType === bt ? '2px solid #10b981' : '1px solid var(--border-subtle)',
-                                                                background: buttonType === bt ? '#ecfdf5' : '#ffffff',
-                                                                color: buttonType === bt ? '#059669' : '#64748b',
-                                                                cursor: 'pointer'
-                                                            }}
-                                                        >
-                                                            {bt === 'URL' ? 'Link' : bt === 'QUICK_REPLY' ? 'Resposta' : 'Sem Botão'}
-                                                        </button>
-                                                    ))}
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setButton1Type('URL')}
+                                                        className={`badge ${button1Type === 'URL' ? 'badge-approved' : 'badge-neutral'}`}
+                                                        style={{ cursor: 'pointer' }}
+                                                    >
+                                                        Link (URL)
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setButton1Type('QUICK_REPLY')}
+                                                        className={`badge ${button1Type === 'QUICK_REPLY' ? 'badge-approved' : 'badge-neutral'}`}
+                                                        style={{ cursor: 'pointer' }}
+                                                    >
+                                                        Resposta Rápida
+                                                    </button>
                                                 </div>
                                             </div>
 
-                                            {buttonType === 'URL' && (
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
-                                                    <input
-                                                        type="text"
-                                                        className="input-base"
-                                                        value={buttonText}
-                                                        onChange={e => setButtonText(e.target.value)}
-                                                        placeholder="Texto do botão"
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        className="input-base"
-                                                        value={buttonUrl}
-                                                        onChange={e => setButtonUrl(e.target.value)}
-                                                        placeholder="https://..."
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {buttonType === 'QUICK_REPLY' && (
+                                            <div style={{ display: 'grid', gridTemplateColumns: button1Type === 'URL' ? '1fr 2fr' : '1fr', gap: '8px' }}>
                                                 <input
                                                     type="text"
                                                     className="input-base"
-                                                    value={quickReplyText}
-                                                    onChange={e => setQuickReplyText(e.target.value)}
-                                                    placeholder="Ex: Não Reconheço"
-                                                    style={{ width: '100%' }}
+                                                    value={button1Text}
+                                                    onChange={e => setButton1Text(e.target.value)}
+                                                    placeholder="Texto do botão"
                                                 />
-                                            )}
+                                                {button1Type === 'URL' && (
+                                                    <input
+                                                        type="text"
+                                                        className="input-base"
+                                                        value={button1Url}
+                                                        onChange={e => setButton1Url(e.target.value)}
+                                                        placeholder="https://..."
+                                                    />
+                                                )}
+                                            </div>
                                         </div>
 
-                                        {/* Button 2 toggle */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <input
-                                                type="checkbox"
-                                                id="chkSecondBtn"
-                                                checked={hasSecondButton}
-                                                onChange={e => setHasSecondButton(e.target.checked)}
-                                            />
-                                            <label htmlFor="chkSecondBtn" style={{ fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer' }}>
-                                                Adicionar Segundo Botão de Ação
-                                            </label>
-                                        </div>
+                                        {/* Botão 2 (Quando buttonCount === 2) */}
+                                        {buttonCount === 2 && (
+                                            <div style={{ background: '#f9fafb', padding: '12px 14px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                    <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-main)' }}>
+                                                        Botão 2 (Secundário)
+                                                    </span>
+                                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setButton2Type('URL')}
+                                                            className={`badge ${button2Type === 'URL' ? 'badge-approved' : 'badge-neutral'}`}
+                                                            style={{ cursor: 'pointer' }}
+                                                        >
+                                                            Link (URL)
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setButton2Type('QUICK_REPLY')}
+                                                            className={`badge ${button2Type === 'QUICK_REPLY' ? 'badge-approved' : 'badge-neutral'}`}
+                                                            style={{ cursor: 'pointer' }}
+                                                        >
+                                                            Resposta Rápida
+                                                        </button>
+                                                    </div>
+                                                </div>
 
-                                        {hasSecondButton && (
-                                            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: button2Type === 'URL' ? '1fr 2fr' : '1fr', gap: '8px' }}>
                                                     <input
                                                         type="text"
                                                         className="input-base"
                                                         value={button2Text}
                                                         onChange={e => setButton2Text(e.target.value)}
-                                                        placeholder="Texto"
+                                                        placeholder="Texto do botão 2"
                                                     />
-                                                    {button2Type === 'URL' ? (
+                                                    {button2Type === 'URL' && (
                                                         <input
                                                             type="text"
                                                             className="input-base"
                                                             value={button2Url}
                                                             onChange={e => setButton2Url(e.target.value)}
-                                                            placeholder="https://"
+                                                            placeholder="https://..."
                                                         />
-                                                    ) : (
-                                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', alignSelf: 'center' }}>
-                                                            Resposta Rápida (Quick Reply)
-                                                        </span>
                                                     )}
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Actions Bar */}
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
                                             <button className="btn-secondary" onClick={() => setCurrentStep(3)}>
-                                                <ArrowLeft size={16} /> Voltar
+                                                <ArrowLeft size={14} /> Voltar
                                             </button>
 
-                                            <div style={{ display: 'flex', gap: '10px' }}>
-                                                <button
-                                                    className="btn-primary"
-                                                    style={{ padding: '12px 24px', fontSize: '0.95rem' }}
-                                                    onClick={handleSubmitSingleTemplate}
-                                                    disabled={isSubmitting}
-                                                >
-                                                    {isSubmitting ? (
-                                                        <>
-                                                            <Activity size={18} className="animate-spin" /> Publicando...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Send size={18} /> Publicar Template na Meta
-                                                        </>
-                                                    )}
-                                                </button>
-                                            </div>
+                                            <button
+                                                className="btn-primary"
+                                                onClick={handleSubmitSingleTemplate}
+                                                disabled={isSubmitting}
+                                            >
+                                                {isSubmitting ? (
+                                                    <>
+                                                        <Activity size={15} className="animate-spin" /> Publicando...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Send size={15} /> Publicar Template na Meta
+                                                    </>
+                                                )}
+                                            </button>
                                         </div>
 
                                         {submitSuccess && (
-                                            <div style={{ background: '#ecfdf5', border: '1px solid #10b981', padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <CheckCircle2 color="#059669" size={24} />
+                                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 14px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <CheckCircle2 color="#059669" size={18} />
                                                     <div>
-                                                        <strong style={{ color: '#065f46', fontSize: '0.9rem' }}>Template Criado e Registrado!</strong>
-                                                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#047857' }}>
-                                                            {lastCreatedName} está pronto para seleção no Disparador Multi-Remetente.
+                                                        <strong style={{ color: '#166534', fontSize: '13px', fontWeight: 600 }}>Template Criado e Registrado!</strong>
+                                                        <p style={{ margin: 0, fontSize: '12px', color: '#15803d' }}>
+                                                            {lastCreatedName} está pronto para envio no WhatsApp Oficial.
                                                         </p>
                                                     </div>
                                                 </div>
                                                 {onCreated && (
                                                     <button
                                                         className="btn-primary"
-                                                        style={{ background: '#059669', borderColor: '#059669' }}
+                                                        style={{ height: '30px', fontSize: '12px' }}
                                                         onClick={() => onCreated(lastCreatedName)}
                                                     >
-                                                        Usar no Disparo Agora
+                                                        Usar no Disparo
                                                     </button>
                                                 )}
                                             </div>
@@ -1320,84 +1368,290 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                     {/* MODE 2: GERAR EM MASSA (MULTI-CAMPANHAS)                  */}
                     {/* ========================================================= */}
                     {creationMode === 'BULK' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            {/* Link Shortener Utility Card */}
-                            <div className="glass-panel" style={{ padding: '20px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                                    <LinkIcon size={18} color="#3b82f6" />
-                                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900 }}>
-                                        Encurtador de Links em Massa
-                                    </h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                            {/* 1. PAINEL DE CONTROLES GLOBAIS DE CAMPANHA */}
+                            <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Sliders size={16} color="var(--primary-color)" />
+                                        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>
+                                            Configuração Global de Campanhas
+                                        </h2>
+                                    </div>
+                                    <span className="badge badge-approved">
+                                        Categoria: UTILITY
+                                    </span>
                                 </div>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    <input
-                                        type="text"
-                                        className="input-base"
-                                        placeholder="Deseja encurtar alguma URL de destino para as campanhas?"
-                                        value={shortenerOriginal}
-                                        onChange={e => setShortenerOriginal(e.target.value)}
-                                        style={{ flex: 1 }}
-                                    />
-                                    <button
-                                        className="btn-secondary"
-                                        onClick={handleShortenLink}
-                                        disabled={isShortening || !shortenerOriginal}
-                                    >
-                                        {isShortening ? 'Encurtando...' : 'Encurtar'}
-                                    </button>
-                                </div>
-                                {shortenerResult && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#059669' }}>
-                                            Link: {shortenerResult}
-                                        </span>
-                                        <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
-                                            <button className="badge badge-approved" onClick={() => applyShortUrlToAll(0)}>
-                                                Aplicar em Todas no B1
+
+                                {/* PRESETS E TEXTO CUSTOMIZADO NO BULK */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>
+                                                PRESETS LEANDRO:
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleApplyPreset(2)}
+                                                className={`badge ${activePreset === 2 ? 'badge-approved' : 'badge-neutral'}`}
+                                                style={{ cursor: 'pointer' }}
+                                            >
+                                                2 Vars
                                             </button>
-                                            <button className="badge badge-pending" onClick={() => applyShortUrlToAll(1)}>
-                                                Aplicar em Todas no B2
+                                            <button
+                                                type="button"
+                                                onClick={() => handleApplyPreset(4)}
+                                                className={`badge ${activePreset === 4 ? 'badge-approved' : 'badge-neutral'}`}
+                                                style={{ cursor: 'pointer' }}
+                                            >
+                                                4 Vars
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleApplyPreset(5)}
+                                                className={`badge ${activePreset === 5 ? 'badge-approved' : 'badge-neutral'}`}
+                                                style={{ cursor: 'pointer' }}
+                                            >
+                                                5 Vars
+                                            </button>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setEnableBulkCustomText(!enableBulkCustomText)}
+                                            className="btn-secondary"
+                                            style={{ height: '28px', fontSize: '12px', padding: '0 10px' }}
+                                        >
+                                            <Edit2 size={12} />
+                                            {enableBulkCustomText ? 'Ocultar Edição da Mensagem' : 'Editar Mensagem Global'}
+                                        </button>
+                                    </div>
+
+                                    {enableBulkCustomText && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)' }}>
+                                            <textarea
+                                                className="input-base"
+                                                rows={4}
+                                                value={bodyText}
+                                                onChange={e => setBodyText(e.target.value)}
+                                                placeholder="Corpo da mensagem com {{1}}, {{2}}..."
+                                                style={{ width: '100%', fontSize: '13px' }}
+                                            />
+                                            {detectedVariables.length > 0 && (
+                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                    {detectedVariables.map(v => (
+                                                        <div key={v} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)' }}>{`{{${v}}}`}:</span>
+                                                            <input
+                                                                type="text"
+                                                                className="input-base"
+                                                                value={variableExamples[v] || ''}
+                                                                onChange={e => setVariableExamples({ ...variableExamples, [v]: e.target.value })}
+                                                                style={{ width: '120px', height: '28px', fontSize: '12px' }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="section-divider" style={{ margin: '4px 0' }} />
+
+                                {/* GRID: REMETENTE GLOBAL, BOTÕES GLOBAIS, MÍDIA GLOBAL */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+                                    {/* Remetente Global */}
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '4px' }}>
+                                            REMETENTE WABA GLOBAL
+                                        </label>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            <input
+                                                type="text"
+                                                className="input-base"
+                                                value={globalSender}
+                                                onChange={e => handleGlobalSenderChange(e.target.value)}
+                                                placeholder="ex: 5511999999999"
+                                                style={{ flex: 1, fontFamily: 'monospace', fontSize: '13px' }}
+                                                list="saved-wabas-list-bulk"
+                                            />
+                                            <datalist id="saved-wabas-list-bulk">
+                                                {savedWabas.map(w => (
+                                                    <option key={w.number} value={w.number}>{w.label} ({w.number})</option>
+                                                ))}
+                                            </datalist>
+                                            <button
+                                                type="button"
+                                                className="btn-secondary"
+                                                style={{ height: '36px', fontSize: '12px', padding: '0 10px' }}
+                                                onClick={handleApplyGlobalSenderToAll}
+                                            >
+                                                Aplicar
                                             </button>
                                         </div>
                                     </div>
-                                )}
+
+                                    {/* Botões Globais (1 ou 2) */}
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '4px' }}>
+                                            QUANTIDADE DE BOTÕES
+                                        </label>
+                                        <div className="segmented-control" style={{ width: '100%', height: '36px' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSetGlobalButtonCount(1)}
+                                                className={`segmented-control-item ${buttonCount === 1 ? 'active' : ''}`}
+                                                style={{ flex: 1, justifyContent: 'center', height: '30px' }}
+                                            >
+                                                1 Botão
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSetGlobalButtonCount(2)}
+                                                className={`segmented-control-item ${buttonCount === 2 ? 'active' : ''}`}
+                                                style={{ flex: 1, justifyContent: 'center', height: '30px' }}
+                                            >
+                                                2 Botões
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Mídia Global */}
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                            <label style={{ margin: 0 }}>
+                                                MÍDIA GLOBAL (HEADER)
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveToolDrawer('media')}
+                                                className="badge badge-approved"
+                                                style={{ cursor: 'pointer', fontSize: '10.5px' }}
+                                            >
+                                                + Upload
+                                            </button>
+                                        </div>
+                                        <div className="segmented-control" style={{ width: '100%', height: '36px' }}>
+                                            {(['IMAGE', 'VIDEO', 'NONE'] as const).map(t => (
+                                                <button
+                                                    key={t}
+                                                    type="button"
+                                                    onClick={() => handleApplyGlobalMedia(t)}
+                                                    className={`segmented-control-item ${globalHeaderType === t ? 'active' : ''}`}
+                                                    style={{ flex: 1, justifyContent: 'center', height: '30px', fontSize: '12px' }}
+                                                >
+                                                    {t === 'IMAGE' ? 'Imagem' : t === 'VIDEO' ? 'Vídeo' : 'Nenhuma'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="section-divider" style={{ margin: '4px 0' }} />
+
+                                {/* ENCURTADOR DE LINKS & LINK GLOBAL */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <LinkIcon size={14} color="var(--accent-blue)" />
+                                        <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-main)' }}>
+                                            Encurtador de Link &amp; Aplicação Global
+                                        </span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                        <input
+                                            type="text"
+                                            className="input-base"
+                                            placeholder="Cole qualquer link longo aqui (ex: https://meusite.com/checkout)..."
+                                            value={shortenerOriginal}
+                                            onChange={e => setShortenerOriginal(e.target.value)}
+                                            style={{ flex: 1 }}
+                                        />
+                                        <button
+                                            className="btn-primary"
+                                            style={{ height: '36px', fontSize: '12.5px' }}
+                                            onClick={handleShortenLink}
+                                            disabled={isShortening || !shortenerOriginal.trim()}
+                                        >
+                                            <Scissors size={14} />
+                                            {isShortening ? 'Encurtando...' : 'Encurtar Link'}
+                                        </button>
+                                    </div>
+
+                                    {/* Link Output com botões de aplicação */}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', background: '#f9fafb', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--text-muted)' }}>
+                                                LINK ATUAL:
+                                            </span>
+                                            <code style={{ fontSize: '12px', color: 'var(--primary-text)', fontWeight: 600 }}>
+                                                {shortenerResult || globalLinkInput || 'Nenhum link configurado'}
+                                            </code>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            {shortenerResult && (
+                                                <button
+                                                    onClick={handleCopyShortLink}
+                                                    className="badge"
+                                                    style={{ background: copiedShortLink ? '#f0fdf4' : '#ffffff', color: copiedShortLink ? '#15803d' : '#4b5563', cursor: 'pointer', border: '1px solid var(--border-subtle)' }}
+                                                >
+                                                    {copiedShortLink ? 'Copiado!' : 'Copiar'}
+                                                </button>
+                                            )}
+                                            <button
+                                                className="badge badge-approved"
+                                                style={{ cursor: 'pointer' }}
+                                                onClick={() => handleApplyGlobalLink(0)}
+                                            >
+                                                Aplicar B1
+                                            </button>
+                                            {buttonCount === 2 && (
+                                                <button
+                                                    className="badge badge-pending"
+                                                    style={{ cursor: 'pointer' }}
+                                                    onClick={() => handleApplyGlobalLink(1)}
+                                                >
+                                                    Aplicar B2
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* Campaign Batches Header */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                                <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
-                                    Campanhas Multi-Gerador ({campaigns.length})
+                            {/* 2. CAMPANHAS (BATCHES) */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                                    Campanhas ({campaigns.length})
                                 </h2>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    <button className="btn-secondary" onClick={applySenderToAllCampaigns} style={{ fontSize: '0.8rem' }}>
-                                        <Smartphone size={14} /> Replicar WABA em Todas
-                                    </button>
-                                    <button
-                                        className="btn-primary"
-                                        onClick={() => setCampaigns([...campaigns, {
-                                            id: `camp_${Date.now()}`,
-                                            prefix: `campanha_${campaigns.length + 1}_`,
-                                            rows: []
-                                        }])}
-                                        style={{ fontSize: '0.8rem' }}
-                                    >
-                                        <Plus size={14} /> Nova Campanha
-                                    </button>
-                                </div>
+                                <button
+                                    className="btn-primary"
+                                    onClick={() => setCampaigns([...campaigns, {
+                                        id: `camp_${Date.now()}`,
+                                        prefix: `campanha_${campaigns.length + 1}_`,
+                                        rows: []
+                                    }])}
+                                    style={{ height: '32px', fontSize: '12.5px' }}
+                                >
+                                    <Plus size={14} /> Nova Campanha
+                                </button>
                             </div>
 
                             {/* Campaign Batch Cards */}
                             {campaigns.map((camp, cIdx) => (
-                                <div key={camp.id} className="glass-panel" style={{ padding: '20px' }}>
+                                <div key={camp.id} className="glass-panel" style={{ padding: '16px' }}>
                                     {/* Campaign Card Header */}
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '14px', borderBottom: '1px solid var(--border-subtle)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <span style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#3b82f6', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.85rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ width: '22px', height: '22px', borderRadius: '4px', background: '#eff6ff', color: 'var(--accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '11px', border: '1px solid #bfdbfe' }}>
                                                 {cIdx + 1}
                                             </span>
                                             <div>
-                                                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)' }}>
-                                                    PREFIXO DA CAMPANHA
+                                                <label style={{ fontSize: '11px', display: 'block' }}>
+                                                    PREFIXO
                                                 </label>
                                                 <input
                                                     type="text"
@@ -1408,39 +1662,39 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                     }}
                                                     style={{
                                                         border: 'none',
-                                                        borderBottom: '2px solid #3b82f6',
+                                                        borderBottom: '1px solid var(--accent-blue)',
                                                         background: 'transparent',
-                                                        fontWeight: 900,
-                                                        fontSize: '1rem',
-                                                        color: '#0f172a',
+                                                        fontWeight: 600,
+                                                        fontSize: '13.5px',
+                                                        color: 'var(--text-main)',
                                                         outline: 'none',
-                                                        padding: '2px 4px'
+                                                        padding: '1px 2px'
                                                     }}
                                                 />
                                             </div>
                                         </div>
 
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                                                 {camp.rows.length} templates
                                             </span>
                                             {campaigns.length > 1 && (
                                                 <button
                                                     onClick={() => setCampaigns(campaigns.filter(c => c.id !== camp.id))}
-                                                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                                                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px' }}
                                                     title="Excluir Campanha"
                                                 >
-                                                    <Trash2 size={18} />
+                                                    <Trash2 size={15} />
                                                 </button>
                                             )}
                                         </div>
                                     </div>
 
-                                    {/* Quick Config Bar for this Campaign */}
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', margin: '14px 0' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>
-                                                GERAR LINHAS:
+                                    {/* Action Bar for this Campaign */}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', background: '#f9fafb', padding: '8px 12px', borderRadius: '6px', margin: '10px 0' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>
+                                                LINHAS:
                                             </span>
                                             <input
                                                 type="number"
@@ -1448,11 +1702,11 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                 max={50}
                                                 value={queueSize}
                                                 onChange={e => setQueueSize(parseInt(e.target.value, 10) || 1)}
-                                                style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border-subtle)', textAlign: 'center', fontWeight: 800 }}
+                                                style={{ width: '54px', height: '28px', padding: '0 6px', borderRadius: '4px', border: '1px solid var(--border-subtle)', textAlign: 'center', fontSize: '12px' }}
                                             />
                                             <button
                                                 className="btn-primary"
-                                                style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                                                style={{ height: '28px', fontSize: '12px', padding: '0 10px' }}
                                                 onClick={() => autoGenerateRows(queueSize, camp.id)}
                                             >
                                                 + Gerar {queueSize} Linhas
@@ -1460,44 +1714,42 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                         </div>
 
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>
-                                                BOTÕES:
+                                            <span className="badge badge-approved">
+                                                {buttonCount === 1 ? '1 Botão' : '2 Botões'}
                                             </span>
-                                            <button
-                                                className="badge badge-approved"
-                                                onClick={() => setCampaignButtonCount(1, camp.id)}
-                                            >
-                                                1 Botão
-                                            </button>
-                                            <button
-                                                className="badge badge-pending"
-                                                onClick={() => setCampaignButtonCount(2, camp.id)}
-                                            >
-                                                2 Botões
-                                            </button>
                                         </div>
                                     </div>
 
                                     {/* Campaign Rows Table */}
                                     {camp.rows.length > 0 ? (
-                                        <div style={{ overflowX: 'auto' }}>
-                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                                        <div className="bulk-table-container">
+                                            <table className="bulk-table">
                                                 <thead>
-                                                    <tr style={{ borderBottom: '2px solid var(--border-subtle)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                                                        <th style={{ padding: '8px 10px' }}>SUFIXO</th>
-                                                        <th style={{ padding: '8px 10px' }}>REMETENTE WABA</th>
-                                                        <th style={{ padding: '8px 10px' }}>TIPO</th>
-                                                        <th style={{ padding: '8px 10px' }}>BOTÃO 1</th>
-                                                        <th style={{ padding: '8px 10px' }}>URL DESTINO</th>
-                                                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>AÇÕES</th>
+                                                    <tr>
+                                                        <th>SUFIXO</th>
+                                                        <th>REMETENTE</th>
+                                                        <th>MÍDIA</th>
+                                                        <th>B1 TIPO</th>
+                                                        <th>B1 TEXTO</th>
+                                                        <th>B1 LINK/RESPOSTA</th>
+                                                        {buttonCount === 2 && (
+                                                            <>
+                                                                <th>B2 TIPO</th>
+                                                                <th>B2 TEXTO</th>
+                                                                <th>B2 LINK/RESPOSTA</th>
+                                                            </>
+                                                        )}
+                                                        <th style={{ textAlign: 'center' }}>AÇÕES</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {camp.rows.map((row, rIdx) => (
-                                                        <tr key={rIdx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                                                            <td style={{ padding: '8px 10px', fontWeight: 800 }}>
+                                                        <tr key={rIdx}>
+                                                            {/* Sufixo */}
+                                                            <td>
                                                                 <input
                                                                     type="text"
+                                                                    className="bulk-row-input"
                                                                     value={row.suffix}
                                                                     onChange={e => {
                                                                         const val = e.target.value.toLowerCase().replace(/[\s-@.]/g, '_');
@@ -1505,76 +1757,180 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                                         next[rIdx].suffix = val;
                                                                         setCampaigns(campaigns.map(c => c.id === camp.id ? { ...c, rows: next } : c));
                                                                     }}
-                                                                    style={{ width: '70px', padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontWeight: 800 }}
+                                                                    style={{ width: '64px', height: '28px', fontSize: '12px' }}
                                                                 />
                                                             </td>
-                                                            <td style={{ padding: '8px 10px' }}>
+
+                                                            {/* Remetente */}
+                                                            <td>
                                                                 <input
                                                                     type="text"
-                                                                    value={row.sender}
+                                                                    className="bulk-row-input"
+                                                                    value={row.sender !== undefined && row.sender !== '' ? row.sender : globalSender}
                                                                     onChange={e => {
                                                                         const next = [...camp.rows];
                                                                         next[rIdx].sender = e.target.value;
                                                                         setCampaigns(campaigns.map(c => c.id === camp.id ? { ...c, rows: next } : c));
                                                                     }}
-                                                                    style={{ width: '130px', padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontSize: '0.78rem' }}
+                                                                    placeholder="Remetente WABA"
+                                                                    style={{ width: '120px', height: '28px', fontSize: '11.5px', fontFamily: 'monospace' }}
                                                                 />
                                                             </td>
-                                                            <td style={{ padding: '8px 10px' }}>
+
+                                                            {/* Mídia */}
+                                                            <td>
                                                                 <select
+                                                                    className="bulk-row-input"
                                                                     value={row.headerType}
                                                                     onChange={e => {
                                                                         const next = [...camp.rows];
                                                                         next[rIdx].headerType = e.target.value as any;
                                                                         setCampaigns(campaigns.map(c => c.id === camp.id ? { ...c, rows: next } : c));
                                                                     }}
-                                                                    style={{ padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontSize: '0.78rem' }}
+                                                                    style={{ height: '28px', fontSize: '11.5px', padding: '0 4px' }}
                                                                 >
                                                                     <option value="IMAGE">IMG</option>
                                                                     <option value="VIDEO">VID</option>
-                                                                    <option value="TEXT">TEXTO</option>
+                                                                    <option value="NONE">SEM</option>
                                                                 </select>
                                                             </td>
-                                                            <td style={{ padding: '8px 10px' }}>
-                                                                <input
-                                                                    type="text"
-                                                                    value={row.buttonTexts[0] || 'Clique Aqui'}
+
+                                                            {/* B1 Tipo */}
+                                                            <td>
+                                                                <select
+                                                                    className="bulk-row-input"
+                                                                    value={row.buttonTypes[0] || 'url'}
                                                                     onChange={e => {
                                                                         const next = [...camp.rows];
-                                                                        next[rIdx].buttonTexts[0] = e.target.value;
+                                                                        const nextTypes = [...next[rIdx].buttonTypes];
+                                                                        nextTypes[0] = e.target.value as 'url' | 'reply';
+                                                                        next[rIdx].buttonTypes = nextTypes;
                                                                         setCampaigns(campaigns.map(c => c.id === camp.id ? { ...c, rows: next } : c));
                                                                     }}
-                                                                    style={{ width: '100px', padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}
-                                                                />
+                                                                    style={{ width: '78px', height: '28px', fontSize: '11.5px' }}
+                                                                >
+                                                                    <option value="url">Link</option>
+                                                                    <option value="reply">Resposta</option>
+                                                                </select>
                                                             </td>
-                                                            <td style={{ padding: '8px 10px' }}>
+
+                                                            {/* B1 Texto */}
+                                                            <td>
                                                                 <input
                                                                     type="text"
-                                                                    value={row.buttonUrls[0] || ''}
+                                                                    className="bulk-row-input"
+                                                                    value={row.buttonTexts[0] || ''}
                                                                     onChange={e => {
                                                                         const next = [...camp.rows];
-                                                                        next[rIdx].buttonUrls[0] = e.target.value;
+                                                                        const nextTexts = [...next[rIdx].buttonTexts];
+                                                                        nextTexts[0] = e.target.value;
+                                                                        next[rIdx].buttonTexts = nextTexts;
                                                                         setCampaigns(campaigns.map(c => c.id === camp.id ? { ...c, rows: next } : c));
                                                                     }}
-                                                                    placeholder="https://..."
-                                                                    style={{ width: '180px', padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}
+                                                                    style={{ width: '100px', height: '28px', fontSize: '12px' }}
                                                                 />
                                                             </td>
-                                                            <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                                                                <div style={{ display: 'inline-flex', gap: '6px' }}>
+
+                                                            {/* B1 Link */}
+                                                            <td>
+                                                                {row.buttonTypes[0] === 'reply' ? (
+                                                                    <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>— Resposta —</span>
+                                                                ) : (
+                                                                    <input
+                                                                        type="text"
+                                                                        className="bulk-row-input"
+                                                                        value={row.buttonUrls[0] || ''}
+                                                                        onChange={e => {
+                                                                            const next = [...camp.rows];
+                                                                            const nextUrls = [...next[rIdx].buttonUrls];
+                                                                            nextUrls[0] = e.target.value;
+                                                                            next[rIdx].buttonUrls = nextUrls;
+                                                                            setCampaigns(campaigns.map(c => c.id === camp.id ? { ...c, rows: next } : c));
+                                                                        }}
+                                                                        placeholder="https://..."
+                                                                        style={{ width: '140px', height: '28px', fontSize: '12px' }}
+                                                                    />
+                                                                )}
+                                                            </td>
+
+                                                            {/* B2 Columns (quando buttonCount === 2) */}
+                                                            {buttonCount === 2 && (
+                                                                <>
+                                                                    <td>
+                                                                        <select
+                                                                            className="bulk-row-input"
+                                                                            value={row.buttonTypes[1] || 'reply'}
+                                                                            onChange={e => {
+                                                                                const next = [...camp.rows];
+                                                                                const nextTypes = [...next[rIdx].buttonTypes];
+                                                                                nextTypes[1] = e.target.value as 'url' | 'reply';
+                                                                                next[rIdx].buttonTypes = nextTypes;
+                                                                                setCampaigns(campaigns.map(c => c.id === camp.id ? { ...c, rows: next } : c));
+                                                                            }}
+                                                                            style={{ width: '78px', height: '28px', fontSize: '11.5px' }}
+                                                                        >
+                                                                            <option value="url">Link</option>
+                                                                            <option value="reply">Resposta</option>
+                                                                        </select>
+                                                                    </td>
+
+                                                                    <td>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="bulk-row-input"
+                                                                            value={row.buttonTexts[1] || 'Não Reconheço'}
+                                                                            onChange={e => {
+                                                                                const next = [...camp.rows];
+                                                                                const nextTexts = [...next[rIdx].buttonTexts];
+                                                                                while (nextTexts.length < 2) nextTexts.push('');
+                                                                                nextTexts[1] = e.target.value;
+                                                                                next[rIdx].buttonTexts = nextTexts;
+                                                                                setCampaigns(campaigns.map(c => c.id === camp.id ? { ...c, rows: next } : c));
+                                                                            }}
+                                                                            style={{ width: '100px', height: '28px', fontSize: '12px' }}
+                                                                        />
+                                                                    </td>
+
+                                                                    <td>
+                                                                        {row.buttonTypes[1] === 'reply' ? (
+                                                                            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>— Resposta —</span>
+                                                                        ) : (
+                                                                            <input
+                                                                                type="text"
+                                                                                className="bulk-row-input"
+                                                                                value={row.buttonUrls[1] || ''}
+                                                                                onChange={e => {
+                                                                                    const next = [...camp.rows];
+                                                                                    const nextUrls = [...next[rIdx].buttonUrls];
+                                                                                    while (nextUrls.length < 2) nextUrls.push('');
+                                                                                    nextUrls[1] = e.target.value;
+                                                                                    next[rIdx].buttonUrls = nextUrls;
+                                                                                    setCampaigns(campaigns.map(c => c.id === camp.id ? { ...c, rows: next } : c));
+                                                                                }}
+                                                                                placeholder="https://..."
+                                                                                style={{ width: '140px', height: '28px', fontSize: '12px' }}
+                                                                            />
+                                                                        )}
+                                                                    </td>
+                                                                </>
+                                                            )}
+
+                                                            {/* Ações */}
+                                                            <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                                                                <div style={{ display: 'inline-flex', gap: '4px' }}>
                                                                     <button
                                                                         onClick={() => duplicateRow(camp.id, rIdx)}
-                                                                        style={{ background: '#f1f5f9', border: 'none', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer' }}
+                                                                        style={{ background: '#f3f4f6', border: 'none', borderRadius: '4px', padding: '4px 6px', cursor: 'pointer' }}
                                                                         title="Duplicar linha"
                                                                     >
-                                                                        <Copy size={13} color="#475569" />
+                                                                        <Copy size={12} color="#4b5563" />
                                                                     </button>
                                                                     <button
                                                                         onClick={() => deleteRow(camp.id, rIdx)}
-                                                                        style={{ background: '#fee2e2', border: 'none', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer' }}
+                                                                        style={{ background: '#fee2e2', border: 'none', borderRadius: '4px', padding: '4px 6px', cursor: 'pointer' }}
                                                                         title="Excluir linha"
                                                                     >
-                                                                        <Trash2 size={13} color="#ef4444" />
+                                                                        <Trash2 size={12} color="#dc2626" />
                                                                     </button>
                                                                 </div>
                                                             </td>
@@ -1584,8 +1940,8 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                             </table>
                                         </div>
                                     ) : (
-                                        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                            Nenhum template gerado nesta campanha ainda. Clique em <strong>+ Gerar Linhas</strong> acima.
+                                        <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                                            Nenhum template nesta campanha. Clique em <strong>+ Gerar Linhas</strong> acima.
                                         </div>
                                     )}
                                 </div>
@@ -1597,98 +1953,98 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                 onClick={handleRunBulkGeneration}
                                 disabled={isGeneratingBulk || hasBulkValidationErrors}
                                 style={{
-                                    padding: '18px 24px',
-                                    borderRadius: '16px',
-                                    fontSize: '1.05rem',
-                                    fontWeight: 900,
+                                    height: '38px',
+                                    borderRadius: '6px',
+                                    fontSize: '13.5px',
+                                    fontWeight: 600,
                                     width: '100%',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    gap: '10px'
+                                    gap: '8px'
                                 }}
                             >
                                 {isGeneratingBulk ? (
                                     <>
-                                        <Activity size={22} className="animate-spin" />
+                                        <Activity size={16} className="animate-spin" />
                                         {bulkProgress.message || 'Processando templates em lote...'}
                                     </>
                                 ) : (
                                     <>
-                                        <Send size={22} />
-                                        🚀 GERAR TODAS AS CAMPANHAS AGORA NA META
+                                        <Send size={15} />
+                                        Publicar Campanhas na Meta
                                     </>
                                 )}
                             </button>
 
-                            {/* Real-time Bulk Progress & Logs */}
+                            {/* Real-time Progress Bar */}
                             {isGeneratingBulk && (
-                                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ background: '#f9fafb', padding: '12px 14px', borderRadius: '6px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <div>
-                                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
                                             Progresso: {bulkProgress.current} de {bulkProgress.total}
                                         </span>
-                                        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                        <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
                                             {bulkProgress.message}
                                         </p>
                                     </div>
                                     <button
                                         className="btn-secondary"
                                         onClick={() => { abortBulkRef.current = true; }}
-                                        style={{ color: '#ef4444' }}
+                                        style={{ height: '30px', fontSize: '12px', color: '#dc2626' }}
                                     >
-                                        Cancelar Envio
+                                        Cancelar
                                     </button>
                                 </div>
                             )}
 
-                            {/* Success & Error Logs */}
+                            {/* Logs */}
                             {(operationSuccesses.length > 0 || operationErrors.length > 0) && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                     {/* Successes */}
-                                    <div className="glass-panel" style={{ padding: '16px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                            <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#059669' }}>
-                                                CRIADOS COM SUCESSO ({operationSuccesses.length})
+                                    <div className="glass-panel" style={{ padding: '12px 14px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#15803d' }}>
+                                                CRIADOS ({operationSuccesses.length})
                                             </span>
                                             <button
                                                 onClick={() => setOperationSuccesses([])}
-                                                style={{ background: 'transparent', border: 'none', fontSize: '11px', color: '#64748b', cursor: 'pointer' }}
+                                                style={{ background: 'transparent', border: 'none', fontSize: '11px', color: 'var(--text-dim)', cursor: 'pointer' }}
                                             >
                                                 Limpar
                                             </button>
                                         </div>
-                                        <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                             {operationSuccesses.map((s, idx) => (
-                                                <div key={idx} style={{ fontSize: '0.75rem', padding: '4px 8px', background: '#ecfdf5', borderRadius: '6px', color: '#065f46', display: 'flex', justifyContent: 'space-between' }}>
+                                                <div key={idx} style={{ fontSize: '12px', padding: '4px 6px', background: '#f0fdf4', borderRadius: '4px', color: '#166534', display: 'flex', justifyContent: 'space-between' }}>
                                                     <strong>{s.name}</strong>
-                                                    <span>{s.timestamp}</span>
+                                                    <span style={{ fontSize: '11px', color: '#15803d' }}>{s.timestamp}</span>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
 
                                     {/* Errors */}
-                                    <div className="glass-panel" style={{ padding: '16px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                            <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#ef4444' }}>
-                                                ERROS RECENTES ({operationErrors.length})
+                                    <div className="glass-panel" style={{ padding: '12px 14px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#b91c1c' }}>
+                                                ERROS ({operationErrors.length})
                                             </span>
                                             <button
                                                 onClick={() => setOperationErrors([])}
-                                                style={{ background: 'transparent', border: 'none', fontSize: '11px', color: '#64748b', cursor: 'pointer' }}
+                                                style={{ background: 'transparent', border: 'none', fontSize: '11px', color: 'var(--text-dim)', cursor: 'pointer' }}
                                             >
                                                 Limpar
                                             </button>
                                         </div>
-                                        <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                             {operationErrors.map((err, idx) => (
-                                                <div key={idx} style={{ fontSize: '0.75rem', padding: '6px 8px', background: '#fef2f2', borderRadius: '6px', color: '#991b1b' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
+                                                <div key={idx} style={{ fontSize: '11.5px', padding: '4px 6px', background: '#fef2f2', borderRadius: '4px', color: '#991b1b' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
                                                         <span>{err.name}</span>
-                                                        <span>{err.timestamp}</span>
+                                                        <span style={{ fontSize: '10.5px' }}>{err.timestamp}</span>
                                                     </div>
-                                                    <div style={{ fontSize: '0.7rem', marginTop: '2px', opacity: 0.9 }}>
+                                                    <div style={{ fontSize: '11px', marginTop: '2px', opacity: 0.9 }}>
                                                         {err.error}
                                                     </div>
                                                 </div>
@@ -1701,36 +2057,36 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                     )}
                 </div>
 
-                {/* RIGHT COLUMN: SMARTPHONE LIVE PREVIEW & LIVE PAYLOAD VIEWER */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'sticky', top: '24px' }}>
+                {/* RIGHT COLUMN: WHATSAPP SMARTPHONE PREVIEW & TECHNICAL PAYLOAD VIEWER */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'sticky', top: '24px' }}>
 
                     {/* 1. WHATSAPP SMARTPHONE PREVIEW */}
-                    <div className="glass-panel" style={{ padding: '20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                            <Smartphone size={18} color="#10b981" />
-                            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900 }}>
-                                Preview no WhatsApp
+                    <div className="glass-panel" style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                            <Smartphone size={16} color="var(--primary-color)" />
+                            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>
+                                Preview WhatsApp
                             </h3>
                         </div>
 
                         {/* Phone Mockup Frame */}
                         <div style={{
                             background: '#efeae2',
-                            borderRadius: '24px',
-                            padding: '16px 12px',
-                            border: '1px solid rgba(0,0,0,0.1)',
-                            boxShadow: '0 8px 30px rgba(0,0,0,0.08)'
+                            borderRadius: '12px',
+                            padding: '12px 10px',
+                            border: '1px solid rgba(0,0,0,0.08)',
+                            boxShadow: 'var(--shadow-subtle)'
                         }}>
                             {/* WhatsApp Chat Header */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '10px', borderBottom: '1px solid rgba(0,0,0,0.06)', marginBottom: '12px' }}>
-                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontWeight: 900, fontSize: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px', borderBottom: '1px solid rgba(0,0,0,0.06)', marginBottom: '10px' }}>
+                                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontWeight: 700, fontSize: '11px' }}>
                                     W
                                 </div>
-                                <div>
-                                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#111b21' }}>
-                                        {selectedSender}
+                                <div style={{ overflow: 'hidden' }}>
+                                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#111b21', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {selectedSender || 'Remetente Oficial'}
                                     </div>
-                                    <div style={{ fontSize: '0.68rem', color: '#667781' }}>
+                                    <div style={{ fontSize: '10.5px', color: '#667781' }}>
                                         Conta Oficial do WhatsApp
                                     </div>
                                 </div>
@@ -1739,20 +2095,20 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                             {/* WhatsApp Speech Bubble */}
                             <div style={{
                                 background: '#ffffff',
-                                borderRadius: '14px',
-                                padding: '10px 12px',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                borderRadius: '8px',
+                                padding: '10px',
+                                boxShadow: '0 1px 1px rgba(0,0,0,0.06)',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '8px'
+                                gap: '6px'
                             }}>
                                 {/* Media Header Preview */}
                                 {headerType !== 'NONE' && (
                                     <div style={{
-                                        borderRadius: '10px',
+                                        borderRadius: '6px',
                                         overflow: 'hidden',
-                                        background: '#090d16',
-                                        height: '140px',
+                                        background: '#0f172a',
+                                        height: '130px',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -1768,27 +2124,22 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                 />
                                             ) : (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', opacity: 0.6 }}>
-                                                    <ImageIcon size={32} />
+                                                    <ImageIcon size={26} />
                                                     <span style={{ fontSize: '11px' }}>Imagem do Cabeçalho</span>
                                                 </div>
                                             )
                                         )}
                                         {headerType === 'VIDEO' && (
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', opacity: 0.8 }}>
-                                                <Video size={36} color="#10b981" />
+                                                <Video size={28} color="#10b981" />
                                                 <span style={{ fontSize: '11px' }}>Vídeo Demonstrativo</span>
-                                            </div>
-                                        )}
-                                        {headerType === 'TEXT' && (
-                                            <div style={{ padding: '12px', fontWeight: 900, fontSize: '0.9rem', color: '#10b981', textAlign: 'center' }}>
-                                                {headerText || 'CABEÇALHO EM TEXTO'}
                                             </div>
                                         )}
                                     </div>
                                 )}
 
                                 {/* Body Text with Dynamic Variables Replaced */}
-                                <div style={{ fontSize: '0.85rem', color: '#111b21', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                                <div style={{ fontSize: '13px', color: '#111b21', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
                                     {(() => {
                                         let txt = bodyText;
                                         detectedVariables.forEach(v => {
@@ -1801,7 +2152,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
 
                                 {/* Footer Text */}
                                 {footerText && (
-                                    <div style={{ fontSize: '0.72rem', color: '#667781', borderTop: '1px solid #f1f5f9', paddingTop: '6px' }}>
+                                    <div style={{ fontSize: '11px', color: '#667781', borderTop: '1px solid #f3f4f6', paddingTop: '4px' }}>
                                         {footerText}
                                     </div>
                                 )}
@@ -1815,20 +2166,20 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                             key={i}
                                             style={{
                                                 background: '#ffffff',
-                                                borderRadius: '10px',
-                                                padding: '9px',
+                                                borderRadius: '6px',
+                                                height: '32px',
                                                 textAlign: 'center',
                                                 color: '#00a884',
-                                                fontSize: '0.82rem',
-                                                fontWeight: 800,
+                                                fontSize: '12.5px',
+                                                fontWeight: 500,
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 gap: '6px',
-                                                boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+                                                boxShadow: '0 1px 1px rgba(0,0,0,0.04)'
                                             }}
                                         >
-                                            {btn.type === 'URL' ? <LinkIcon size={13} /> : <MessageSquare size={13} />}
+                                            {btn.type === 'URL' ? <LinkIcon size={12} /> : <MessageSquare size={12} />}
                                             {btn.text}
                                         </div>
                                     ))}
@@ -1838,94 +2189,57 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                     </div>
 
                     {/* 2. LIVE TECHNICAL PAYLOAD VIEWER & MANUAL JSON EDITOR */}
-                    <div className="glass-panel" style={{ padding: '20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Code size={18} color="#3b82f6" />
-                                <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 900 }}>
-                                    Visualizador Técnico de Payload
+                    <div className="glass-panel" style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Code size={15} color="var(--accent-blue)" />
+                                <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600 }}>
+                                    Payload Técnico
                                 </h3>
                             </div>
-                            <div style={{ display: 'flex', gap: '6px' }}>
+                            <div style={{ display: 'flex', gap: '4px' }}>
                                 <button
                                     onClick={handleCopyPayloadJson}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        background: copiedJson ? '#ecfdf5' : '#f1f5f9',
-                                        color: copiedJson ? '#059669' : '#475569',
-                                        border: '1px solid var(--border-subtle)',
-                                        borderRadius: '6px',
-                                        padding: '4px 8px',
-                                        fontSize: '11px',
-                                        fontWeight: 800,
-                                        cursor: 'pointer'
-                                    }}
+                                    className="btn-secondary"
+                                    style={{ height: '26px', fontSize: '11px', padding: '0 8px' }}
                                 >
-                                    {copiedJson ? <Check size={12} /> : <Copy size={12} />}
-                                    {copiedJson ? 'Copiado!' : 'Copiar JSON'}
+                                    {copiedJson ? <Check size={11} /> : <Copy size={11} />}
+                                    {copiedJson ? 'Copiado!' : 'Copiar'}
                                 </button>
                                 <button
                                     onClick={handleToggleManualEdit}
-                                    style={{
-                                        background: isEditingPayload ? '#fee2e2' : '#f1f5f9',
-                                        color: isEditingPayload ? '#ef4444' : '#475569',
-                                        border: '1px solid var(--border-subtle)',
-                                        borderRadius: '6px',
-                                        padding: '4px 8px',
-                                        fontSize: '11px',
-                                        fontWeight: 800,
-                                        cursor: 'pointer'
-                                    }}
+                                    className="btn-secondary"
+                                    style={{ height: '26px', fontSize: '11px', padding: '0 8px', color: isEditingPayload ? '#dc2626' : 'inherit' }}
                                 >
-                                    {isEditingPayload ? 'Cancelar' : 'Editar Manual'}
+                                    {isEditingPayload ? 'Cancelar' : 'Editar'}
                                 </button>
                             </div>
                         </div>
 
-                        {/* Format Switcher: Infobip vs Meta Direct */}
-                        <div style={{ display: 'flex', background: '#f1f5f9', padding: '2px', borderRadius: '8px', marginBottom: '10px' }}>
+                        {/* Format Switcher */}
+                        <div className="segmented-control" style={{ width: '100%', height: '28px', marginBottom: '8px' }}>
                             <button
                                 onClick={() => setPayloadViewFormat('INFOBIP')}
-                                style={{
-                                    flex: 1,
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    padding: '4px',
-                                    fontSize: '10px',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    background: payloadViewFormat === 'INFOBIP' ? '#ffffff' : 'transparent',
-                                    color: payloadViewFormat === 'INFOBIP' ? '#0f172a' : '#64748b'
-                                }}
+                                className={`segmented-control-item ${payloadViewFormat === 'INFOBIP' ? 'active' : ''}`}
+                                style={{ flex: 1, justifyContent: 'center', height: '24px', fontSize: '11px' }}
                             >
-                                Formato Infobip
+                                Infobip
                             </button>
                             <button
                                 onClick={() => setPayloadViewFormat('META_DIRECT')}
-                                style={{
-                                    flex: 1,
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    padding: '4px',
-                                    fontSize: '10px',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    background: payloadViewFormat === 'META_DIRECT' ? '#ffffff' : 'transparent',
-                                    color: payloadViewFormat === 'META_DIRECT' ? '#0f172a' : '#64748b'
-                                }}
+                                className={`segmented-control-item ${payloadViewFormat === 'META_DIRECT' ? 'active' : ''}`}
+                                style={{ flex: 1, justifyContent: 'center', height: '24px', fontSize: '11px' }}
                             >
-                                Formato Meta Direct
+                                Meta Direct
                             </button>
                         </div>
 
                         {/* JSON Code Area */}
                         <div style={{
-                            background: '#090d16',
-                            borderRadius: '12px',
-                            padding: '12px',
-                            maxHeight: '280px',
+                            background: '#0f172a',
+                            borderRadius: '6px',
+                            padding: '10px',
+                            maxHeight: '240px',
                             overflowY: 'auto'
                         }}>
                             {isEditingPayload ? (
@@ -1934,7 +2248,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                     onChange={e => setManualPayloadStr(e.target.value)}
                                     style={{
                                         width: '100%',
-                                        height: '240px',
+                                        height: '200px',
                                         background: 'transparent',
                                         border: 'none',
                                         color: '#34d399',

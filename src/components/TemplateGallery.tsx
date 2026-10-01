@@ -314,49 +314,48 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
             )}
 
             {/* Header Bar */}
-            <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', borderRadius: '8px' }}>
                 <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                        <span className="badge badge-approved" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <Sparkles size={13} />
-                            Plug &amp; Sales Meta Templates
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span className="badge badge-approved">
+                            Meta Templates
                         </span>
                         {lastSyncTime && (
-                            <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>
+                            <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
                                 Sincronizado: {new Date(lastSyncTime).toLocaleTimeString('pt-BR')}
                             </span>
                         )}
                     </div>
-                    <h2 style={{ fontSize: '1.45rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
+                    <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)', letterSpacing: '-0.2px', margin: 0 }}>
                         Templates Aprovados &amp; Pendentes
                     </h2>
-                    <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-                        Monitoramento e gerenciamento oficial de templates WhatsApp via Infobip (BM do Luiz - Oficial).
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                        Gerenciamento oficial de templates WhatsApp via Infobip (BM do Luiz).
                     </p>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     {/* View Switcher */}
-                    <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ display: 'flex', background: '#f1f5f9', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
                         <button
                             onClick={() => setViewMode('cards')}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                padding: '6px 12px',
-                                borderRadius: '7px',
+                                padding: '5px 10px',
+                                borderRadius: '4px',
                                 border: 'none',
                                 background: viewMode === 'cards' ? '#ffffff' : 'transparent',
                                 color: viewMode === 'cards' ? 'var(--text-main)' : 'var(--text-muted)',
-                                fontWeight: viewMode === 'cards' ? 700 : 500,
-                                fontSize: '0.8rem',
+                                fontWeight: viewMode === 'cards' ? 600 : 400,
+                                fontSize: '12.5px',
                                 cursor: 'pointer',
-                                boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                                boxShadow: viewMode === 'cards' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
                             }}
                         >
-                            <LayoutGrid size={14} />
-                            Cards WhatsApp
+                            <LayoutGrid size={13} />
+                            Cards
                         </button>
                         <button
                             onClick={() => setViewMode('table')}
@@ -364,18 +363,18 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                padding: '6px 12px',
-                                borderRadius: '7px',
+                                padding: '5px 10px',
+                                borderRadius: '4px',
                                 border: 'none',
                                 background: viewMode === 'table' ? '#ffffff' : 'transparent',
                                 color: viewMode === 'table' ? 'var(--text-main)' : 'var(--text-muted)',
-                                fontWeight: viewMode === 'table' ? 700 : 500,
-                                fontSize: '0.8rem',
+                                fontWeight: viewMode === 'table' ? 600 : 400,
+                                fontSize: '12.5px',
                                 cursor: 'pointer',
-                                boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                                boxShadow: viewMode === 'table' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
                             }}
                         >
-                            <LayoutList size={14} />
+                            <LayoutList size={13} />
                             Tabela
                         </button>
                     </div>
@@ -384,9 +383,9 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                     <button
                         className="btn-secondary"
                         onClick={handleExportExcel}
-                        style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        style={{ height: '34px', padding: '0 12px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
-                        <Download size={14} />
+                        <Download size={13} />
                         Exportar Excel
                     </button>
 
@@ -395,10 +394,10 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                         className="btn-primary"
                         onClick={() => syncTemplates(true)}
                         disabled={isLoading}
-                        style={{ padding: '8px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+                        style={{ height: '34px', padding: '0 14px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
-                        <RefreshCw size={14} className={isLoading ? 'spin-animation' : ''} />
-                        {isLoading ? 'Sincronizando...' : 'Sincronizar Templates'}
+                        <RefreshCw size={13} className={isLoading ? 'spin-animation' : ''} />
+                        {isLoading ? 'Sincronizando...' : 'Sincronizar'}
                     </button>
                 </div>
             </div>
@@ -407,23 +406,22 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
             <div style={{
                 background: '#ffffff',
                 border: '1px solid var(--border-subtle)',
-                borderRadius: '16px',
-                padding: '12px 18px',
-                boxShadow: 'var(--shadow-card)',
+                borderRadius: '8px',
+                padding: '10px 16px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
-                gap: '12px'
+                gap: '10px'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Clock size={16} color="var(--primary-color)" />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-main)' }}>
-                        Período dos Templates:
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Clock size={14} color="var(--primary-color)" />
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        Período:
                     </span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     {[
                         { id: '7days', label: 'Últimos 7 dias (desde 21/09)', badge: 'Solicitado' },
                         { id: '14days', label: 'Últimos 14 dias', badge: null },
@@ -439,15 +437,15 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px',
-                                    padding: '7px 14px',
-                                    borderRadius: '10px',
-                                    border: `1.5px solid ${isSelected ? 'var(--primary-color)' : 'var(--border-subtle)'}`,
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    border: `1px solid ${isSelected ? 'var(--primary-color)' : 'var(--border-subtle)'}`,
                                     background: isSelected ? 'var(--primary-light)' : '#ffffff',
                                     color: isSelected ? 'var(--primary-color)' : 'var(--text-muted)',
-                                    fontWeight: isSelected ? 800 : 600,
-                                    fontSize: '0.8rem',
+                                    fontWeight: isSelected ? 600 : 400,
+                                    fontSize: '12px',
                                     cursor: 'pointer',
-                                    transition: 'all 0.15s ease'
+                                    transition: 'all 120ms ease'
                                 }}
                             >
                                 <span>{r.label}</span>
@@ -455,10 +453,10 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                     <span style={{
                                         background: isSelected ? 'var(--primary-color)' : '#e2e8f0',
                                         color: isSelected ? '#ffffff' : 'var(--text-dim)',
-                                        padding: '1px 6px',
-                                        borderRadius: '999px',
-                                        fontSize: '0.66rem',
-                                        fontWeight: 800
+                                        padding: '1px 5px',
+                                        borderRadius: '4px',
+                                        fontSize: '10px',
+                                        fontWeight: 600
                                     }}>
                                         {r.badge}
                                     </span>
@@ -470,167 +468,162 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
             </div>
 
             {/* Metrics HUD Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
                 {/* Total */}
-                <div className="glass-panel" style={{ padding: '16px 18px', background: '#ffffff' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.76rem', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase' }}>
+                <div className="glass-panel" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                             Total Listados
                         </span>
-                        <div style={{ background: '#f1f5f9', padding: '6px', borderRadius: '8px', color: 'var(--text-muted)' }}>
-                            <FileText size={16} />
+                        <div style={{ background: '#f1f5f9', padding: '4px', borderRadius: '4px', color: 'var(--text-muted)' }}>
+                            <FileText size={14} />
                         </div>
                     </div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--text-main)' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-main)' }}>
                         {metrics.total}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                        Templates recentes no período
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
+                        Templates no período
                     </span>
                 </div>
 
                 {/* Aprovados */}
-                <div className="glass-panel" style={{ padding: '16px 18px', background: '#ffffff', borderLeft: '4px solid #10b981' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.76rem', color: '#059669', fontWeight: 700, textTransform: 'uppercase' }}>
-                            Aprovados (APPROVED)
+                <div className="glass-panel" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                            Aprovados
                         </span>
-                        <div style={{ background: '#ecfdf5', padding: '6px', borderRadius: '8px', color: '#059669' }}>
-                            <CheckCircle2 size={16} />
+                        <div style={{ background: '#f0fdf4', padding: '4px', borderRadius: '4px', color: '#16a34a' }}>
+                            <CheckCircle2 size={14} />
                         </div>
                     </div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#059669' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: '#16a34a' }}>
                         {metrics.approved}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                        {metrics.total > 0 ? `${((metrics.approved / metrics.total) * 100).toFixed(0)}% de aprovação` : '0%'}
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
+                        {metrics.total > 0 ? `${((metrics.approved / metrics.total) * 100).toFixed(0)}% aprovados` : '0%'}
                     </span>
                 </div>
 
                 {/* Pendentes */}
-                <div className="glass-panel" style={{ padding: '16px 18px', background: '#ffffff', borderLeft: '4px solid #f59e0b' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.76rem', color: '#b45309', fontWeight: 700, textTransform: 'uppercase' }}>
-                            Pendentes (PENDING)
+                <div className="glass-panel" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', color: '#d97706', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                            Pendentes
                         </span>
-                        <div style={{ background: '#fffbeb', padding: '6px', borderRadius: '8px', color: '#b45309' }}>
-                            <Clock size={16} />
+                        <div style={{ background: '#fffbeb', padding: '4px', borderRadius: '4px', color: '#d97706' }}>
+                            <Clock size={14} />
                         </div>
                     </div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#b45309' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: '#d97706' }}>
                         {metrics.pending}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
                         Em análise pela Meta
                     </span>
                 </div>
 
                 {/* Rejeitados / Outros */}
-                <div className="glass-panel" style={{ padding: '16px 18px', background: '#ffffff', borderLeft: '4px solid #ef4444' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.76rem', color: '#dc2626', fontWeight: 700, textTransform: 'uppercase' }}>
-                            Rejeitados / Pausados
+                <div className="glass-panel" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', color: '#dc2626', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                            Rejeitados
                         </span>
-                        <div style={{ background: '#fef2f2', padding: '6px', borderRadius: '8px', color: '#dc2626' }}>
-                            <AlertTriangle size={16} />
+                        <div style={{ background: '#fef2f2', padding: '4px', borderRadius: '4px', color: '#dc2626' }}>
+                            <AlertTriangle size={14} />
                         </div>
                     </div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#dc2626' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: '#dc2626' }}>
                         {metrics.rejected}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
                         Recusados ou desativados
                     </span>
                 </div>
 
                 {/* Categorias */}
-                <div className="glass-panel" style={{ padding: '16px 18px', background: '#ffffff', borderLeft: '4px solid #3b82f6' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.76rem', color: '#2563eb', fontWeight: 700, textTransform: 'uppercase' }}>
-                            Utilidade vs Marketing
+                <div className="glass-panel" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', color: '#2563eb', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                            Categorias
                         </span>
-                        <div style={{ background: '#eff6ff', padding: '6px', borderRadius: '8px', color: '#2563eb' }}>
-                            <Tag size={16} />
+                        <div style={{ background: '#eff6ff', padding: '4px', borderRadius: '4px', color: '#2563eb' }}>
+                            <Tag size={14} />
                         </div>
                     </div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)' }}>
-                        {metrics.utility} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-dim)' }}>Util /</span> {metrics.marketing} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-dim)' }}>Mkt</span>
+                    <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)' }}>
+                        {metrics.utility} <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text-dim)' }}>Util /</span> {metrics.marketing} <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text-dim)' }}>Mkt</span>
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                        Classificação de conteúdo Meta
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
+                        Classificação Meta
                     </span>
                 </div>
             </div>
 
-            {/* DEDICATED SENDER SEARCH BAR (Pesquisa Separada por Número Remetente) */}
+            {/* DEDICATED SENDER SEARCH BAR (Pesquisa por Número Remetente) */}
             <div className="glass-panel" style={{
-                padding: '20px 22px',
-                background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)',
-                border: '1.5px solid #86efac',
-                borderRadius: '16px',
-                boxShadow: '0 4px 15px -3px rgba(22, 163, 74, 0.08)'
+                padding: '16px 20px',
+                borderRadius: '8px'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ background: '#dcfce7', padding: '8px', borderRadius: '10px', color: '#16a34a', display: 'flex' }}>
-                            <Smartphone size={20} />
-                        </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Smartphone size={16} color="var(--primary-color)" />
                         <div>
-                            <h4 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#14532d', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                Pesquisar Templates por Número Remetente WhatsApp (BM do Luiz)
-                                <span style={{ fontSize: '0.7rem', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
-                                    Busca Direta Meta
+                            <h4 style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                Pesquisar Templates por Remetente (BM do Luiz)
+                                <span className="badge badge-approved" style={{ height: '18px', padding: '0 5px', fontSize: '10.5px' }}>
+                                    Busca Direta
                                 </span>
                             </h4>
-                            <p style={{ fontSize: '0.78rem', color: '#166534', margin: '2px 0 0 0' }}>
-                                Digite o número WhatsApp vinculado para consultar e filtrar imediatamente os templates aprovados pela Meta.
-                            </p>
                         </div>
                     </div>
 
                     {/* Quick Example Chip */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#166534' }}>
-                            Exemplo rápido ativo:
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                            Atalho:
                         </span>
                         <button
                             type="button"
                             onClick={() => handleSearchSender('+1 555-932-1381')}
+                            className="btn-secondary"
                             style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #22c55e',
-                                color: '#15803d',
-                                padding: '6px 12px',
-                                borderRadius: '20px',
-                                fontSize: '0.78rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
+                                height: '26px',
+                                padding: '0 8px',
+                                fontSize: '11.5px',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '6px',
-                                boxShadow: '0 2px 5px rgba(34, 197, 94, 0.15)',
-                                transition: 'all 0.15s ease'
+                                gap: '4px'
                             }}
-                            title="Carregar templates criados para +1 555-932-1381 (ivo_01 a ivo_04)"
+                            title="Carregar templates de +1 555-932-1381"
                         >
-                            <span>⚡ +1 555-932-1381</span>
-                            <span style={{ fontSize: '0.68rem', background: '#dcfce7', padding: '1px 6px', borderRadius: '10px' }}>Exemplo Ativo</span>
+                            <span>+1 555-932-1381</span>
                         </button>
                     </div>
                 </div>
 
                 {/* Sender Search Input & Action Controls */}
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <div style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
-                        <Smartphone size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#16a34a' }} />
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+                        <Smartphone size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
                         <input
                             type="text"
                             placeholder="Digite o número WhatsApp (ex: +1 555-932-1381 ou 5511...)"
                             value={senderSearchInput}
                             onChange={(e) => setSenderSearchInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSender(); }}
-                            className="input-field"
-                            style={{ paddingLeft: '38px', height: '42px', fontSize: '0.86rem', borderColor: '#86efac', background: '#ffffff' }}
+                            style={{
+                                width: '100%',
+                                height: '36px',
+                                paddingLeft: '32px',
+                                paddingRight: '10px',
+                                fontSize: '13px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                background: '#ffffff',
+                                color: 'var(--text-main)',
+                                outline: 'none'
+                            }}
                         />
                     </div>
 
@@ -639,25 +632,19 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                         disabled={isSearchingSender}
                         className="btn-primary"
                         style={{
-                            height: '42px',
-                            padding: '0 20px',
-                            fontSize: '0.84rem',
-                            fontWeight: 800,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            background: '#16a34a',
-                            borderColor: '#15803d'
+                            height: '36px',
+                            padding: '0 16px',
+                            fontSize: '13px'
                         }}
                     >
                         {isSearchingSender ? (
                             <>
-                                <RefreshCw size={14} className="spin-animation" />
-                                <span>Buscando na Meta...</span>
+                                <RefreshCw size={13} className="spin-animation" />
+                                <span>Buscando...</span>
                             </>
                         ) : (
                             <>
-                                <Search size={15} />
+                                <Search size={14} />
                                 <span>Buscar Número</span>
                             </>
                         )}
@@ -666,23 +653,15 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                     {activeSenderFilter && (
                         <button
                             onClick={handleClearSenderFilter}
+                            className="btn-secondary"
                             style={{
-                                height: '42px',
-                                padding: '0 16px',
-                                fontSize: '0.82rem',
-                                fontWeight: 700,
-                                background: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '8px',
-                                color: 'var(--text-main)',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px'
+                                height: '36px',
+                                padding: '0 12px',
+                                fontSize: '13px'
                             }}
                         >
                             <X size={14} />
-                            <span>Ver Todos os Templates</span>
+                            <span>Ver Todos</span>
                         </button>
                     )}
                 </div>
@@ -690,38 +669,37 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                 {/* Banner when sender filter is active */}
                 {activeSenderFilter && (
                     <div style={{
-                        marginTop: '12px',
-                        padding: '10px 14px',
-                        background: '#dcfce7',
-                        border: '1px solid #86efac',
-                        borderRadius: '10px',
+                        marginTop: '10px',
+                        padding: '8px 12px',
+                        background: '#f0fdf4',
+                        border: '1px solid #bbf7d0',
+                        borderRadius: '6px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        fontSize: '0.84rem',
-                        color: '#15803d',
-                        fontWeight: 700
+                        fontSize: '12.5px',
+                        color: '#166534'
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Smartphone size={15} />
-                            <span>Mostrando templates vinculados ao Remetente: <strong>{activeSenderFilter}</strong> ({filteredTemplates.length} encontrados)</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Smartphone size={14} />
+                            <span>Filtrando por: <strong>{activeSenderFilter}</strong> ({filteredTemplates.length} encontrados)</span>
                         </div>
                         <button
                             onClick={handleClearSenderFilter}
-                            style={{ background: 'none', border: 'none', color: '#15803d', cursor: 'pointer', fontWeight: 800, textDecoration: 'underline', fontSize: '0.8rem' }}
+                            style={{ background: 'none', border: 'none', color: '#166534', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', fontSize: '12px' }}
                         >
-                            Limpar e ver lista geral
+                            Limpar
                         </button>
                     </div>
                 )}
             </div>
 
             {/* Smart Filters Bar */}
-            <div className="glass-panel" style={{ padding: '18px 20px', background: '#ffffff' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Filter size={16} color="var(--primary-color)" />
-                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div className="glass-panel" style={{ padding: '14px 18px', background: '#ffffff', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Filter size={14} color="var(--primary-color)" />
+                        <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                             Filtros Rápidos &amp; Busca Geral
                         </span>
                     </div>
@@ -729,21 +707,15 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                     {hasActiveFilters && (
                         <button
                             onClick={clearFilters}
+                            className="btn-secondary"
                             style={{
-                                background: '#fee2e2',
-                                color: '#b91c1c',
-                                border: 'none',
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
+                                height: '26px',
+                                padding: '0 8px',
+                                fontSize: '11.5px',
+                                color: '#dc2626'
                             }}
                         >
-                            <span>Limpar Filtros</span>
+                            Limpar Filtros
                         </button>
                     )}
                 </div>
@@ -785,7 +757,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                             className="input-field"
                             style={{ height: '40px', fontSize: '0.82rem', fontWeight: 600 }}
                         >
-                            <option value="ALL">Conta: BM do Luiz (4k3e4p - Oficial)</option>
+                            <option value="ALL">Conta: BM do Luiz (9kn66r - Oficial)</option>
                         </select>
                     </div>
 
@@ -844,17 +816,16 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                     padding: '0',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    borderRadius: '16px',
+                                    borderRadius: '8px',
                                     overflow: 'hidden',
                                     border: '1px solid var(--border-subtle)',
                                     background: '#ffffff',
-                                    boxShadow: 'var(--shadow-card)',
-                                    transition: 'all 0.2s ease'
+                                    transition: 'border-color 120ms ease'
                                 }}
                             >
                                 {/* Top Header Info */}
                                 <div style={{
-                                    padding: '14px 16px',
+                                    padding: '10px 14px',
                                     background: '#f8fafc',
                                     borderBottom: '1px solid var(--border-subtle)',
                                     display: 'flex',
@@ -863,18 +834,11 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                     gap: '8px'
                                 }}>
                                     <div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px', flexWrap: 'wrap' }}>
-                                            <span style={{
-                                                background: '#e0f2fe',
-                                                color: '#0369a1',
-                                                padding: '2px 7px',
-                                                borderRadius: '6px',
-                                                fontWeight: 800,
-                                                fontSize: '0.7rem'
-                                            }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px', flexWrap: 'wrap' }}>
+                                            <span className="badge" style={{ fontSize: '11px', height: '20px', padding: '0 6px' }}>
                                                 {t.category}
                                             </span>
-                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: 600 }}>
+                                            <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
                                                 {t.language}
                                             </span>
                                             {(t._senderFormatted || t._sender) && (
@@ -886,18 +850,18 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                                     }}
                                                     style={{
                                                         background: '#f0fdf4',
-                                                        color: '#15803d',
+                                                        color: '#166534',
                                                         border: '1px solid #bbf7d0',
-                                                        padding: '2px 6px',
-                                                        borderRadius: '6px',
-                                                        fontWeight: 800,
-                                                        fontSize: '0.68rem',
+                                                        padding: '1px 6px',
+                                                        borderRadius: '4px',
+                                                        fontWeight: 500,
+                                                        fontSize: '11px',
                                                         cursor: 'pointer',
                                                         display: 'inline-flex',
                                                         alignItems: 'center',
                                                         gap: '3px'
                                                     }}
-                                                    title="Clique para filtrar apenas templates deste remetente"
+                                                    title="Filtrar por este remetente"
                                                 >
                                                     <Smartphone size={10} />
                                                     {t._senderFormatted || t._sender}
@@ -906,12 +870,13 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                         </div>
                                         <h4
                                             style={{
-                                                fontSize: '0.94rem',
-                                                fontWeight: 800,
+                                                fontSize: '13px',
+                                                fontWeight: 600,
                                                 color: 'var(--text-main)',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '6px'
+                                                gap: '6px',
+                                                margin: 0
                                             }}
                                         >
                                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '190px' }} title={t.name}>
@@ -919,10 +884,10 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                             </span>
                                             <button
                                                 onClick={() => handleCopy(t.name, `name_${t.id || t.name}`, 'Nome')}
-                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', padding: '2px' }}
                                                 title="Copiar nome do template"
                                             >
-                                                {copiedId === `name_${t.id || t.name}` ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
+                                                {copiedId === `name_${t.id || t.name}` ? <Check size={12} color="#16a34a" /> : <Copy size={12} />}
                                             </button>
                                         </h4>
                                     </div>
@@ -930,25 +895,25 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                     {/* Status Badge */}
                                     <div>
                                         {isApproved && (
-                                            <span className="badge" style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}>
-                                                <CheckCircle2 size={12} style={{ marginRight: '4px', verticalAlign: '-1px' }} />
+                                            <span className="badge badge-approved" style={{ height: '20px', padding: '0 6px', fontSize: '11px' }}>
+                                                <CheckCircle2 size={11} />
                                                 Aprovado
                                             </span>
                                         )}
                                         {isPending && (
-                                            <span className="badge" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}>
-                                                <Clock size={12} style={{ marginRight: '4px', verticalAlign: '-1px' }} />
+                                            <span className="badge badge-pending" style={{ height: '20px', padding: '0 6px', fontSize: '11px' }}>
+                                                <Clock size={11} />
                                                 Pendente
                                             </span>
                                         )}
                                         {isRejected && (
-                                            <span className="badge" style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
-                                                <AlertTriangle size={12} style={{ marginRight: '4px', verticalAlign: '-1px' }} />
+                                            <span className="badge badge-rejected" style={{ height: '20px', padding: '0 6px', fontSize: '11px' }}>
+                                                <AlertTriangle size={11} />
                                                 Rejeitado
                                             </span>
                                         )}
                                         {!isApproved && !isPending && !isRejected && (
-                                            <span className="badge" style={{ background: '#f8fafc', color: '#64748b' }}>
+                                            <span className="badge" style={{ height: '20px', padding: '0 6px', fontSize: '11px' }}>
                                                 {t.status}
                                             </span>
                                         )}
@@ -957,11 +922,10 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
 
                                 {/* WhatsApp Chat Mockup Body */}
                                 <div style={{
-                                    padding: '16px',
+                                    padding: '12px',
                                     flex: 1,
-                                    background: '#ece5dd', // Real WhatsApp chat wallpaper tint
-                                    backgroundImage: 'radial-gradient(#d1d7db 1px, transparent 1px)',
-                                    backgroundSize: '16px 16px',
+                                    background: '#f8fafc',
+                                    borderBottom: '1px solid var(--border-subtle)',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     justifyContent: 'center'
@@ -969,40 +933,40 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                     {/* Chat Bubble */}
                                     <div style={{
                                         background: '#ffffff',
-                                        borderRadius: '10px 10px 10px 2px',
-                                        padding: '12px 14px',
-                                        boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                                        borderRadius: '6px',
+                                        border: '1px solid #e2e8f0',
+                                        padding: '10px 12px',
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        gap: '10px',
+                                        gap: '8px',
                                         position: 'relative'
                                     }}>
                                         {/* Header placeholder if media */}
                                         {headerFormat && headerFormat !== 'TEXT' && (
                                             <div style={{
-                                                background: '#f1f5f9',
+                                                background: '#f8fafc',
                                                 border: '1px dashed #cbd5e1',
-                                                borderRadius: '8px',
-                                                padding: '16px',
+                                                borderRadius: '4px',
+                                                padding: '10px',
                                                 textAlign: 'center',
                                                 color: 'var(--text-muted)',
-                                                fontSize: '0.78rem',
-                                                fontWeight: 700,
+                                                fontSize: '11.5px',
+                                                fontWeight: 500,
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 gap: '6px'
                                             }}>
-                                                <Smartphone size={16} color="var(--primary-color)" />
-                                                <span>Cabeçalho de Mídia ({headerFormat})</span>
+                                                <Smartphone size={13} color="var(--primary-color)" />
+                                                <span>Mídia ({headerFormat})</span>
                                             </div>
                                         )}
 
                                         {/* Message Body */}
                                         <div style={{
-                                            fontSize: '0.84rem',
+                                            fontSize: '13px',
                                             lineHeight: 1.5,
-                                            color: '#111827',
+                                            color: 'var(--text-main)',
                                             whiteSpace: 'pre-wrap',
                                             wordBreak: 'break-word'
                                         }}>
@@ -1011,45 +975,45 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
 
                                         {/* Footer text */}
                                         {t.structure?.footer?.text && (
-                                            <div style={{ fontSize: '0.72rem', color: '#6b7280', fontStyle: 'italic' }}>
+                                            <div style={{ fontSize: '11.5px', color: 'var(--text-dim)', fontStyle: 'italic' }}>
                                                 {t.structure.footer.text}
                                             </div>
                                         )}
 
                                         {/* Timestamp in bubble */}
-                                        <div style={{ textAlign: 'right', fontSize: '0.66rem', color: '#9ca3af' }}>
+                                        <div style={{ textAlign: 'right', fontSize: '11px', color: 'var(--text-dim)' }}>
                                             {t.lastUpdatedAt ? new Date(t.lastUpdatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '12:00'}
                                         </div>
 
                                         {/* Buttons */}
                                         {buttons.length > 0 && (
                                             <div style={{
-                                                borderTop: '1px solid #f3f4f6',
-                                                paddingTop: '8px',
+                                                borderTop: '1px solid #f1f5f9',
+                                                paddingTop: '6px',
                                                 marginTop: '2px',
                                                 display: 'flex',
                                                 flexDirection: 'column',
-                                                gap: '6px'
+                                                gap: '4px'
                                             }}>
                                                 {buttons.map((btn, bIdx) => (
                                                     <div
                                                         key={bIdx}
                                                         style={{
-                                                            background: '#f9fafb',
-                                                            border: '1px solid #e5e7eb',
-                                                            borderRadius: '6px',
-                                                            padding: '7px 10px',
+                                                            background: '#f8fafc',
+                                                            border: '1px solid #e2e8f0',
+                                                            borderRadius: '4px',
+                                                            padding: '5px 8px',
                                                             textAlign: 'center',
-                                                            fontSize: '0.8rem',
-                                                            fontWeight: 700,
+                                                            fontSize: '12px',
+                                                            fontWeight: 500,
                                                             color: '#0284c7',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
-                                                            gap: '6px'
+                                                            gap: '4px'
                                                         }}
                                                     >
-                                                        <ExternalLink size={13} />
+                                                        <ExternalLink size={11} />
                                                         <span>{btn.text}</span>
                                                     </div>
                                                 ))}
@@ -1060,23 +1024,21 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
 
                                 {/* Card Footer & Action Buttons */}
                                 <div style={{
-                                    padding: '12px 16px',
+                                    padding: '10px 14px',
                                     background: '#ffffff',
-                                    borderTop: '1px solid var(--border-subtle)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
-                                    gap: '10px'
+                                    gap: '8px'
                                 }}>
-                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                                    <div style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
                                         <div>{t.businessName || t._account || 'BM do Luiz'}</div>
                                         {(t._senderFormatted || t._sender) && (
-                                            <div style={{ color: '#15803d', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+                                            <div style={{ color: '#166534', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '3px', marginTop: '1px' }}>
                                                 <Smartphone size={10} />
-                                                <span>Remetente: {t._senderFormatted || t._sender}</span>
+                                                <span>{t._senderFormatted || t._sender}</span>
                                             </div>
                                         )}
-                                        <div>{t.lastUpdatedAt ? `Atualizado: ${new Date(t.lastUpdatedAt).toLocaleDateString('pt-BR')}` : ''}</div>
                                     </div>
 
                                     <div style={{ display: 'flex', gap: '6px' }}>
@@ -1084,7 +1046,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                             <button
                                                 onClick={() => onSelectTemplateForDispatch(t.name)}
                                                 className="btn-primary"
-                                                style={{ padding: '5px 10px', fontSize: '0.74rem', fontWeight: 800 }}
+                                                style={{ height: '30px', padding: '0 10px', fontSize: '12px' }}
                                                 title="Usar este template no Multi-Remetente"
                                             >
                                                 Usar no Disparo
@@ -1093,7 +1055,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                                         <button
                                             onClick={() => setSelectedTemplateForModal(t)}
                                             className="btn-secondary"
-                                            style={{ padding: '5px 8px', fontSize: '0.74rem' }}
+                                            style={{ height: '30px', padding: '0 8px', fontSize: '12px' }}
                                             title="Ver Detalhes do Template"
                                         >
                                             <Eye size={13} />

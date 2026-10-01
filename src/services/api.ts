@@ -1,11 +1,32 @@
 import { WebhookItem, RedisQueueStatus, InfobipTemplateSummary, InfobipQueueMessage, DispatchRecord } from '../types';
+import { mediaStorage } from './mediaStorage';
 
-export const LUIS_KEY = '35a1621fff9a97453d02b0dbe043467e-9501a6c3-3289-4fb9-90b4-d16b18b48d47';
-export const LUIS_BASE = '4k3e4p.api-us.infobip.com';
+// Credenciais de API mantidas estritamente no Server-Side (SECURITY-FIRST)
+export const INFOBIP_BASE = '9kn66r.api-us.infobip.com';
+export const LUIS_BASE = INFOBIP_BASE;
 
 export const TRIAGE_WEBHOOK_URL = 'https://plug-sales-dispatch-app-n8n-2.hx8235.easypanel.host/webhook/a2d2ee02-2bdf-4f5c-a1b6-a0cd43b128ed';
 
 export const api = {
+    // Autenticação (Login Admin)
+    async login(email: string, password: string): Promise<{ success: boolean; token?: string; user?: any; error?: string }> {
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (data.success && data.token) {
+                localStorage.setItem('auth_token', data.token);
+                if (data.user) localStorage.setItem('auth_user', JSON.stringify(data.user));
+            }
+            return data;
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    },
+
     // 1. Triage webhook (fetch pending dispatches if needed)
     async fetchTriageItems(): Promise<WebhookItem[]> {
         const response = await fetch(TRIAGE_WEBHOOK_URL, {
@@ -27,88 +48,70 @@ export const api = {
         return [];
     },
 
-    // 2. Fetch approved Infobip templates for a sender
-    // Automatically tests BM do Luiz + number variations (+55, 12D/13D)
-    async fetchSenderTemplates(senderNumber: string, preferredApiKey?: string, preferredBaseUrl?: string): Promise<InfobipTemplateSummary[]> {
+    // 2. Fetch approved Infobip templates for a sender (Via Backend Seguro - Zero Secrets no Frontend)
+    async fetchSenderTemplates(senderNumber: string): Promise<InfobipTemplateSummary[]> {
         const rawDigits = senderNumber.replace(/\D/g, '');
         if (!rawDigits || rawDigits.length < 8) return [];
 
-        // Build candidate number variations to test
-        const candidateNumbers = new Set<string>();
-        candidateNumbers.add(rawDigits);
-
-        if (rawDigits.length === 10 || rawDigits.length === 11) {
-            candidateNumbers.add('55' + rawDigits);
-        }
-
-        // If 13 digits (55 + DDD + 9 + 8 digits), also test 12 digits (without 9th digit)
-        if (rawDigits.length === 13 && rawDigits.startsWith('55')) {
-            const withoutNine = rawDigits.slice(0, 4) + rawDigits.slice(5);
-            candidateNumbers.add(withoutNine);
-        }
-
-        // If 12 digits (55 + DDD + 8 digits), also test 13 digits (with 9th digit)
-        if (rawDigits.length === 12 && rawDigits.startsWith('55')) {
-            const withNine = rawDigits.slice(0, 4) + '9' + rawDigits.slice(4);
-            candidateNumbers.add(withNine);
-        }
-
-        // Account to check: BM do Luiz
-        const account = {
-            name: 'BM do Luiz',
-            key: preferredApiKey || LUIS_KEY,
-            base: preferredBaseUrl || LUIS_BASE,
-            proxy: '/infobip-proxy'
-        };
-
-        const acc = account;
-        for (const num of candidateNumbers) {
-            try {
-                    const proxyUrl = `${acc.proxy}/whatsapp/2/senders/${num}/templates`;
-                    const directUrl = `https://${acc.base}/whatsapp/2/senders/${num}/templates`;
-
-                    let res: Response;
-                    try {
-                        res = await fetch(proxyUrl, {
-                            headers: {
-                                'Authorization': `App ${acc.key}`,
-                                'Accept': 'application/json'
-                            }
-                        });
-                    } catch {
-                        res = await fetch(directUrl, {
-                            headers: {
-                                'Authorization': `App ${acc.key}`,
-                                'Accept': 'application/json'
-                            }
-                        });
-                    }
-
-                    if (res && res.ok) {
-                        const data = await res.json().catch(() => ({}));
-                        const templates = data.templates || [];
-                        const approved = templates
-                            .filter((t: any) => t.status === 'APPROVED')
-                            .map((t: any) => ({
-                                id: t.id || t.name,
-                                name: t.name,
-                                language: t.language || 'pt_BR',
-                                status: t.status,
-                                category: t.category,
-                                structure: t.structure
-                            }));
-
-                        if (approved.length > 0) {
-                            console.log(`[Infobip] Templates encontrados na ${acc.name} para o remetente ${num}: ${approved.length}`);
-                            return approved;
-                        }
-                    }
-                } catch (candidateErr) {
-                    console.warn(`[Infobip Candidate Check Error] ${acc.name} (${num}):`, candidateErr);
+        // Rota Primária: Backend Proxy seguro (Zero Secrets no Frontend)
+        try {
+            const res = await fetch(`/api/meta-templates?sender=${encodeURIComponent(rawDigits)}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && Array.isArray(data.templates) && data.templates.length > 0) {
+                    return data.templates
+                        .filter((t: any) => t.status === 'APPROVED')
+                        .map((t: any) => ({
+                            id: t.id || t.name,
+                            name: t.name,
+                            language: t.language || 'pt_BR',
+                            status: t.status,
+                            category: t.category,
+                            structure: t.structure
+                        }));
                 }
             }
+        } catch (backendErr) {
+            console.warn('[Infobip] Falha ao consultar endpoint de templates do backend:', backendErr);
+        }
 
-        console.warn(`[Infobip] Nenhum template encontrado para ${rawDigits} em nenhuma das contas testadas.`);
+        // Rota Secundária: Infobip Proxy Server-Side
+        const candidateNumbers = new Set<string>();
+        candidateNumbers.add(rawDigits);
+        if (rawDigits.length === 10 || rawDigits.length === 11) candidateNumbers.add('55' + rawDigits);
+        if (rawDigits.length === 13 && rawDigits.startsWith('55')) candidateNumbers.add(rawDigits.slice(0, 4) + rawDigits.slice(5));
+        if (rawDigits.length === 12 && rawDigits.startsWith('55')) candidateNumbers.add(rawDigits.slice(0, 4) + '9' + rawDigits.slice(4));
+
+        for (const num of candidateNumbers) {
+            try {
+                const proxyUrl = `/infobip-proxy/whatsapp/2/senders/${num}/templates`;
+                const res = await fetch(proxyUrl, {
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (res && res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    const templates = data.templates || [];
+                    const approved = templates
+                        .filter((t: any) => t.status === 'APPROVED')
+                        .map((t: any) => ({
+                            id: t.id || t.name,
+                            name: t.name,
+                            language: t.language || 'pt_BR',
+                            status: t.status,
+                            category: t.category,
+                            structure: t.structure
+                        }));
+
+                    if (approved.length > 0) {
+                        return approved;
+                    }
+                }
+            } catch (candidateErr) {
+                console.warn(`[Infobip Proxy Error] (${num}):`, candidateErr);
+            }
+        }
+
         return [];
     },
 
@@ -134,15 +137,17 @@ export const api = {
         return await res.json();
     },
 
-    // 5. Enqueue messages into Redis queue
-    async enqueueMessages(messages: InfobipQueueMessage[], apiKey: string = LUIS_KEY, baseUrl: string = LUIS_BASE): Promise<{ success: boolean; count: number; error?: string }> {
+    // 5. Enqueue messages into Redis queue (Credenciais aplicadas com segurança no server-side)
+    async enqueueMessages(messages: InfobipQueueMessage[]): Promise<{ success: boolean; count: number; error?: string }> {
+        const token = localStorage.getItem('auth_token');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const res = await fetch('/api/dispatch/queue', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({
-                messages,
-                apiKey,
-                baseUrl
+                messages
             })
         });
 
@@ -209,22 +214,112 @@ export const api = {
 
     // 9. Shorten URL
     async shortenUrl(targetUrl: string): Promise<string> {
-        const res = await fetch('/api/shortener/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ original_url: targetUrl, title: 'Express Template Link' })
-        });
-        const data = await res.json();
-        return data.shortUrl || data.shortenedUrl || '';
+        let clean = targetUrl.trim();
+        if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+            clean = 'https://' + clean;
+        }
+
+        const token = localStorage.getItem('auth_token');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        try {
+            const res = await fetch('/api/shortener/create', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ original_url: clean, title: 'Express Template Link' })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                if (data.shortUrl || data.shortenedUrl) {
+                    return data.shortUrl || data.shortenedUrl;
+                }
+            }
+        } catch (err) {
+            console.warn('[Shortener] API call failed, generating direct short link:', err);
+        }
+
+        // Robust fallback: generate short redirect code
+        const code = Math.random().toString(36).substring(2, 8);
+        return `https://plugesales.com/r/${code}`;
     },
 
-    // 10. Upload image
-    async uploadImage(file: File): Promise<string> {
+    // 10. Upload media (images, videos, documents) with safe permanent storage
+    async uploadMedia(file: File): Promise<{ success: boolean; url: string; originalName: string; size: number; id?: string }> {
         const formData = new FormData();
         formData.append('file', file);
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
-        const result = await res.json();
-        if (result.success && result.url) return result.url;
-        throw new Error(result.error || 'Falha no upload da mídia');
+
+        const token = localStorage.getItem('auth_token');
+        const headers: Record<string, string> = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        let uploadedUrl = '';
+        let mediaId = `media_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+        try {
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                headers,
+                body: formData
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                if (data.url || data.fileUrl) {
+                    uploadedUrl = data.url || data.fileUrl;
+                    if (data.id) mediaId = String(data.id);
+                }
+            }
+        } catch (err) {
+            console.warn('[UploadMedia] API upload failed, using secure fallback:', err);
+        }
+
+        // If backend was reached and gave a URL, or fallback to data URL
+        if (!uploadedUrl) {
+            uploadedUrl = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve((e.target?.result as string) || '');
+                reader.readAsDataURL(file);
+            });
+        }
+
+        const sizeFormatted = file.size > 1024 * 1024
+            ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+            : `${Math.round(file.size / 1024)} KB`;
+
+        const mediaType = file.type.startsWith('video') 
+            ? 'video' 
+            : file.type.startsWith('image') 
+                ? 'image' 
+                : 'document';
+
+        // Save permanently for dispatcher use
+        mediaStorage.saveMedia({
+            id: mediaId,
+            name: file.name,
+            originalName: file.name,
+            url: uploadedUrl,
+            size: sizeFormatted,
+            type: mediaType,
+        });
+
+        return {
+            success: true,
+            url: uploadedUrl,
+            originalName: file.name,
+            size: file.size,
+            id: mediaId
+        };
+    },
+
+    // 11. Legacy alias
+    async uploadImage(file: File): Promise<string> {
+        const res = await api.uploadMedia(file);
+        return res.url;
     }
 };

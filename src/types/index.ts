@@ -100,11 +100,113 @@ export interface InfobipQueueMessage {
         };
         language: string;
     };
-    _apiKey: string;
-    _baseUrl: string;
+    _apiKey?: string;
+    _baseUrl?: string;
 }
 
-export type AppTab = 'registry' | 'dispatch' | 'records' | 'redis' | 'bms' | 'templates' | 'upload-clientes' | 'create-template';
+export type AppTab = 
+    | 'registry' 
+    | 'dispatch' 
+    | 'records' 
+    | 'redis' 
+    | 'monitor'
+    | 'rotator'
+    | 'bms' 
+    | 'templates' 
+    | 'upload-clientes' 
+    | 'create-template'
+    | 'spreadsheet-cleaner'
+    | 'media-hosting';
+
+export interface RotatorTarget {
+    url: string;
+    weight: number;
+    clicks?: number;
+}
+
+export interface ProRotator {
+    id: number | string;
+    title: string;
+    slug: string;
+    targets: RotatorTarget[];
+    total_clicks?: number;
+    created_at?: string;
+    user_id?: number | string;
+    client_id?: number | string | null;
+    owner_name?: string;
+    client_name?: string;
+}
+
+export interface RotatorStats {
+    rotator: ProRotator;
+    targets: { target_index?: number; target_url: string; clicks: number }[];
+    timeline: { date: string; clicks: number }[];
+    recentClicks: { user_agent?: string; country?: string; city?: string; timestamp: string }[];
+}
+
+export interface SavedMediaItem {
+    id: string;
+    name: string;
+    originalName: string;
+    url: string;
+    size: string;
+    type: 'image' | 'video' | 'document';
+    createdAt: string;
+}
+
+export interface SubmissionAd {
+    id: string;
+    ad_name?: string;
+    template_type: 'TEXT' | 'IMAGE' | 'VIDEO';
+    message_mode: 'manual' | 'upload';
+    media_url?: string;
+    ad_copy: string;
+    ad_copy_file?: string;
+    button_link?: string;
+    spreadsheet_url?: string;
+    variables: string[];
+    showFifthVariable?: boolean;
+    scheduled_at?: string;
+    delivered_leads?: number;
+    total_leads?: number;
+    price_per_msg?: number;
+    cta_targets?: RotatorTarget[];
+    rotator_slug?: string;
+    sender_phone?: string;
+}
+
+export interface ClientSubmission {
+    id: number | string;
+    campaign_name?: string;
+    sender_phone?: string;
+    profile_photo?: string;
+    profile_name: string;
+    ddd: string;
+    template_type: 'TEXT' | 'IMAGE' | 'VIDEO';
+    media_url?: string;
+    ad_copy: string;
+    button_link?: string;
+    spreadsheet_url?: string;
+    status: 'PENDENTE' | 'EM ANDAMENTO' | 'GERADO' | 'CONCLUIDO' | 'CANCELADO' | string;
+    assigned_to?: string | null;
+    submitted_by?: string;
+    user_id?: number | string;
+    client_name?: string;
+    timestamp: string;
+    dispatch_date?: string;
+    notes?: string;
+    ads: SubmissionAd[];
+    contacts?: ParsedContact[];
+    headers?: string[];
+    fileName?: string;
+    validCount?: number;
+    totalRows?: number;
+    variables?: string[];
+    showFifthVariable?: boolean;
+    cta_targets?: RotatorTarget[];
+    rotator_slug?: string;
+    download_count?: number;
+}
 
 export interface ClientBatchRecord {
     id: string;
@@ -117,6 +219,7 @@ export interface ClientBatchRecord {
     createdAt: string;
     contacts: ParsedContact[];
     headers: string[];
+    submission?: ClientSubmission;
 }
 
 export interface InfobipAccountTemplate {

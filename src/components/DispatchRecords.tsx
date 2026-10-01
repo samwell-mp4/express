@@ -80,65 +80,73 @@ export const DispatchRecords: React.FC = () => {
         : 100;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
             {/* Top Header Bar */}
-            <div className="glass-panel" style={{ padding: '22px 26px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-                <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                            background: 'var(--primary-color)',
-                            color: '#fff',
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '10px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 2px 8px var(--primary-glow)'
-                        }}>
-                            <Radio size={20} />
-                        </div>
-                        <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-main)', lineHeight: 1.1 }}>
-                                    Registro de Envios em Tempo Real
-                                </h2>
+            <div style={{
+                background: '#FFFFFF',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '8px',
+                padding: '16px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                        background: '#F0FDF4',
+                        color: '#16A34A',
+                        border: '1px solid #DCFCE7',
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                    }}>
+                        <Radio size={16} />
+                    </div>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)', letterSpacing: '-0.01em', margin: 0 }}>
+                                Registro de Envios em Tempo Real
+                            </h2>
+                            <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                background: autoRefresh ? '#ECFDF5' : '#F3F4F6',
+                                color: autoRefresh ? '#065F46' : '#6B7280',
+                                border: `1px solid ${autoRefresh ? '#A7F3D0' : '#E5E7EB'}`,
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 600
+                            }}>
                                 <span style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    background: autoRefresh ? '#ecfdf5' : '#f1f5f9',
-                                    color: autoRefresh ? '#059669' : '#64748b',
-                                    border: `1px solid ${autoRefresh ? '#a7f3d0' : '#cbd5e1'}`,
-                                    padding: '2px 8px',
-                                    borderRadius: '999px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 700
-                                }}>
-                                    <span style={{
-                                        width: '6px',
-                                        height: '6px',
-                                        borderRadius: '50%',
-                                        background: autoRefresh ? '#10b981' : '#94a3b8',
-                                        boxShadow: autoRefresh ? '0 0 6px #10b981' : 'none'
-                                    }} />
-                                    {autoRefresh ? 'Ao Vivo (2s)' : 'Pausado'}
-                                </span>
-                            </div>
-                            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '3px' }}>
-                                Acompanhe exatamente os números que estão sendo disparados pela BM e o status de entrega de cada mensagem.
-                            </p>
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    background: autoRefresh ? '#10B981' : '#9CA3AF'
+                                }} />
+                                {autoRefresh ? 'Ao Vivo (2s)' : 'Pausado'}
+                            </span>
                         </div>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                            Acompanhamento de mensagens disparadas e confirmações de entrega da Meta/Infobip.
+                        </p>
                     </div>
                 </div>
 
                 {/* Right controls */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <button
                         className="btn-secondary"
                         onClick={() => setAutoRefresh(!autoRefresh)}
-                        style={{ fontSize: '0.82rem', padding: '7px 12px' }}
+                        style={{ height: '34px', fontSize: '13px', padding: '0 12px', borderRadius: '6px' }}
                     >
                         <RefreshCw size={13} className={autoRefresh ? 'animate-spin' : ''} />
                         {autoRefresh ? 'Pausar Atualização' : 'Retomar Ao Vivo'}
@@ -147,7 +155,7 @@ export const DispatchRecords: React.FC = () => {
                     <button
                         className="btn-secondary"
                         onClick={loadRecords}
-                        style={{ fontSize: '0.82rem', padding: '7px 12px' }}
+                        style={{ height: '34px', fontSize: '13px', padding: '0 12px', borderRadius: '6px' }}
                         title="Atualizar manualmente"
                     >
                         Atualizar Agora
@@ -156,7 +164,20 @@ export const DispatchRecords: React.FC = () => {
                     {records.length > 0 && (
                         <button
                             onClick={handleClearLogs}
-                            style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '7px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}
+                            style={{
+                                height: '34px',
+                                background: '#FEF2F2',
+                                border: '1px solid #FECACA',
+                                color: '#DC2626',
+                                padding: '0 12px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: 500,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
                             title="Limpar registros"
                         >
                             <Trash2 size={13} />
@@ -167,111 +188,158 @@ export const DispatchRecords: React.FC = () => {
             </div>
 
             {/* Metrics HUD */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
                 
                 {/* Total */}
-                <div className="glass-card" style={{ padding: '18px', background: '#fff', borderTop: '3px solid #64748b' }}>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)', fontWeight: 600, display: 'block' }}>Total de Disparos</span>
-                    <strong style={{ fontSize: '1.6rem', color: 'var(--text-main)', display: 'block', margin: '4px 0' }}>
+                <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                        Total de Disparos
+                    </span>
+                    <strong style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-main)', display: 'block', margin: '4px 0 2px' }}>
                         {totalCount}
                     </strong>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Mensagens registradas</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Mensagens registradas</span>
                 </div>
 
                 {/* Entregues */}
-                <div className="glass-card" style={{ padding: '18px', background: '#fff', borderTop: '3px solid #10b981' }}>
-                    <span style={{ fontSize: '0.74rem', color: '#16a34a', fontWeight: 700, display: 'block' }}>Entregues com Sucesso</span>
-                    <strong style={{ fontSize: '1.6rem', color: '#059669', display: 'block', margin: '4px 0' }}>
+                <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
+                    <span style={{ fontSize: '11px', color: '#16A34A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                        Entregues
+                    </span>
+                    <strong style={{ fontSize: '20px', fontWeight: 600, color: '#16A34A', display: 'block', margin: '4px 0 2px' }}>
                         {deliveredCount}
                     </strong>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Confirmados pela Meta/Infobip</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Confirmados pela Meta</span>
                 </div>
 
                 {/* Enviados / Em Rota */}
-                <div className="glass-card" style={{ padding: '18px', background: '#fff', borderTop: '3px solid #3b82f6' }}>
-                    <span style={{ fontSize: '0.74rem', color: '#2563eb', fontWeight: 700, display: 'block' }}>Enviados / Em Rota</span>
-                    <strong style={{ fontSize: '1.6rem', color: '#1d4ed8', display: 'block', margin: '4px 0' }}>
+                <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
+                    <span style={{ fontSize: '11px', color: '#2563EB', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                        Em Rota
+                    </span>
+                    <strong style={{ fontSize: '20px', fontWeight: 600, color: '#2563EB', display: 'block', margin: '4px 0 2px' }}>
                         {sentCount}
                     </strong>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Aguardando confirmação</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Aguardando confirmação</span>
                 </div>
 
                 {/* Falhas */}
-                <div className="glass-card" style={{ padding: '18px', background: '#fff', borderTop: '3px solid #ef4444' }}>
-                    <span style={{ fontSize: '0.74rem', color: '#dc2626', fontWeight: 700, display: 'block' }}>Falhas / Rejeitados</span>
-                    <strong style={{ fontSize: '1.6rem', color: '#dc2626', display: 'block', margin: '4px 0' }}>
+                <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
+                    <span style={{ fontSize: '11px', color: '#DC2626', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                        Falhas / Rejeitados
+                    </span>
+                    <strong style={{ fontSize: '20px', fontWeight: 600, color: '#DC2626', display: 'block', margin: '4px 0 2px' }}>
                         {failedCount}
                     </strong>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Erros de número ou limite</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Erros de número ou limite</span>
                 </div>
 
                 {/* Taxa de Entrega */}
-                <div className="glass-card" style={{ padding: '18px', background: '#fff', borderTop: '3px solid var(--primary-color)' }}>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--primary-color)', fontWeight: 700, display: 'block' }}>Taxa de Entrega</span>
-                    <strong style={{ fontSize: '1.6rem', color: 'var(--text-main)', display: 'block', margin: '4px 0' }}>
+                <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                        Taxa de Entrega
+                    </span>
+                    <strong style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-main)', display: 'block', margin: '4px 0 6px' }}>
                         {successRate}%
                     </strong>
-                    {/* Mini progress bar */}
-                    <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden', marginTop: '6px' }}>
-                        <div style={{ width: `${successRate}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #059669)', borderRadius: '999px' }} />
+                    <div style={{ width: '100%', height: '4px', background: '#E5E7EB', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{ width: `${successRate}%`, height: '100%', background: '#16A34A', borderRadius: '2px' }} />
                     </div>
                 </div>
 
             </div>
 
             {/* Filter & Search Bar */}
-            <div className="glass-panel" style={{ padding: '14px 20px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '240px' }}>
-                    <Search size={16} color="var(--text-dim)" />
+            <div style={{
+                background: '#FFFFFF',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '240px' }}>
+                    <Search size={15} color="var(--text-dim)" />
                     <input 
                         type="text"
-                        placeholder="Buscar por número destinatário, remetente ou template..."
-                        className="form-input"
+                        placeholder="Buscar destinatário, remetente ou template..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{ border: 'none', background: '#f8fafc', padding: '8px 12px', fontSize: '0.84rem' }}
+                        style={{
+                            height: '34px',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '6px',
+                            background: '#FFFFFF',
+                            padding: '0 12px',
+                            fontSize: '13px',
+                            width: '100%',
+                            maxWidth: '440px',
+                            color: 'var(--text-main)'
+                        }}
                     />
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Filter size={15} color="var(--text-muted)" />
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Status:</span>
+                    <Filter size={14} color="var(--text-muted)" />
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Status:</span>
                     <select
-                        className="form-select"
                         value={statusFilter}
                         onChange={(e: any) => setStatusFilter(e.target.value)}
-                        style={{ padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600 }}
+                        style={{
+                            height: '34px',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '6px',
+                            background: '#FFFFFF',
+                            padding: '0 10px',
+                            fontSize: '13px',
+                            fontWeight: 500,
+                            color: 'var(--text-main)'
+                        }}
                     >
                         <option value="ALL">Todos ({records.length})</option>
-                        <option value="DELIVERED">✓ Entregues ({deliveredCount})</option>
-                        <option value="SENT">✈️ Enviados ({sentCount})</option>
-                        <option value="FAILED">⚠️ Falhas ({failedCount})</option>
+                        <option value="DELIVERED">Entregues ({deliveredCount})</option>
+                        <option value="SENT">Enviados ({sentCount})</option>
+                        <option value="FAILED">Falhas ({failedCount})</option>
                     </select>
                 </div>
             </div>
 
             {/* Live Table */}
             {filteredRecords.length === 0 ? (
-                <div className="glass-card" style={{ padding: '60px 20px', textAlign: 'center', background: '#fff' }}>
-                    <Activity size={36} color="var(--primary-color)" style={{ margin: '0 auto 12px', opacity: 0.8 }} />
-                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                <div style={{
+                    background: '#FFFFFF',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '8px',
+                    padding: '48px 20px',
+                    textAlign: 'center'
+                }}>
+                    <Activity size={32} color="#9CA3AF" style={{ margin: '0 auto 10px' }} />
+                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: '0 0 4px' }}>
                         Nenhum envio registrado no momento
                     </h3>
-                    <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', maxWidth: '420px', margin: '6px auto 16px' }}>
-                        Quando você disparar uma campanha na aba <strong>Multi-Remetente</strong>, cada mensagem aparecerá aqui em tempo real com seu número e status de entrega.
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto' }}>
+                        Quando você disparar uma campanha, cada mensagem aparecerá aqui em tempo real com seu número e status de entrega.
                     </p>
                 </div>
             ) : (
-                <div className="glass-panel" style={{ overflowX: 'auto', padding: '8px', background: '#fff' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem', textAlign: 'left' }}>
+                <div style={{
+                    background: '#FFFFFF',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '8px',
+                    overflow: 'hidden'
+                }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
                         <thead>
-                            <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-dim)', background: '#f8fafc' }}>
-                                <th style={{ padding: '12px 16px' }}>HORÁRIO</th>
-                                <th style={{ padding: '12px 16px' }}>DESTINATÁRIO (CLIENTE)</th>
-                                <th style={{ padding: '12px 16px' }}>REMETENTE (WABA)</th>
-                                <th style={{ padding: '12px 16px' }}>TEMPLATE</th>
-                                <th style={{ padding: '12px 16px' }}>STATUS DE ENTREGA</th>
-                                <th style={{ padding: '12px 16px' }}>ID DA MENSAGEM</th>
+                            <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: '#F9FAFB' }}>
+                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Horário</th>
+                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Destinatário</th>
+                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Remetente (WABA)</th>
+                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Template</th>
+                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</th>
+                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>ID da Mensagem</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -280,90 +348,90 @@ export const DispatchRecords: React.FC = () => {
                                 const dateStr = new Date(r.timestamp).toLocaleDateString('pt-BR');
 
                                 return (
-                                    <tr key={r.id || i} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}>
+                                    <tr key={r.id || i} style={{ borderBottom: '1px solid #F3F4F6', transition: 'background 0.15s' }}>
                                         {/* Timestamp */}
-                                        <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
-                                            <span style={{ fontWeight: 700, color: 'var(--text-main)', display: 'block' }}>{timeStr}</span>
-                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{dateStr}</span>
+                                        <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                                            <span style={{ fontWeight: 600, color: 'var(--text-main)', display: 'block' }}>{timeStr}</span>
+                                            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{dateStr}</span>
                                         </td>
 
                                         {/* Recipient */}
-                                        <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--text-main)', fontFamily: 'monospace' }}>
+                                        <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'monospace' }}>
                                             {r.recipient}
                                         </td>
 
                                         {/* Sender WABA */}
-                                        <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '3px 8px', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                                                <Smartphone size={13} color="var(--primary-color)" />
+                                        <td style={{ padding: '10px 14px', color: 'var(--text-muted)' }}>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#F9FAFB', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-subtle)', fontFamily: 'monospace', fontSize: '12px' }}>
+                                                <Smartphone size={12} color="var(--primary-color)" />
                                                 {r.senderNumber || 'BM Luiz'}
                                             </span>
                                         </td>
 
                                         {/* Template */}
-                                        <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-main)' }}>
+                                        <td style={{ padding: '10px 14px', fontWeight: 500, color: 'var(--text-main)' }}>
                                             {r.templateName || '—'}
                                         </td>
 
                                         {/* Status Badge */}
-                                        <td style={{ padding: '12px 16px' }}>
+                                        <td style={{ padding: '10px 14px' }}>
                                             {r.status === 'DELIVERED' ? (
                                                 <span style={{
-                                                    background: '#ecfdf5',
-                                                    color: '#065f46',
-                                                    border: '1px solid #a7f3d0',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '999px',
-                                                    fontSize: '0.74rem',
-                                                    fontWeight: 700,
+                                                    background: '#ECFDF5',
+                                                    color: '#065F46',
+                                                    border: '1px solid #A7F3D0',
+                                                    padding: '2px 8px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '11px',
+                                                    fontWeight: 600,
                                                     display: 'inline-flex',
                                                     alignItems: 'center',
-                                                    gap: '5px'
+                                                    gap: '4px'
                                                 }}>
-                                                    <Check size={12} strokeWidth={3} />
+                                                    <Check size={11} strokeWidth={2.5} />
                                                     ENTREGUE
                                                 </span>
                                             ) : r.status === 'SENT' ? (
                                                 <span style={{
-                                                    background: '#eff6ff',
-                                                    color: '#1e40af',
-                                                    border: '1px solid #bfdbfe',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '999px',
-                                                    fontSize: '0.74rem',
-                                                    fontWeight: 700,
+                                                    background: '#EFF6FF',
+                                                    color: '#1E40AF',
+                                                    border: '1px solid #BFDBFE',
+                                                    padding: '2px 8px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '11px',
+                                                    fontWeight: 600,
                                                     display: 'inline-flex',
                                                     alignItems: 'center',
-                                                    gap: '5px'
+                                                    gap: '4px'
                                                 }}>
-                                                    <Send size={12} />
+                                                    <Send size={11} />
                                                     ENVIADO
                                                 </span>
                                             ) : (
                                                 <span 
                                                     title={r.errorReason || 'Erro retornado pela API da Infobip/Meta'}
                                                     style={{
-                                                        background: '#fef2f2',
-                                                        color: '#dc2626',
-                                                        border: '1px solid #fecaca',
-                                                        padding: '4px 10px',
-                                                        borderRadius: '999px',
-                                                        fontSize: '0.74rem',
-                                                        fontWeight: 700,
+                                                        background: '#FEF2F2',
+                                                        color: '#B91C1C',
+                                                        border: '1px solid #FECACA',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 600,
                                                         display: 'inline-flex',
                                                         alignItems: 'center',
-                                                        gap: '5px',
+                                                        gap: '4px',
                                                         cursor: 'help'
                                                     }}
                                                 >
-                                                    <AlertTriangle size={12} />
+                                                    <AlertTriangle size={11} />
                                                     FALHA
                                                 </span>
                                             )}
                                         </td>
 
                                         {/* Message ID */}
-                                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.74rem', color: 'var(--text-dim)' }}>
+                                        <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-dim)' }}>
                                             {r.messageId || '—'}
                                         </td>
                                     </tr>

@@ -67,39 +67,41 @@ export const RedisMonitor: React.FC<RedisMonitorProps> = ({ status, onRefresh })
     const msgsPerMinute = Math.round(60 / effectiveRate);
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
             {/* Top Overview Banner */}
-            <div className="glass-panel" style={{ padding: '24px', background: '#fff' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ background: '#ecfdf5', color: 'var(--primary-color)', padding: '10px', borderRadius: '12px' }}>
-                            <Database size={24} />
+            <div className="glass-panel" style={{ padding: '18px 22px', background: '#fff', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ background: '#ecfdf5', color: 'var(--primary-color)', width: '36px', height: '36px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Database size={18} />
                         </div>
                         <div>
-                            <h2 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Monitor de Fila Redis (Infobip Dispatcher)</h2>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                            <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)', margin: 0, letterSpacing: '-0.01em' }}>Monitor de Fila Redis (Infobip Dispatcher)</h2>
+                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
                                 Fila FIFO inteligente para envios controlados com proteção anti-bloqueio Meta e Rate Limit ajustável.
                             </p>
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <button 
                             className="btn-secondary"
                             onClick={onRefresh}
                             disabled={isActionLoading}
+                            style={{ height: '34px', fontSize: '13px', padding: '0 12px', borderRadius: '6px' }}
                         >
-                            <RefreshCw size={16} className={isActionLoading ? 'animate-spin' : ''} />
-                            Atualizar Status
+                            <RefreshCw size={13} className={isActionLoading ? 'animate-spin' : ''} />
+                            Atualizar
                         </button>
 
                         <button 
                             className="btn-danger"
                             onClick={handleStopQueue}
                             disabled={isActionLoading || status.queueLength === 0}
+                            style={{ height: '34px', fontSize: '13px', padding: '0 12px', borderRadius: '6px' }}
                         >
-                            <Pause size={16} />
+                            <Pause size={13} />
                             Pausar Fila
                         </button>
 
@@ -107,9 +109,9 @@ export const RedisMonitor: React.FC<RedisMonitorProps> = ({ status, onRefresh })
                             className="btn-danger"
                             onClick={handleClearQueue}
                             disabled={isActionLoading || status.queueLength === 0}
-                            style={{ background: '#fee2e2' }}
+                            style={{ background: '#fee2e2', height: '34px', fontSize: '13px', padding: '0 12px', borderRadius: '6px' }}
                         >
-                            <Trash2 size={16} />
+                            <Trash2 size={13} />
                             Limpar Fila
                         </button>
                     </div>
@@ -120,16 +122,16 @@ export const RedisMonitor: React.FC<RedisMonitorProps> = ({ status, onRefresh })
                     <div style={{ 
                         background: '#fefce8', 
                         border: '1px solid #fef08a', 
-                        borderRadius: '12px', 
-                        padding: '12px 16px', 
+                        borderRadius: '6px', 
+                        padding: '10px 14px', 
                         display: 'flex', 
                         alignItems: 'center', 
-                        gap: '10px',
-                        marginBottom: '20px',
+                        gap: '8px',
+                        marginBottom: '16px',
                         color: '#a16207'
                     }}>
-                        <AlertTriangle size={18} />
-                        <span style={{ fontSize: '0.85rem' }}>{status.warning}</span>
+                        <AlertTriangle size={16} />
+                        <span style={{ fontSize: '13px' }}>{status.warning}</span>
                     </div>
                 )}
 
@@ -138,126 +140,125 @@ export const RedisMonitor: React.FC<RedisMonitorProps> = ({ status, onRefresh })
                     <div style={{ 
                         background: '#ecfdf5', 
                         border: '1px solid #a7f3d0', 
-                        borderRadius: '12px', 
-                        padding: '12px 16px', 
+                        borderRadius: '6px', 
+                        padding: '10px 14px', 
                         display: 'flex', 
                         alignItems: 'center', 
-                        gap: '10px',
-                        marginBottom: '20px',
+                        gap: '8px',
+                        marginBottom: '16px',
                         color: '#065f46'
                     }}>
-                        <CheckCircle2 size={18} />
-                        <span style={{ fontSize: '0.85rem' }}>{actionMessage}</span>
+                        <CheckCircle2 size={16} />
+                        <span style={{ fontSize: '13px' }}>{actionMessage}</span>
                     </div>
                 )}
 
                 {/* Stat Cards Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
                     
                     {/* Card 1: Fila Pendente */}
-                    <div className="glass-card" style={{ padding: '20px', background: '#ffffff', borderTop: '3px solid var(--primary-color)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Fila Pendente</span>
-                            <Clock size={18} color="var(--primary-color)" />
+                    <div className="glass-card" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fila Pendente</span>
+                            <Clock size={15} color="var(--primary-color)" />
                         </div>
-                        <div style={{ fontSize: '2.2rem', fontWeight: 900, color: status.queueLength > 0 ? 'var(--primary-color)' : 'var(--text-main)' }}>
+                        <div style={{ fontSize: '22px', fontWeight: 600, color: status.queueLength > 0 ? 'var(--primary-color)' : 'var(--text-main)' }}>
                             {status.queueLength.toLocaleString('pt-BR')}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '2px' }}>
                             Mensagens na fila <code>dispatch_queue</code>
                         </div>
                     </div>
 
                     {/* Card 2: Estado do Worker */}
-                    <div className="glass-card" style={{ padding: '20px', background: '#ffffff', borderTop: `3px solid ${status.isRunning ? 'var(--status-approved)' : '#94a3b8'}` }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Worker Status</span>
-                            <Zap size={18} color={status.isRunning ? 'var(--status-approved)' : '#94a3b8'} />
+                    <div className="glass-card" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Worker Status</span>
+                            <Zap size={15} color={status.isRunning ? 'var(--status-approved)' : '#94a3b8'} />
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
                             <span style={{ 
-                                width: '12px', 
-                                height: '12px', 
+                                width: '8px', 
+                                height: '8px', 
                                 borderRadius: '50%', 
-                                background: status.isRunning ? 'var(--status-approved)' : '#94a3b8',
-                                boxShadow: status.isRunning ? '0 0 10px #16a34a' : 'none'
+                                background: status.isRunning ? 'var(--status-approved)' : '#94a3b8'
                             }} />
-                            <span style={{ fontSize: '1.25rem', fontWeight: 800, color: status.isRunning ? 'var(--status-approved)' : 'var(--text-muted)' }}>
+                            <span style={{ fontSize: '15px', fontWeight: 600, color: status.isRunning ? 'var(--status-approved)' : 'var(--text-muted)' }}>
                                 {status.isRunning ? 'EM DISPARO' : 'OCIOSO / AGUARDANDO'}
                             </span>
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '8px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>
                             Delay atual: <strong>{effectiveRate}s</strong> por mensagem
                         </div>
                     </div>
 
                     {/* Card 3: Mensagens Processadas */}
-                    <div className="glass-card" style={{ padding: '20px', background: '#ffffff', borderTop: '3px solid #10b981' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Total Processado</span>
-                            <CheckCircle2 size={18} color="var(--status-approved)" />
+                    <div className="glass-card" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total Processado</span>
+                            <CheckCircle2 size={15} color="var(--status-approved)" />
                         </div>
-                        <div style={{ fontSize: '2.2rem', fontWeight: 900, color: 'var(--text-main)' }}>
+                        <div style={{ fontSize: '22px', fontWeight: 600, color: 'var(--text-main)' }}>
                             {status.processed.toLocaleString('pt-BR')}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '2px' }}>
                             Gravadas em <code>engine_logs</code>
                         </div>
                     </div>
 
                     {/* Card 4: Rate Limit Aberto */}
-                    <div className="glass-card" style={{ padding: '20px', background: '#ffffff', borderTop: '3px solid #3b82f6' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Taxa de Disparo</span>
-                            <Gauge size={18} color="#3b82f6" />
+                    <div className="glass-card" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Taxa de Disparo</span>
+                            <Gauge size={15} color="#3b82f6" />
                         </div>
-                        <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1d4ed8', marginTop: '2px' }}>
-                            {effectiveRate}s <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-dim)' }}>/ msg</span>
+                        <div style={{ fontSize: '22px', fontWeight: 600, color: 'var(--text-main)', marginTop: '2px' }}>
+                            {effectiveRate}s <span style={{ fontSize: '13px', fontWeight: 400, color: 'var(--text-dim)' }}>/ msg</span>
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '6px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '2px' }}>
                             ~{msgsPerMinute} mensagens por minuto
                         </div>
                     </div>
 
                 </div>
 
-                {/* RATE LIMIT OPEN CONTROLLER PANEL (Solicitado pelo usuário: em aberto, suporte a 0.5s) */}
+                {/* RATE LIMIT OPEN CONTROLLER PANEL */}
                 <div style={{
                     background: '#f8fafc',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: '12px',
-                    padding: '18px 22px',
+                    borderRadius: '8px',
+                    padding: '14px 18px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     flexWrap: 'wrap',
-                    gap: '16px'
+                    gap: '12px'
                 }}>
                     <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Sliders size={18} color="var(--primary-color)" />
-                            <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Sliders size={15} color="var(--primary-color)" />
+                            <strong style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>
                                 Controle de Rate Limit (Delay entre Mensagens)
                             </strong>
                         </div>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '3px' }}>
-                            Defina o intervalo em segundos entre cada disparo do worker. Você pode usar valores rápidos como <strong>0.5s</strong> ou intervalos mais seguros.
+                        <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px', margin: 0 }}>
+                            Defina o intervalo em segundos entre cada disparo do worker (ex: 0.5s Turbo, 1.0s, 1.5s).
                         </p>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         {/* Preset buttons */}
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                        <div style={{ display: 'flex', gap: '4px' }}>
                             <button
                                 onClick={() => handleSaveRateLimit(0.5)}
                                 style={{
-                                    padding: '6px 12px',
-                                    borderRadius: '8px',
-                                    border: effectiveRate === 0.5 ? '2px solid var(--primary-color)' : '1px solid var(--border-subtle)',
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    border: effectiveRate === 0.5 ? '1px solid var(--primary-color)' : '1px solid var(--border-subtle)',
                                     background: effectiveRate === 0.5 ? '#ecfdf5' : '#ffffff',
                                     color: effectiveRate === 0.5 ? 'var(--primary-color)' : 'var(--text-main)',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 700,
+                                    fontSize: '12px',
+                                    fontWeight: 500,
                                     cursor: 'pointer'
                                 }}
                             >
@@ -267,13 +268,13 @@ export const RedisMonitor: React.FC<RedisMonitorProps> = ({ status, onRefresh })
                             <button
                                 onClick={() => handleSaveRateLimit(1.0)}
                                 style={{
-                                    padding: '6px 12px',
-                                    borderRadius: '8px',
-                                    border: effectiveRate === 1.0 ? '2px solid var(--primary-color)' : '1px solid var(--border-subtle)',
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    border: effectiveRate === 1.0 ? '1px solid var(--primary-color)' : '1px solid var(--border-subtle)',
                                     background: effectiveRate === 1.0 ? '#ecfdf5' : '#ffffff',
                                     color: effectiveRate === 1.0 ? 'var(--primary-color)' : 'var(--text-main)',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 700,
+                                    fontSize: '12px',
+                                    fontWeight: 500,
                                     cursor: 'pointer'
                                 }}
                             >
@@ -283,13 +284,13 @@ export const RedisMonitor: React.FC<RedisMonitorProps> = ({ status, onRefresh })
                             <button
                                 onClick={() => handleSaveRateLimit(1.5)}
                                 style={{
-                                    padding: '6px 12px',
-                                    borderRadius: '8px',
-                                    border: effectiveRate === 1.5 ? '2px solid var(--primary-color)' : '1px solid var(--border-subtle)',
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    border: effectiveRate === 1.5 ? '1px solid var(--primary-color)' : '1px solid var(--border-subtle)',
                                     background: effectiveRate === 1.5 ? '#ecfdf5' : '#ffffff',
                                     color: effectiveRate === 1.5 ? 'var(--primary-color)' : 'var(--text-main)',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 700,
+                                    fontSize: '12px',
+                                    fontWeight: 500,
                                     cursor: 'pointer'
                                 }}
                             >
@@ -307,15 +308,15 @@ export const RedisMonitor: React.FC<RedisMonitorProps> = ({ status, onRefresh })
                                 className="form-input"
                                 value={customRateLimit}
                                 onChange={(e) => setCustomRateLimit(parseFloat(e.target.value) || 0.5)}
-                                style={{ width: '80px', padding: '6px 10px', textAlign: 'center', fontWeight: 800 }}
+                                style={{ width: '60px', height: '32px', padding: '0 6px', textAlign: 'center', fontWeight: 600, fontSize: '13px', borderRadius: '6px' }}
                             />
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>segundos</span>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>seg</span>
                             
                             <button
                                 className="btn-primary"
                                 onClick={() => handleSaveRateLimit(customRateLimit)}
                                 disabled={isSavingRateLimit}
-                                style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+                                style={{ height: '32px', fontSize: '12.5px', padding: '0 12px', borderRadius: '6px' }}
                             >
                                 {isSavingRateLimit ? 'Salvando...' : 'Aplicar'}
                             </button>
@@ -326,17 +327,17 @@ export const RedisMonitor: React.FC<RedisMonitorProps> = ({ status, onRefresh })
             </div>
 
             {/* Architecture Details Box */}
-            <div className="glass-card" style={{ padding: '20px', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-muted)', background: '#ffffff' }}>
-                <h3 style={{ color: 'var(--text-main)', fontSize: '0.98rem', fontWeight: 700, marginBottom: '8px' }}>
-                    💡 Sobre o Rate Limit Dinâmico:
+            <div className="glass-card" style={{ padding: '16px 20px', fontSize: '13px', lineHeight: '1.6', color: 'var(--text-muted)', background: '#ffffff', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                <h3 style={{ color: 'var(--text-main)', fontSize: '14.5px', fontWeight: 600, marginBottom: '6px', margin: 0 }}>
+                    Sobre o Rate Limit Dinâmico:
                 </h3>
-                <p>
+                <p style={{ margin: '4px 0' }}>
                     • <strong>0.5 segundos:</strong> Dispara aproximadamente ~120 mensagens por minuto. Ideal para campanhas com alto volume quando os números possuem boa reputação na Meta.
                 </p>
-                <p>
+                <p style={{ margin: '4px 0' }}>
                     • <strong>1.0 a 1.5 segundos:</strong> Intervalo seguro recomendado para evitar bloqueios ou "throttling" da API da Meta/Infobip.
                 </p>
-                <p>
+                <p style={{ margin: '4px 0' }}>
                     • O valor é salvo instantaneamente na chave <code>dispatch_rate_limit</code> do Redis e aplicado em tempo real pelo worker sem necessidade de reiniciar.
                 </p>
             </div>

@@ -310,48 +310,48 @@ export const BmControl: React.FC<BmControlProps> = ({
             )}
 
             {/* Header Control Panel */}
-            <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            {/* Header Control Panel */}
+            <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', borderRadius: '8px' }}>
                 <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                        <span className="badge badge-approved" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <Layers size={13} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span className="badge badge-approved">
                             Google Sheets Oficial
                         </span>
                         {lastSyncTime && (
-                            <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>
+                            <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
                                 Sincronizado: {new Date(lastSyncTime).toLocaleTimeString('pt-BR')}
                             </span>
                         )}
                     </div>
-                    <h2 style={{ fontSize: '1.45rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
-                        Controle de BMs & Contas Meta
+                    <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)', letterSpacing: '-0.2px', margin: 0 }}>
+                        Controle de BMs &amp; Contas Meta
                     </h2>
-                    <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
                         Filtros inteligentes por colaborador, status de verificação, limites e observações operacionais.
                     </p>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     {/* View Switcher */}
-                    <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ display: 'flex', background: '#f1f5f9', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
                         <button
                             onClick={() => setViewMode('table')}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                padding: '6px 12px',
-                                borderRadius: '7px',
+                                padding: '5px 10px',
+                                borderRadius: '4px',
                                 border: 'none',
                                 background: viewMode === 'table' ? '#ffffff' : 'transparent',
                                 color: viewMode === 'table' ? 'var(--text-main)' : 'var(--text-muted)',
-                                fontWeight: viewMode === 'table' ? 700 : 500,
-                                fontSize: '0.8rem',
+                                fontWeight: viewMode === 'table' ? 600 : 400,
+                                fontSize: '12.5px',
                                 cursor: 'pointer',
-                                boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                                boxShadow: viewMode === 'table' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
                             }}
                         >
-                            <LayoutList size={14} />
+                            <LayoutList size={13} />
                             Tabela
                         </button>
                         <button
@@ -360,18 +360,18 @@ export const BmControl: React.FC<BmControlProps> = ({
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                padding: '6px 12px',
-                                borderRadius: '7px',
+                                padding: '5px 10px',
+                                borderRadius: '4px',
                                 border: 'none',
                                 background: viewMode === 'cards' ? '#ffffff' : 'transparent',
                                 color: viewMode === 'cards' ? 'var(--text-main)' : 'var(--text-muted)',
-                                fontWeight: viewMode === 'cards' ? 700 : 500,
-                                fontSize: '0.8rem',
+                                fontWeight: viewMode === 'cards' ? 600 : 400,
+                                fontSize: '12.5px',
                                 cursor: 'pointer',
-                                boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                                boxShadow: viewMode === 'cards' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
                             }}
                         >
-                            <LayoutGrid size={14} />
+                            <LayoutGrid size={13} />
                             Cards
                         </button>
                     </div>
@@ -381,9 +381,9 @@ export const BmControl: React.FC<BmControlProps> = ({
                         className="btn-secondary"
                         onClick={handleExportExcel}
                         title="Exportar registros filtrados para Excel"
-                        style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        style={{ height: '34px', padding: '0 12px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
-                        <Download size={14} />
+                        <Download size={13} />
                         Exportar Excel
                     </button>
 
@@ -392,10 +392,10 @@ export const BmControl: React.FC<BmControlProps> = ({
                         className="btn-primary"
                         onClick={() => syncData(true)}
                         disabled={isLoading}
-                        style={{ padding: '8px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+                        style={{ height: '34px', padding: '0 14px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
-                        <RefreshCw size={14} className={isLoading ? 'spin-animation' : ''} />
-                        {isLoading ? 'Sincronizando...' : 'Sincronizar Planilha'}
+                        <RefreshCw size={13} className={isLoading ? 'spin-animation' : ''} />
+                        {isLoading ? 'Sincronizando...' : 'Sincronizar'}
                     </button>
 
                     {/* Open Google Sheets External Link */}
@@ -404,10 +404,10 @@ export const BmControl: React.FC<BmControlProps> = ({
                         target="_blank"
                         rel="noreferrer"
                         className="btn-secondary"
-                        style={{ padding: '8px 10px', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+                        style={{ height: '34px', padding: '0 10px', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
                         title="Abrir Planilha Original Google Docs"
                     >
-                        <ExternalLink size={15} />
+                        <ExternalLink size={14} />
                     </a>
                 </div>
             </div>
@@ -416,28 +416,27 @@ export const BmControl: React.FC<BmControlProps> = ({
             <div style={{
                 background: '#ffffff',
                 border: '1px solid var(--border-subtle)',
-                borderRadius: '16px',
-                padding: '12px 16px',
-                boxShadow: 'var(--shadow-card)'
+                borderRadius: '8px',
+                padding: '10px 14px'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <User size={15} color="var(--primary-color)" />
-                        <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>
-                            Colaborador / Aba da Planilha
+                        <User size={14} color="var(--primary-color)" />
+                        <span style={{ fontSize: '12px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px', color: 'var(--text-muted)' }}>
+                            Colaborador / Aba
                         </span>
                     </div>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>
-                        Exibindo 14 colaboradores oficiais
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
+                        14 colaboradores oficiais
                     </span>
                 </div>
 
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '6px',
                     overflowX: 'auto',
-                    paddingBottom: '6px'
+                    paddingBottom: '4px'
                 }}>
                     {/* GERAL (TODOS) TAB */}
                     <button
@@ -445,28 +444,29 @@ export const BmControl: React.FC<BmControlProps> = ({
                         style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 16px',
-                            borderRadius: '10px',
-                            border: `1.5px solid ${selectedCollaborator === 'GERAL' ? 'var(--primary-color)' : 'var(--border-subtle)'}`,
+                            gap: '6px',
+                            height: '30px',
+                            padding: '0 10px',
+                            borderRadius: '6px',
+                            border: `1px solid ${selectedCollaborator === 'GERAL' ? 'var(--primary-color)' : 'var(--border-subtle)'}`,
                             background: selectedCollaborator === 'GERAL' ? 'var(--primary-light)' : '#ffffff',
                             color: selectedCollaborator === 'GERAL' ? 'var(--primary-color)' : 'var(--text-main)',
-                            fontWeight: selectedCollaborator === 'GERAL' ? 800 : 600,
-                            fontSize: '0.82rem',
+                            fontWeight: selectedCollaborator === 'GERAL' ? 600 : 400,
+                            fontSize: '12px',
                             cursor: 'pointer',
                             whiteSpace: 'nowrap',
-                            transition: 'all 0.15s ease',
+                            transition: 'all 120ms ease',
                             flexShrink: 0
                         }}
                     >
-                        <span>✨ Geral (Todos)</span>
+                        <span>Geral (Todos)</span>
                         <span style={{
-                            background: selectedCollaborator === 'GERAL' ? 'var(--primary-color)' : '#e2e8f0',
+                            background: selectedCollaborator === 'GERAL' ? 'var(--primary-color)' : '#f1f5f9',
                             color: selectedCollaborator === 'GERAL' ? '#ffffff' : 'var(--text-muted)',
-                            padding: '2px 7px',
-                            borderRadius: '999px',
-                            fontSize: '0.7rem',
-                            fontWeight: 800
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            fontSize: '10.5px',
+                            fontWeight: 600
                         }}>
                             {records.length}
                         </span>
@@ -484,16 +484,17 @@ export const BmControl: React.FC<BmControlProps> = ({
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px',
-                                    padding: '8px 14px',
-                                    borderRadius: '10px',
+                                    height: '30px',
+                                    padding: '0 10px',
+                                    borderRadius: '6px',
                                     border: `1px solid ${isSelected ? 'var(--primary-color)' : 'var(--border-subtle)'}`,
                                     background: isSelected ? 'var(--primary-light)' : '#ffffff',
                                     color: isSelected ? 'var(--primary-color)' : 'var(--text-main)',
-                                    fontWeight: isSelected ? 800 : 500,
-                                    fontSize: '0.8rem',
+                                    fontWeight: isSelected ? 600 : 400,
+                                    fontSize: '12px',
                                     cursor: 'pointer',
                                     whiteSpace: 'nowrap',
-                                    transition: 'all 0.15s ease',
+                                    transition: 'all 120ms ease',
                                     flexShrink: 0
                                 }}
                             >
@@ -501,10 +502,10 @@ export const BmControl: React.FC<BmControlProps> = ({
                                 <span style={{
                                     background: isSelected ? 'var(--primary-color)' : '#f1f5f9',
                                     color: isSelected ? '#ffffff' : 'var(--text-dim)',
-                                    padding: '1px 6px',
-                                    borderRadius: '999px',
-                                    fontSize: '0.68rem',
-                                    fontWeight: 700
+                                    padding: '1px 5px',
+                                    borderRadius: '4px',
+                                    fontSize: '10.5px',
+                                    fontWeight: 600
                                 }}>
                                     {count}
                                 </span>
@@ -515,94 +516,94 @@ export const BmControl: React.FC<BmControlProps> = ({
             </div>
 
             {/* Metrics HUD Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
                 {/* Total */}
-                <div className="glass-panel" style={{ padding: '16px 18px', background: '#ffffff' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.76rem', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase' }}>
+                <div className="glass-panel" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                             Total de BMs
                         </span>
-                        <div style={{ background: '#f1f5f9', padding: '6px', borderRadius: '8px', color: 'var(--text-muted)' }}>
-                            <Layers size={16} />
+                        <div style={{ background: '#f1f5f9', padding: '4px', borderRadius: '4px', color: 'var(--text-muted)' }}>
+                            <Layers size={14} />
                         </div>
                     </div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--text-main)' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-main)' }}>
                         {metrics.total}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                        {selectedCollaborator === 'GERAL' ? 'Consolidado de todos' : `Colaborador: ${selectedCollaborator}`}
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
+                        {selectedCollaborator === 'GERAL' ? 'Consolidado geral' : `Colaborador: ${selectedCollaborator}`}
                     </span>
                 </div>
 
                 {/* Aprovadas */}
-                <div className="glass-panel" style={{ padding: '16px 18px', background: '#ffffff', borderLeft: '4px solid #10b981' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.76rem', color: '#059669', fontWeight: 700, textTransform: 'uppercase' }}>
+                <div className="glass-panel" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                             Aprovado / 100%
                         </span>
-                        <div style={{ background: '#ecfdf5', padding: '6px', borderRadius: '8px', color: '#059669' }}>
-                            <ShieldCheck size={16} />
+                        <div style={{ background: '#f0fdf4', padding: '4px', borderRadius: '4px', color: '#16a34a' }}>
+                            <ShieldCheck size={14} />
                         </div>
                     </div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#059669' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: '#16a34a' }}>
                         {metrics.aprovadas}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                        {metrics.total > 0 ? `${((metrics.aprovadas / metrics.total) * 100).toFixed(0)}% das BMs listadas` : '0%'}
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
+                        {metrics.total > 0 ? `${((metrics.aprovadas / metrics.total) * 100).toFixed(0)}% das BMs` : '0%'}
                     </span>
                 </div>
 
                 {/* Em Análise */}
-                <div className="glass-panel" style={{ padding: '16px 18px', background: '#ffffff', borderLeft: '4px solid #f59e0b' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.76rem', color: '#b45309', fontWeight: 700, textTransform: 'uppercase' }}>
-                            Em Análise / Meta
+                <div className="glass-panel" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', color: '#d97706', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                            Em Análise
                         </span>
-                        <div style={{ background: '#fffbeb', padding: '6px', borderRadius: '8px', color: '#b45309' }}>
-                            <Clock size={16} />
+                        <div style={{ background: '#fffbeb', padding: '4px', borderRadius: '4px', color: '#d97706' }}>
+                            <Clock size={14} />
                         </div>
                     </div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#b45309' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: '#d97706' }}>
                         {metrics.analise}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
                         Aguardando aprovação
                     </span>
                 </div>
 
                 {/* Banidas */}
-                <div className="glass-panel" style={{ padding: '16px 18px', background: '#ffffff', borderLeft: '4px solid #ef4444' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.76rem', color: '#dc2626', fontWeight: 700, textTransform: 'uppercase' }}>
-                            Banidas / Restrição
+                <div className="glass-panel" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', color: '#dc2626', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                            Banidas
                         </span>
-                        <div style={{ background: '#fef2f2', padding: '6px', borderRadius: '8px', color: '#dc2626' }}>
-                            <ShieldAlert size={16} />
+                        <div style={{ background: '#fef2f2', padding: '4px', borderRadius: '4px', color: '#dc2626' }}>
+                            <ShieldAlert size={14} />
                         </div>
                     </div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#dc2626' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: '#dc2626' }}>
                         {metrics.banidas}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                        Contas com perda ou queda
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
+                        Contas com restrição
                     </span>
                 </div>
 
                 {/* Com Número WhatsApp */}
-                <div className="glass-panel" style={{ padding: '16px 18px', background: '#ffffff', borderLeft: '4px solid #3b82f6' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.76rem', color: '#2563eb', fontWeight: 700, textTransform: 'uppercase' }}>
+                <div className="glass-panel" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', color: '#2563eb', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                             Com WhatsApp
                         </span>
-                        <div style={{ background: '#eff6ff', padding: '6px', borderRadius: '8px', color: '#2563eb' }}>
-                            <Smartphone size={16} />
+                        <div style={{ background: '#eff6ff', padding: '4px', borderRadius: '4px', color: '#2563eb' }}>
+                            <Smartphone size={14} />
                         </div>
                     </div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#2563eb' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: '#2563eb' }}>
                         {metrics.comNumero}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                        Números válidos para disparo
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
+                        Números cadastrados
                     </span>
                 </div>
             </div>

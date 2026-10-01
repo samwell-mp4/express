@@ -50,6 +50,115 @@ function googleSheetsProxyPlugin(): Plugin {
   return {
     name: 'google-sheets-proxy',
     configureServer(server) {
+      // Smart Link Shortener & Rotator Redirection Middleware (/r/:slug)
+      server.middlewares.use((req, res, next) => {
+        const rawUrl = req.url || '';
+        if (rawUrl.startsWith('/r/')) {
+          const slug = rawUrl.replace(/^\/r\//, '').split('?')[0];
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.end(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Redirecionando | Link Rotator PRO</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0B0F19; color: #F3F4F6; }
+    .box { text-align: center; max-width: 440px; width: 90%; padding: 36px 28px; background: #111827; border: 1px solid #1F2937; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+    .spinner { width: 36px; height: 36px; border: 3px solid #374151; border-top-color: #ACF800; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h3 { margin: 0 0 10px; font-size: 17px; font-weight: 700; color: #F9FAFB; letter-spacing: -0.3px; }
+    p { margin: 0; font-size: 13px; color: #9CA3AF; line-height: 1.5; }
+    .err-btn { display: inline-block; margin-top: 20px; padding: 9px 18px; background: #1F2937; color: #ACF800; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 600; border: 1px solid #374151; }
+    .err-btn:hover { background: #374151; }
+  </style>
+</head>
+<body>
+  <div class="box" id="box">
+    <div class="spinner"></div>
+    <h3>Redirecionando...</h3>
+    <p>Conectando você ao destino através do Link Rotator PRO.</p>
+  </div>
+  <script>
+    (async function() {
+      const slug = "${slug}".trim();
+      const box = document.getElementById('box');
+      
+      // 1. Tentar API Backend (se online)
+      try {
+        const res = await fetch('/api/pro-links');
+        if (res.ok) {
+          const links = await res.json();
+          if (Array.isArray(links)) {
+            const found = links.find(l => (l.slug || '').toLowerCase() === slug.toLowerCase());
+            if (found) {
+              const rawTargets = typeof found.targets === 'string' ? JSON.parse(found.targets) : found.targets;
+              if (rawTargets && rawTargets.length > 0) {
+                const totalW = rawTargets.reduce((s, t) => s + (parseFloat(t.weight) || 1), 0);
+                let rnd = Math.random() * totalW;
+                let targetUrl = rawTargets[0].url;
+                for (let i = 0; i < rawTargets.length; i++) {
+                  rnd -= (parseFloat(rawTargets[i].weight) || 1);
+                  if (rnd <= 0) { targetUrl = rawTargets[i].url; break; }
+                }
+                if (!/^https?:\\/\\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
+                window.location.replace(targetUrl);
+                return;
+              }
+            }
+          }
+        }
+      } catch(e) {}
+
+      // 2. Fallback Armazenamento Local
+      try {
+        const local = JSON.parse(localStorage.getItem('plugesales_pro_rotators_v1') || '[]');
+        const found = local.find(r => (r.slug || '').toLowerCase() === slug.toLowerCase());
+        if (found && found.targets && found.targets.length > 0) {
+          const totalW = found.targets.reduce((s, t) => s + (parseFloat(t.weight) || 1), 0);
+          let rnd = Math.random() * totalW;
+          let targetUrl = found.targets[0].url;
+          let targetIdx = 0;
+          for (let i = 0; i < found.targets.length; i++) {
+            rnd -= (parseFloat(found.targets[i].weight) || 1);
+            if (rnd <= 0) { targetUrl = found.targets[i].url; targetIdx = i; break; }
+          }
+          found.total_clicks = (found.total_clicks || 0) + 1;
+          const statsKey = 'plugesales_pro_rotator_stats_' + found.id;
+          const stats = JSON.parse(localStorage.getItem(statsKey) || '{"targets":[],"timeline":[],"recentClicks":[]}');
+          const existingTargetStat = stats.targets.find(t => t.target_url === targetUrl);
+          if (existingTargetStat) existingTargetStat.clicks++;
+          else stats.targets.push({ target_index: targetIdx, target_url: targetUrl, clicks: 1 });
+          const today = new Date().toISOString().split('T')[0];
+          const todayTimeline = stats.timeline.find(d => d.date === today);
+          if (todayTimeline) todayTimeline.clicks++;
+          else stats.timeline.push({ date: today, clicks: 1 });
+          stats.recentClicks.unshift({
+            user_agent: navigator.userAgent,
+            country: 'Local',
+            city: 'N/A',
+            timestamp: new Date().toISOString()
+          });
+          if (stats.recentClicks.length > 50) stats.recentClicks.length = 50;
+          localStorage.setItem(statsKey, JSON.stringify(stats));
+          localStorage.setItem('plugesales_pro_rotators_v1', JSON.stringify(local));
+
+          if (!/^https?:\\/\\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
+          window.location.replace(targetUrl);
+          return;
+        }
+      } catch(e) {}
+
+      // 3. Não encontrado
+      box.innerHTML = '<h3 style="color:#EF4444;font-size:18px;">Link não encontrado</h3><p style="margin-top:8px;">O link encurtado <b>/r/' + slug + '</b> não existe ou não possui destinos configurados.</p><a class="err-btn" href="/">Voltar ao Painel</a>';
+    })();
+  </script>
+</body>
+</html>`);
+          return;
+        }
+        next();
+      });
+
       server.middlewares.use('/api/bm-sheets', async (req, res) => {
         try {
           const urlObj = new URL(req.url || '', 'http://localhost');
@@ -149,8 +258,8 @@ function googleSheetsProxyPlugin(): Plugin {
             return;
           }
 
-          const LUIZ_HOST = '4k3e4p.api-us.infobip.com';
-          const LUIZ_KEY = '35a1621fff9a97453d02b0dbe043467e-9501a6c3-3289-4fb9-90b4-d16b18b48d47';
+          const LUIZ_HOST = '9kn66r.api-us.infobip.com';
+          const LUIZ_KEY = 'a20edbf816d727811c324791316af20b-56e251b9-66f6-4f75-b461-e9006d123473';
           const LUIS_HOST = LUIZ_HOST;
           const LUIS_KEY = LUIZ_KEY;
 
@@ -376,10 +485,13 @@ export default defineConfig({
         secure: false
       },
       '/infobip-proxy': {
-        target: 'https://4k3e4p.api-us.infobip.com',
+        target: 'https://9kn66r.api-us.infobip.com',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/infobip-proxy/, '')
+        rewrite: (path) => path.replace(/^\/infobip-proxy/, ''),
+        headers: {
+          'Authorization': 'App a20edbf816d727811c324791316af20b-56e251b9-66f6-4f75-b461-e9006d123473'
+        }
       }
     }
   }

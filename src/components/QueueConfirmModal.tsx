@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Database, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Smartphone, Send } from 'lucide-react';
 import { SenderConfig, ParsedContact, PlaceholderMapping, InfobipQueueMessage } from '../types';
-import { api, LUIS_KEY, LUIS_BASE } from '../services/api';
+import { api, LUIS_BASE } from '../services/api';
 import { excelService } from '../services/excelService';
 
 interface QueueConfirmModalProps {
@@ -70,9 +70,7 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                         templateName: s.templateName || 'template_padrao',
                         templateData: Object.keys(templateData).length > 0 ? templateData : undefined,
                         language: s.templateLanguage || 'pt_BR'
-                    },
-                    _apiKey: LUIS_KEY,
-                    _baseUrl: LUIS_BASE
+                    }
                 });
             });
         });
@@ -106,7 +104,7 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
         try {
             for (let i = 0; i < allMessages.length; i += batchSize) {
                 const batch = allMessages.slice(i, i + batchSize);
-                await api.enqueueMessages(batch, LUIS_KEY, LUIS_BASE);
+                await api.enqueueMessages(batch);
                 sent += batch.length;
                 setProgress({ current: sent, total: allMessages.length });
             }
@@ -144,23 +142,25 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
         <div style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(6px)',
+            background: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1100,
-            padding: '20px'
+            padding: '16px'
         }}>
             <div className="glass-panel" style={{
                 width: '100%',
-                maxWidth: '720px',
+                maxWidth: '680px',
                 maxHeight: '90vh',
                 overflowY: 'auto',
-                padding: '28px',
+                padding: '22px',
                 position: 'relative',
                 background: '#ffffff',
-                boxShadow: 'var(--shadow-float)'
+                borderRadius: '8px',
+                border: '1px solid var(--border-subtle)',
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
             }}>
                 
                 {/* Close Button */}
@@ -169,33 +169,33 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                     disabled={isEnqueuing}
                     style={{
                         position: 'absolute',
-                        top: '20px',
-                        right: '20px',
+                        top: '16px',
+                        right: '16px',
                         background: '#f1f5f9',
                         border: 'none',
                         color: 'var(--text-muted)',
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '6px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
                     }}
                 >
-                    <X size={18} />
+                    <X size={15} />
                 </button>
 
                 {/* Modal Title */}
-                <div style={{ marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span className="badge badge-approved">Etapa Final</span>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)', fontWeight: 600 }}>Confirmação de Fila</span>
+                <div style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span className="badge badge-approved" style={{ fontSize: '11px', height: '20px', padding: '0 6px', borderRadius: '4px', fontWeight: 500 }}>Etapa Final</span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Confirmação de Fila</span>
                     </div>
-                    <h2 style={{ fontSize: '1.45rem', fontWeight: 900, marginTop: '6px', color: 'var(--text-main)' }}>
+                    <h2 style={{ fontSize: '18px', fontWeight: 600, marginTop: '4px', margin: '4px 0 0 0', color: 'var(--text-main)', letterSpacing: '-0.01em' }}>
                         Confirmar Envio para a Fila Redis
                     </h2>
-                    <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
                         Os disparos serão enfileirados e enviados sequencialmente pelo worker via Infobip.
                     </p>
                 </div>
@@ -205,85 +205,85 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                     <div style={{ 
                         background: '#fef2f2', 
                         border: '1px solid #fecaca', 
-                        padding: '12px 16px', 
-                        borderRadius: '10px', 
-                        marginBottom: '16px',
+                        padding: '10px 14px', 
+                        borderRadius: '6px', 
+                        marginBottom: '14px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '10px',
+                        gap: '8px',
                         color: '#dc2626',
-                        fontSize: '0.85rem'
+                        fontSize: '13px'
                     }}>
-                        <AlertTriangle size={18} />
+                        <AlertTriangle size={16} />
                         <span>{errorMsg}</span>
                     </div>
                 )}
 
                 {/* Success Banner */}
                 {isDone ? (
-                    <div style={{ textAlign: 'center', padding: '30px 10px' }}>
+                    <div style={{ textAlign: 'center', padding: '24px 10px' }}>
                         <div style={{ 
                             background: '#dcfce7', 
                             color: '#15803d', 
-                            width: '64px', 
-                            height: '64px', 
+                            width: '48px', 
+                            height: '48px', 
                             borderRadius: '50%', 
                             display: 'flex', 
                             alignItems: 'center', 
                             justifyContent: 'center',
-                            margin: '0 auto 16px' 
+                            margin: '0 auto 12px' 
                         }}>
-                            <CheckCircle2 size={36} />
+                            <CheckCircle2 size={24} />
                         </div>
-                        <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                        <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)', margin: '0 0 6px 0' }}>
                             {progress.current} Mensagens Enfileiradas com Sucesso!
                         </h3>
-                        <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '8px', maxWidth: '480px', margin: '8px auto 24px' }}>
-                            Os disparos estão alocados na fila <code>dispatch_queue</code> do Redis e serão enviados na BM do Luiz com intervalo de 1.5s.
+                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '440px', margin: '0 auto 18px' }}>
+                            Os disparos estão alocados na fila <code>dispatch_queue</code> do Redis e serão enviados na BM do Luiz com intervalo de {selectedRateLimit}s.
                         </p>
-                        <button className="btn-primary" onClick={onSuccess} style={{ padding: '12px 28px', fontSize: '0.95rem' }}>
+                        <button className="btn-primary" onClick={onSuccess} style={{ height: '36px', padding: '0 18px', fontSize: '13px', borderRadius: '6px' }}>
                             Acompanhar no Monitor de Fila
                         </button>
                     </div>
                 ) : (
                     <>
                         {/* Summary Stats Grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '18px' }}>
-                            <div className="glass-card" style={{ padding: '14px', background: '#f8fafc' }}>
-                                <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)', display: 'block' }}>Total de Mensagens</span>
-                                <strong style={{ fontSize: '1.35rem', color: 'var(--primary-color)' }}>{totalAllocated}</strong>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginBottom: '14px' }}>
+                            <div className="glass-card" style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                                <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total de Mensagens</span>
+                                <strong style={{ fontSize: '18px', fontWeight: 600, color: 'var(--primary-color)' }}>{totalAllocated}</strong>
                             </div>
 
-                            <div className="glass-card" style={{ padding: '14px', background: '#f8fafc' }}>
-                                <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)', display: 'block' }}>Remetentes Ativos</span>
-                                <strong style={{ fontSize: '1.35rem', color: 'var(--text-main)' }}>{activePartitions.length}</strong>
+                            <div className="glass-card" style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                                <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Remetentes Ativos</span>
+                                <strong style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)' }}>{activePartitions.length}</strong>
                             </div>
 
-                            <div className="glass-card" style={{ padding: '14px', background: '#f8fafc' }}>
-                                <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)', display: 'block' }}>Conta Destino</span>
-                                <strong style={{ fontSize: '0.95rem', color: 'var(--accent-cyan)', display: 'block', marginTop: '4px' }}>BM do Luiz</strong>
+                            <div className="glass-card" style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                                <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Conta Destino</span>
+                                <strong style={{ fontSize: '14px', color: 'var(--text-main)', display: 'block', marginTop: '2px', fontWeight: 600 }}>BM do Luiz</strong>
                             </div>
                         </div>
 
                         {/* Remetentes Allocation Table */}
-                        <div className="glass-card" style={{ padding: '14px', marginBottom: '18px', maxHeight: '180px', overflowY: 'auto' }}>
-                            <h4 style={{ fontSize: '0.82rem', color: 'var(--text-dim)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: 700 }}>
+                        <div className="glass-card" style={{ padding: '12px', marginBottom: '14px', maxHeight: '160px', overflowY: 'auto', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                            <h4 style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em', margin: '0 0 6px 0' }}>
                                 Distribuição de Cargas por Remetente
                             </h4>
-                            <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <table style={{ width: '100%', fontSize: '12.5px', borderCollapse: 'collapse', textAlign: 'left' }}>
                                 <thead>
-                                    <tr style={{ color: 'var(--text-dim)', borderBottom: '1px solid var(--border-subtle)' }}>
-                                        <th style={{ padding: '6px 8px' }}>REMETENTE (FROM)</th>
-                                        <th style={{ padding: '6px 8px' }}>TEMPLATE</th>
-                                        <th style={{ padding: '6px 8px', textAlign: 'right' }}>MENSAGENS</th>
+                                    <tr style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)', background: '#F8FAFC' }}>
+                                        <th style={{ padding: '6px 8px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>REMETENTE (FROM)</th>
+                                        <th style={{ padding: '6px 8px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>TEMPLATE</th>
+                                        <th style={{ padding: '6px 8px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>MENSAGENS</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {activePartitions.map((p, idx) => (
                                         <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                            <td style={{ padding: '8px', color: 'var(--text-main)', fontWeight: 600 }}>{p.senderNumber}</td>
-                                            <td style={{ padding: '8px', color: 'var(--text-muted)' }}>{p.templateName || 'Padrão'}</td>
-                                            <td style={{ padding: '8px', textAlign: 'right', color: 'var(--primary-color)', fontWeight: 700 }}>
+                                            <td style={{ padding: '6px 8px', color: 'var(--text-main)', fontWeight: 500, fontFamily: 'monospace' }}>{p.senderNumber}</td>
+                                            <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>{p.templateName || 'Padrão'}</td>
+                                            <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-main)', fontWeight: 600 }}>
                                                 {p.allocatedContacts?.length || 0}
                                             </td>
                                         </tr>
@@ -294,18 +294,19 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
 
                         {/* Payload Preview */}
                         {sampleMessage && (
-                            <div style={{ marginBottom: '18px' }}>
-                                <span style={{ fontSize: '0.76rem', color: 'var(--text-dim)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>
-                                    Amostra do Payload Enviado à Infobip (1º Contato):
+                            <div style={{ marginBottom: '14px' }}>
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    Amostra do Payload (1º Contato):
                                 </span>
                                 <pre style={{
                                     background: '#0f172a',
-                                    padding: '12px',
-                                    borderRadius: '10px',
-                                    fontSize: '0.74rem',
+                                    padding: '10px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '12px',
                                     fontFamily: 'monospace',
                                     color: '#cbd5e1',
-                                    overflowX: 'auto'
+                                    overflowX: 'auto',
+                                    margin: 0
                                 }}>
                                     {JSON.stringify({
                                         from: sampleMessage.from,
@@ -318,17 +319,17 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
 
                         {/* Progress Bar while enqueuing */}
                         {isEnqueuing && (
-                            <div style={{ marginBottom: '18px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                            <div style={{ marginBottom: '14px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
                                     <span>Enfileirando no Redis...</span>
                                     <span>{progress.current} / {progress.total}</span>
                                 </div>
-                                <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+                                <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
                                     <div style={{ 
                                         height: '100%', 
                                         width: `${(progress.current / (progress.total || 1)) * 100}%`,
                                         background: 'var(--primary-color)',
-                                        transition: 'width 0.2s'
+                                        transition: 'width 0.15s ease'
                                     }} />
                                 </div>
                             </div>
@@ -338,25 +339,25 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                         <div style={{
                             background: '#f8fafc',
                             border: '1px solid var(--border-subtle)',
-                            borderRadius: '10px',
-                            padding: '12px 16px',
-                            marginBottom: '18px',
+                            borderRadius: '6px',
+                            padding: '10px 14px',
+                            marginBottom: '16px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             flexWrap: 'wrap',
-                            gap: '10px'
+                            gap: '8px'
                         }}>
                             <div>
-                                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)', display: 'block' }}>
-                                    ⚡ Velocidade do Disparo (Rate Limit):
+                                <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-main)', display: 'block' }}>
+                                    Velocidade do Disparo (Rate Limit):
                                 </span>
-                                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                                     Intervalo entre o envio de cada mensagem na fila
                                 </span>
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <div style={{ display: 'flex', gap: '4px' }}>
                                     {[0.5, 1.0, 1.5].map((val) => (
                                         <button
@@ -364,13 +365,13 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                                             type="button"
                                             onClick={() => setSelectedRateLimit(val)}
                                             style={{
-                                                padding: '4px 10px',
-                                                borderRadius: '6px',
-                                                border: selectedRateLimit === val ? '2px solid var(--primary-color)' : '1px solid var(--border-subtle)',
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                border: selectedRateLimit === val ? '1px solid var(--primary-color)' : '1px solid var(--border-subtle)',
                                                 background: selectedRateLimit === val ? '#ecfdf5' : '#ffffff',
                                                 color: selectedRateLimit === val ? 'var(--primary-color)' : 'var(--text-main)',
-                                                fontSize: '0.76rem',
-                                                fontWeight: 700,
+                                                fontSize: '12px',
+                                                fontWeight: 500,
                                                 cursor: 'pointer'
                                             }}
                                         >
@@ -387,25 +388,25 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                                         className="form-input"
                                         value={selectedRateLimit}
                                         onChange={(e) => setSelectedRateLimit(parseFloat(e.target.value) || 0.5)}
-                                        style={{ width: '65px', padding: '4px 8px', fontSize: '0.8rem', textAlign: 'center', fontWeight: 700 }}
+                                        style={{ width: '56px', height: '28px', padding: '0 4px', fontSize: '12px', textAlign: 'center', fontWeight: 600, borderRadius: '4px' }}
                                     />
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>s</span>
+                                    <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>s</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Actions */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px' }}>
-                            <button className="btn-secondary" onClick={onClose} disabled={isEnqueuing}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                            <button className="btn-secondary" onClick={onClose} disabled={isEnqueuing} style={{ height: '36px', fontSize: '13px', borderRadius: '6px' }}>
                                 Cancelar
                             </button>
                             <button 
                                 className="btn-primary" 
                                 onClick={handleConfirmDispatch} 
                                 disabled={isEnqueuing || totalAllocated === 0}
-                                style={{ padding: '12px 24px' }}
+                                style={{ height: '36px', padding: '0 16px', fontSize: '13px', borderRadius: '6px' }}
                             >
-                                <Send size={16} />
+                                <Send size={14} />
                                 {isEnqueuing ? 'Enfileirando...' : 'Iniciar Envio para o Redis'}
                             </button>
                         </div>

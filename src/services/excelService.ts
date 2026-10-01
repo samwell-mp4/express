@@ -10,9 +10,15 @@ export interface SpreadsheetAnalysis {
         duplicateCount: number;
         invalidCount: number;
     };
+    totalRows: number;
+    validCount: number;
+    duplicateCount: number;
+    invalidCount: number;
     samplePreview: ParsedContact[];
     detectedPhoneCol: number;
     detectedNameCol: number;
+    detectedPhoneColumn?: string;
+    detectedNameColumn?: string;
     rawGrid?: any[][];
     dataStartIndex?: number;
 }
@@ -243,9 +249,15 @@ export const excelService = {
                         contacts: extracted.contacts,
                         headers: finalHeaders,
                         stats: extracted.stats,
+                        totalRows: extracted.stats.totalRows,
+                        validCount: extracted.stats.validCount,
+                        duplicateCount: extracted.stats.duplicateCount,
+                        invalidCount: extracted.stats.invalidCount,
                         samplePreview: extracted.samplePreview,
                         detectedPhoneCol: phoneColIndex,
                         detectedNameCol: nameColIndex,
+                        detectedPhoneColumn: finalHeaders[phoneColIndex] || '',
+                        detectedNameColumn: nameColIndex !== -1 ? finalHeaders[nameColIndex] : '',
                         rawGrid: json,
                         dataStartIndex
                     });
@@ -260,14 +272,19 @@ export const excelService = {
         });
     },
 
-    // Re-extract contacts when user changes column mapping manually
-    reExtractWithColumns(analysis: SpreadsheetAnalysis, phoneColIndex: number, nameColIndex: number): SpreadsheetAnalysis {
+    // Re-extract contacts when user changes column mapping manually (accepts index or header name)
+    reExtractWithColumns(analysis: SpreadsheetAnalysis, phoneCol: number | string, nameCol: number | string): SpreadsheetAnalysis {
         if (!analysis.rawGrid || analysis.dataStartIndex === undefined) return analysis;
+        
+        let phoneIdx = typeof phoneCol === 'number' ? phoneCol : analysis.headers.indexOf(phoneCol);
+        let nameIdx = typeof nameCol === 'number' ? nameCol : analysis.headers.indexOf(nameCol);
+        if (phoneIdx === -1) phoneIdx = analysis.detectedPhoneCol || 0;
+
         const res = excelService.extractFromGrid(
             analysis.rawGrid, 
             analysis.dataStartIndex, 
-            phoneColIndex, 
-            nameColIndex, 
+            phoneIdx, 
+            nameIdx, 
             analysis.headers
         );
 
@@ -275,9 +292,15 @@ export const excelService = {
             ...analysis,
             contacts: res.contacts,
             stats: res.stats,
+            totalRows: res.stats.totalRows,
+            validCount: res.stats.validCount,
+            duplicateCount: res.stats.duplicateCount,
+            invalidCount: res.stats.invalidCount,
             samplePreview: res.samplePreview,
-            detectedPhoneCol: phoneColIndex,
-            detectedNameCol: nameColIndex
+            detectedPhoneCol: phoneIdx,
+            detectedNameCol: nameIdx,
+            detectedPhoneColumn: analysis.headers[phoneIdx] || '',
+            detectedNameColumn: nameIdx !== -1 ? analysis.headers[nameIdx] : ''
         };
     },
 
@@ -306,18 +329,26 @@ export const excelService = {
             }
         });
 
+        const stats = {
+            totalRows: lines.length,
+            validCount: contacts.length,
+            duplicateCount: duplicates,
+            invalidCount: invalid
+        };
+
         return {
             contacts,
             headers: ['Telefone', 'Nome'],
-            stats: {
-                totalRows: lines.length,
-                validCount: contacts.length,
-                duplicateCount: duplicates,
-                invalidCount: invalid
-            },
+            stats,
+            totalRows: stats.totalRows,
+            validCount: stats.validCount,
+            duplicateCount: stats.duplicateCount,
+            invalidCount: stats.invalidCount,
             samplePreview: contacts.slice(0, 10),
             detectedPhoneCol: 0,
-            detectedNameCol: 1
+            detectedNameCol: 1,
+            detectedPhoneColumn: 'Telefone',
+            detectedNameColumn: 'Nome'
         };
     },
 
