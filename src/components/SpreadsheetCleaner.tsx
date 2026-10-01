@@ -44,6 +44,7 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
     const [deduplicate, setDeduplicate] = useState(true);
     const [autoDeletedNotice, setAutoDeletedNotice] = useState(false);
     const [copiedPreviewIndex, setCopiedPreviewIndex] = useState<number | null>(null);
+    const [batchSize, setBatchSize] = useState<number | 'ALL'>('ALL');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -204,27 +205,30 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
         if (sanitizedRows.length === 0) return alert('Nenhum dado válido para download.');
 
         // Monta os dados finais higienizados
-        const exportData = sanitizedRows.map((r, i) => ({
-            'Ordem': i + 1,
-            'Telefone_Higienizado': r.telefone,
-            'Nome': r.nome || '',
-            'CPF_CNPJ': r.cpf || '',
-            'Email': r.email || '',
-            ...r
-        }));
+        const exportData = sanitizedRows.map((r, i) => {
+            let finalName = r.nome || '';
+            if (batchSize !== 'ALL') {
+                const labelNumber = Math.floor(i / (batchSize as number)) + 1;
+                finalName = finalName ? `${finalName}_etiqueta_${labelNumber}` : `_etiqueta_${labelNumber}`;
+            }
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Higienizado');
+            return {
+                'Ordem': i + 1,
+                'Telefone_Higienizado': r.telefone,
+                'Nome': finalName,
+                'CPF_CNPJ': r.cpf || '',
+                'Email': r.email || '',
+                ...r
+            };
+        });
 
         const baseName = (file?.name || 'planilha').replace(/\.[^/.]+$/, '');
         const outFileName = `${baseName}_higienizado.${format}`;
 
-        if (format === 'csv') {
-            XLSX.writeFile(wb, outFileName, { bookType: 'csv' });
-        } else {
-            XLSX.writeFile(wb, outFileName, { bookType: 'xlsx' });
-        }
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Higienizado');
+        XLSX.writeFile(wb, outFileName, { bookType: format === 'csv' ? 'csv' : 'xlsx' });
 
         // PURGA IMEDIATA DE TODOS OS DADOS DA MEMÓRIA
         setFile(null);
@@ -381,18 +385,27 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                         </div>
                     </div>
 
-                    {/* Botões de Download com Auto-Exclusão */}
+                    {/* Botões de Download com Auto-Exclusão e Divisão por Lotes */}
                     <div className="glass-panel" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', borderRadius: '8px' }}>
                         <div>
                             <strong style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-main)' }}>
                                 Exportar Arquivo Higienizado
                             </strong>
-                            <p style={{ margin: '1px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                                Ao baixar, os dados são imediatamente expurgados da memória.
+                            <p style={{ margin: '4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Deseja adicionar uma etiqueta no NOME a cada quantidade de contatos?
+                            </p>
+                            <div className="segmented-control" style={{ maxWidth: '300px', marginTop: '6px' }}>
+                                <button type="button" className={`segmented-control-item ${batchSize === 'ALL' ? 'active' : ''}`} onClick={() => setBatchSize('ALL')}>Tudo Limpo</button>
+                                <button type="button" className={`segmented-control-item ${batchSize === 1000 ? 'active' : ''}`} onClick={() => setBatchSize(1000)}>1k</button>
+                                <button type="button" className={`segmented-control-item ${batchSize === 5000 ? 'active' : ''}`} onClick={() => setBatchSize(5000)}>5k</button>
+                                <button type="button" className={`segmented-control-item ${batchSize === 10000 ? 'active' : ''}`} onClick={() => setBatchSize(10000)}>10k</button>
+                            </div>
+                            <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: 'var(--text-dim)' }}>
+                                A planilha será salva completa, e a etiqueta mudará (ex: _etiqueta_1, _etiqueta_2) de acordo com sua escolha.
                             </p>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                             <button
                                 className="btn-primary"
                                 style={{ height: '36px', padding: '0 14px', fontSize: '13px' }}
@@ -428,64 +441,14 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
                         </div>
                     </div>
 
-                    {/* Preview das Primeiras 10 Linhas */}
+                    {/* Resumo da Higienização */}
                     {sanitizedRows.length > 0 && (
-                        <div className="glass-panel" style={{ padding: '16px', borderRadius: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                                <strong style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
-                                    Prévia das Linhas Higienizadas
-                                </strong>
-                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                    Exibindo {Math.min(10, sanitizedRows.length)} de {sanitizedRows.length} contatos
-                                </span>
-                            </div>
-
-                            <div className="bulk-table-container" style={{ borderRadius: '6px' }}>
-                                <table className="bulk-table">
-                                    <thead>
-                                        <tr>
-                                            <th style={{ width: '40px' }}>#</th>
-                                            <th>TELEFONE (55+DDD+9D)</th>
-                                            <th>NOME / INFO 2</th>
-                                            <th>CPF / CNPJ</th>
-                                            <th>E-MAIL</th>
-                                            <th style={{ textAlign: 'center', width: '80px' }}>AÇÃO</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {sanitizedRows.slice(0, 10).map((r, idx) => (
-                                            <tr key={idx}>
-                                                <td style={{ color: 'var(--text-dim)', fontSize: '12px' }}>{idx + 1}</td>
-                                                <td>
-                                                    <code style={{ fontWeight: 600, color: '#16a34a', fontSize: '12.5px' }}>
-                                                        {r.telefone}
-                                                    </code>
-                                                </td>
-                                                <td>{r.nome || '—'}</td>
-                                                <td>{r.cpf || '—'}</td>
-                                                <td>{r.email || '—'}</td>
-                                                <td style={{ textAlign: 'center' }}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleCopyPreview(r.telefone, idx)}
-                                                        className="badge"
-                                                        style={{
-                                                            cursor: 'pointer',
-                                                            background: copiedPreviewIndex === idx ? '#f0fdf4' : '#f8fafc',
-                                                            color: copiedPreviewIndex === idx ? '#16a34a' : '#475569',
-                                                            border: '1px solid var(--border-subtle)',
-                                                            height: '22px'
-                                                        }}
-                                                    >
-                                                        {copiedPreviewIndex === idx ? <Check size={11} /> : <Copy size={11} />}
-                                                        {copiedPreviewIndex === idx ? 'Copiado' : 'Copiar'}
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                        <div className="glass-panel" style={{ padding: '20px', borderRadius: '8px', textAlign: 'center', background: '#f8fafc', border: '1px dashed #cbd5e1' }}>
+                            <CheckCircle2 size={32} color="#10b981" style={{ margin: '0 auto 8px auto' }} />
+                            <strong style={{ fontSize: '15px', color: '#0f172a', display: 'block' }}>Processamento Concluído!</strong>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#475569' }}>
+                                A prévia não é exibida por motivos de performance e segurança. A planilha está pronta para exportação.
+                            </p>
                         </div>
                     )}
                 </div>

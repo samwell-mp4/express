@@ -35,6 +35,7 @@ import { templateService } from '../services/templateService';
 import { api, LUIS_BASE } from '../services/api';
 import { SpreadsheetCleaner } from './SpreadsheetCleaner';
 import { MediaHostingManager } from './MediaHostingManager';
+import { rotatorStorage } from '../services/rotatorStorage';
 
 interface TemplateCreatorWizardProps {
     onCreated?: (templateName: string) => void;
@@ -588,15 +589,23 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         if (!shortenerOriginal.trim()) return alert('Cole o link que deseja encurtar.');
         setIsShortening(true);
         try {
-            const short = await api.shortenUrl(shortenerOriginal.trim());
-            if (short) {
-                setShortenerResult(short);
-                setGlobalLinkInput(short);
-            }
+            const targetUrl = shortenerOriginal.trim();
+            const code = Math.random().toString(36).substring(2, 8);
+            const newRotator = await rotatorStorage.createRotator({
+                title: `Encurtador Express ${code}`,
+                slug: code,
+                targets: [{ url: targetUrl, weight: 1 }]
+            });
+            
+            const origin = window.location.origin;
+            const short = `${origin}/r/${newRotator.slug}`;
+            
+            setShortenerResult(short);
+            setGlobalLinkInput(short);
         } catch (err: any) {
             console.error('Erro ao encurtar link:', err);
             const fallbackCode = Math.random().toString(36).substring(2, 8);
-            const fallbackUrl = `https://plugesales.com/r/${fallbackCode}`;
+            const fallbackUrl = `${window.location.origin}/r/${fallbackCode}`;
             setShortenerResult(fallbackUrl);
             setGlobalLinkInput(fallbackUrl);
         } finally {

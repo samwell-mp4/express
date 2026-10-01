@@ -249,11 +249,8 @@ export const api = {
 
     // 10. Upload media (images, videos, documents) with safe permanent storage
     async uploadMedia(file: File): Promise<{ success: boolean; url: string; originalName: string; size: number; id?: string }> {
-        const formData = new FormData();
-        formData.append('file', file);
-
         const token = localStorage.getItem('auth_token');
-        const headers: Record<string, string> = {};
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
@@ -262,16 +259,29 @@ export const api = {
         let mediaId = `media_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
         try {
+            const base64Data = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve((e.target?.result as string) || '');
+                reader.readAsDataURL(file);
+            });
+
             const res = await fetch('/api/upload', {
                 method: 'POST',
                 headers,
-                body: formData
+                body: JSON.stringify({
+                    name: file.name,
+                    data: base64Data
+                })
             });
 
             if (res.ok) {
                 const data = await res.json();
                 if (data.url || data.fileUrl) {
-                    uploadedUrl = data.url || data.fileUrl;
+                    let returnedUrl = data.url || data.fileUrl;
+                    if (returnedUrl.startsWith('/')) {
+                        returnedUrl = window.location.origin + returnedUrl;
+                    }
+                    uploadedUrl = returnedUrl;
                     if (data.id) mediaId = String(data.id);
                 }
             }
