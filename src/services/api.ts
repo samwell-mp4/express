@@ -347,6 +347,7 @@ export const api = {
                 return {
                     id: String(r.id || r.transmission_id || Math.random()),
                     transmissionId: r.transmission_id,
+                    campaignId: r.campaign_id || r.campaignId || undefined,
                     campaignName: r.campaign_name || r.campaignName || 'Campanha_Principal',
                     listName: r.list_name || r.listName || 'Lista_Padrao',
                     timestamp: r.timestamp || new Date().toISOString(),

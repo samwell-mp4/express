@@ -54,7 +54,12 @@ export const App: React.FC = () => {
     const [headers, setHeaders] = useState<string[]>([]);
     const [targetUrl, setTargetUrl] = useState('');
     const [mediaUrl, setMediaUrl] = useState('');
-    const [selectedClient, setSelectedClient] = useState('Campanha Multi-WABA');
+    const [selectedClient, setSelectedClient] = useState(() => {
+        const now = new Date();
+        const d = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        const t = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+        return `Campanha_${d}_${t}`;
+    });
 
     // Senders Configuration (BM Luiz)
     const [senders, setSenders] = useState<SenderConfig[]>([
@@ -172,6 +177,10 @@ export const App: React.FC = () => {
         setShowConfirmModal(false);
         setActiveTab('monitor');
         refreshRedisStatus();
+        const now = new Date();
+        const d = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        const t = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+        setSelectedClient(`Campanha_${d}_${t}`);
     };
 
     const handleSelectNumberForDispatch = (number: string, bmName: string) => {

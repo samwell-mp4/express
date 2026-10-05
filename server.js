@@ -172,6 +172,7 @@ async function initDB() {
       )
     `);
     await client.query(`ALTER TABLE dispatch_records ADD COLUMN IF NOT EXISTS campaign_name TEXT;`).catch(() => {});
+    await client.query(`ALTER TABLE dispatch_records ADD COLUMN IF NOT EXISTS campaign_id TEXT;`).catch(() => {});
     await client.query(`ALTER TABLE dispatch_records ADD COLUMN IF NOT EXISTS list_name TEXT;`).catch(() => {});
     await client.query(`ALTER TABLE dispatch_records ADD COLUMN IF NOT EXISTS done_at TIMESTAMPTZ;`).catch(() => {});
     await client.query(`ALTER TABLE dispatch_records ADD COLUMN IF NOT EXISTS delivery_status TEXT;`).catch(() => {});
@@ -621,6 +622,7 @@ async function runDispatchWorker() {
         payload = { error: sendErr.message };
       }
 
+      const campaignId = job.campaignId || job.campaign_id || null;
       const campaignName = job.campaignName || job.campaign_name || 'Campanha_Padrao';
       const listName = job.listName || 'Lista_Contatos';
       const messageId = payload?.messages?.[0]?.messageId || `tx_${Date.now()}`;
@@ -636,6 +638,7 @@ async function runDispatchWorker() {
 
       const logRecord = {
         id: `disp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        campaign_id: campaignId,
         transmission_id: messageId,
         campaign_name: campaignName,
         list_name: listName,
@@ -665,10 +668,11 @@ async function runDispatchWorker() {
       if (isPostgresConnected) {
         try {
           await pgPool.query(
-            `INSERT INTO dispatch_records (transmission_id, campaign_name, list_name, log_type, delivery_status, waba, recipient, message, payload, user_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            `INSERT INTO dispatch_records (transmission_id, campaign_id, campaign_name, list_name, log_type, delivery_status, waba, recipient, message, payload, user_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
             [
               logRecord.transmission_id,
+              campaignId,
               campaignName,
               listName,
               logRecord.log_type,

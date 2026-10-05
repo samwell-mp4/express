@@ -11,9 +11,11 @@ import { DispatchRecord } from '../types';
 import { api, parseInfobipErrorDiagnostic, DiagnosticError } from '../services/api';
 
 interface CampaignGroup {
+    id: string;
     name: string;
     listName: string;
     senderNumber: string;
+    senderNumbers: string[];
     templateName: string;
     mediaUrl: string;
     headerType: string;
@@ -38,7 +40,7 @@ export const DispatchRecords: React.FC = () => {
     const [viewMode, setViewMode] = useState<'CAMPAIGNS' | 'REALTIME'>('CAMPAIGNS');
 
     // Campanha Selecionada para a Visualização Individual (Imagem 2)
-    const [selectedCampaignName, setSelectedCampaignName] = useState<string | null>(null);
+    const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
 
     // Sincronização de Entrega Infobip (DLR)
     const [isSyncingInfobip, setIsSyncingInfobip] = useState(false);
@@ -120,7 +122,7 @@ export const DispatchRecords: React.FC = () => {
         if (!window.confirm('Deseja limpar todos os registros locais de envios?')) return;
         localStorage.removeItem('express_live_dispatch_records');
         setRecords([]);
-        setSelectedCampaignName(null);
+        setSelectedCampaignId(null);
     };
 
     const handleCopyLog = (text: string) => {
@@ -129,17 +131,24 @@ export const DispatchRecords: React.FC = () => {
         setTimeout(() => setCopiedLog(false), 2000);
     };
 
-    // Agrupamento por Campanha
+    // Agrupamento por Campanha - Separação estrita de lotes/campanhas
     const campaigns: CampaignGroup[] = useMemo(() => {
         const map = new Map<string, DispatchRecord[]>();
+
         records.forEach(r => {
-            const cName = r.campaignName || 'Campanha_Padrao';
-            if (!map.has(cName)) map.set(cName, []);
-            map.get(cName)!.push(r);
+            // Se tem campaignId específico do lote, usa ele como chave única
+            // Se não tem, agrupa por nome + cluster de tempo para nunca juntar campanhas distintas
+            let groupKey = r.campaignId;
+            if (!groupKey) {
+                const timeCluster = r.timestamp ? r.timestamp.slice(0, 14) : 'legacy';
+                groupKey = `${r.campaignName || 'Campanha'}_${timeCluster}`;
+            }
+            if (!map.has(groupKey)) map.set(groupKey, []);
+            map.get(groupKey)!.push(r);
         });
 
         const list: CampaignGroup[] = [];
-        map.forEach((recs, name) => {
+        map.forEach((recs, groupId) => {
             const total = recs.length;
             const delivered = recs.filter(r => r.status === 'DELIVERED').length;
             const failed = recs.filter(r => r.status === 'FAILED').length;
@@ -147,10 +156,15 @@ export const DispatchRecords: React.FC = () => {
             const deliveryRate = total > 0 ? Math.round((delivered / total) * 100) : 0;
             
             const first = recs[0];
+            // Identifica TODOS os números de remetentes distintos usados nessa transmissão
+            const allSenders = Array.from(new Set(recs.map(r => r.senderNumber).filter(Boolean)));
+
             list.push({
-                name,
+                id: groupId,
+                name: first.campaignName || 'Campanha_Principal',
                 listName: first.listName || 'Lista_Principal',
-                senderNumber: first.senderNumber,
+                senderNumber: allSenders[0] || first.senderNumber || '',
+                senderNumbers: allSenders,
                 templateName: first.templateName,
                 mediaUrl: first.mediaUrl || '',
                 headerType: first.headerType || 'NONE',
@@ -169,9 +183,9 @@ export const DispatchRecords: React.FC = () => {
 
     // Campanha atualmente aberta para detalhamento individual (Imagem 2)
     const activeCampaign = useMemo(() => {
-        if (!selectedCampaignName) return null;
-        return campaigns.find(c => c.name === selectedCampaignName) || null;
-    }, [campaigns, selectedCampaignName]);
+        if (!selectedCampaignId) return null;
+        return campaigns.find(c => c.id === selectedCampaignId) || null;
+    }, [campaigns, selectedCampaignId]);
 
     // Exportação Completa de Relatório XLS / CSV no Padrão Infobip (Imagem 3)
     const handleExportDetailedReport = (campaign: CampaignGroup, format: 'xlsx' | 'csv' = 'xlsx') => {
@@ -314,13 +328,13 @@ export const DispatchRecords: React.FC = () => {
                             type="button"
                             onClick={() => {
                                 setViewMode('CAMPAIGNS');
-                                setSelectedCampaignName(null);
+                                setSelectedCampaignId(null);
                             }}
                             style={{
                                 border: 'none',
-                                background: viewMode === 'CAMPAIGNS' && !selectedCampaignName ? '#ffffff' : 'transparent',
-                                color: viewMode === 'CAMPAIGNS' && !selectedCampaignName ? 'var(--primary-color)' : 'var(--text-muted)',
-                                fontWeight: viewMode === 'CAMPAIGNS' && !selectedCampaignName ? 600 : 500,
+                                background: viewMode === 'CAMPAIGNS' && !selectedCampaignId ? '#ffffff' : 'transparent',
+                                color: viewMode === 'CAMPAIGNS' && !selectedCampaignId ? 'var(--primary-color)' : 'var(--text-muted)',
+                                fontWeight: viewMode === 'CAMPAIGNS' && !selectedCampaignId ? 600 : 500,
                                 padding: '6px 14px',
                                 borderRadius: '4px',
                                 cursor: 'pointer',
@@ -328,7 +342,7 @@ export const DispatchRecords: React.FC = () => {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                boxShadow: viewMode === 'CAMPAIGNS' && !selectedCampaignName ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                boxShadow: viewMode === 'CAMPAIGNS' && !selectedCampaignId ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                                 transition: 'all 0.15s ease'
                             }}
                         >
@@ -350,7 +364,7 @@ export const DispatchRecords: React.FC = () => {
                             type="button"
                             onClick={() => {
                                 setViewMode('REALTIME');
-                                setSelectedCampaignName(null);
+                                setSelectedCampaignId(null);
                             }}
                             style={{
                                 border: 'none',
@@ -487,7 +501,7 @@ export const DispatchRecords: React.FC = () => {
                             {/* Voltar para todas as transmissões */}
                             <button
                                 type="button"
-                                onClick={() => setSelectedCampaignName(null)}
+                                onClick={() => setSelectedCampaignId(null)}
                                 style={{
                                     border: 'none',
                                     background: 'none',
@@ -669,14 +683,41 @@ export const DispatchRecords: React.FC = () => {
                                         </span>
                                     </div>
 
-                                    {/* Remetente */}
+                                    {/* Remetente(s) */}
                                     <div>
                                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                            <Radio size={13} /> Remetente
+                                            <Radio size={13} /> {activeCampaign.senderNumbers.length > 1 ? `Remetentes (${activeCampaign.senderNumbers.length})` : 'Remetente'}
                                         </div>
-                                        <strong style={{ fontSize: '15px', fontFamily: 'monospace', color: 'var(--text-main)' }}>
-                                            {activeCampaign.senderNumber || '—'}
-                                        </strong>
+                                        {activeCampaign.senderNumbers.length > 1 ? (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxWidth: '380px' }}>
+                                                {activeCampaign.senderNumbers.map((num, sIdx) => {
+                                                    const countForNum = activeCampaign.records.filter(r => r.senderNumber === num).length;
+                                                    return (
+                                                        <span key={sIdx} style={{
+                                                            background: '#f8fafc',
+                                                            border: '1px solid #cbd5e1',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '12px',
+                                                            fontFamily: 'monospace',
+                                                            color: '#0f172a',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px'
+                                                        }}>
+                                                            <strong>{num}</strong>
+                                                            <span style={{ fontSize: '10.5px', background: '#e0f2fe', color: '#0369a1', padding: '0 4px', borderRadius: '3px', fontWeight: 700 }}>
+                                                                {countForNum} msgs
+                                                            </span>
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <strong style={{ fontSize: '15px', fontFamily: 'monospace', color: 'var(--text-main)' }}>
+                                                {activeCampaign.senderNumber || '—'}
+                                            </strong>
+                                        )}
                                     </div>
 
                                     {/* Destinatários */}
@@ -754,6 +795,7 @@ export const DispatchRecords: React.FC = () => {
                                         <thead style={{ position: 'sticky', top: 0, background: '#f1f5f9', zIndex: 1 }}>
                                             <tr style={{ borderBottom: '1px solid #e2e8f0', color: 'var(--text-muted)' }}>
                                                 <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>DESTINATÁRIO</th>
+                                                <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>REMETENTE (WABA)</th>
                                                 <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>STATUS</th>
                                                 <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>OPERADORA</th>
                                                 <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>ENVIO / ENTREGA</th>
@@ -770,6 +812,9 @@ export const DispatchRecords: React.FC = () => {
                                                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                                         <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-main)' }}>
                                                             {r.recipient}
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '11.5px', color: '#0369a1', fontWeight: 600 }}>
+                                                            {r.senderNumber || '—'}
                                                         </td>
                                                         <td style={{ padding: '8px 12px' }}>
                                                             {isDelivered ? (
@@ -894,10 +939,12 @@ export const DispatchRecords: React.FC = () => {
                                         </div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {activeCampaign.senderNumber || '554891159480'}
+                                                {activeCampaign.senderNumbers.length > 1 
+                                                    ? `${activeCampaign.senderNumbers[0]} (+${activeCampaign.senderNumbers.length - 1} WABAs)` 
+                                                    : (activeCampaign.senderNumber || '554891159480')}
                                             </div>
                                             <div style={{ fontSize: '10.5px', color: '#a7f3d0' }}>
-                                                Active now
+                                                {activeCampaign.senderNumbers.length > 1 ? `${activeCampaign.senderNumbers.length} remetentes ativos` : 'Active now'}
                                             </div>
                                         </div>
                                     </div>
@@ -1038,8 +1085,44 @@ export const DispatchRecords: React.FC = () => {
                                         <h4 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)', margin: '0 0 4px 0', letterSpacing: '-0.01em' }}>
                                             {camp.name}
                                         </h4>
-                                        <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
-                                            Remetente: <strong style={{ color: 'var(--text-main)', fontFamily: 'monospace' }}>{camp.senderNumber || '—'}</strong>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                            {camp.senderNumbers.length > 1 ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                        <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Remetentes:</span>
+                                                        <span style={{ 
+                                                            background: '#e0f2fe', 
+                                                            color: '#0369a1', 
+                                                            padding: '1px 6px', 
+                                                            borderRadius: '4px', 
+                                                            fontSize: '10.5px', 
+                                                            fontWeight: 700 
+                                                        }}>
+                                                            {camp.senderNumbers.length} WABAs
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                        {camp.senderNumbers.map((num, i) => (
+                                                            <span key={i} style={{ 
+                                                                fontFamily: 'monospace', 
+                                                                fontSize: '11px', 
+                                                                fontWeight: 600,
+                                                                background: '#f1f5f9', 
+                                                                color: 'var(--text-main)', 
+                                                                padding: '1px 6px', 
+                                                                borderRadius: '4px',
+                                                                border: '1px solid #cbd5e1'
+                                                            }}>
+                                                                {num}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    Remetente: <strong style={{ color: 'var(--text-main)', fontFamily: 'monospace' }}>{camp.senderNumber || '—'}</strong>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -1088,7 +1171,7 @@ export const DispatchRecords: React.FC = () => {
                                         <button
                                             type="button"
                                             className="btn-primary"
-                                            onClick={() => setSelectedCampaignName(camp.name)}
+                                            onClick={() => setSelectedCampaignId(camp.id)}
                                             style={{
                                                 flex: 1,
                                                 height: '34px',

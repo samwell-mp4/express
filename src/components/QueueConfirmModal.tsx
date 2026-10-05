@@ -88,8 +88,9 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
     };
 
     // Build all queue messages
-    const buildMessages = (): InfobipQueueMessage[] => {
+    const buildMessages = (batchCampaignId?: string): InfobipQueueMessage[] => {
         const messages: InfobipQueueMessage[] = [];
+        const effectiveBatchId = batchCampaignId || `cmp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
         activePartitions.forEach(s => {
             const senderNum = s.senderNumber.replace(/\D/g, '');
@@ -130,6 +131,8 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                 messages.push({
                     from: senderNum,
                     to: c.telefone,
+                    campaignId: effectiveBatchId,
+                    campaign_id: effectiveBatchId,
                     campaignName: campaignName.trim(),
                     campaign_name: campaignName.trim(),
                     listName: listName || 'Lista_Principal',
@@ -161,7 +164,8 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
             return;
         }
 
-        const allMessages = buildMessages();
+        const campaignBatchId = `cmp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const allMessages = buildMessages(campaignBatchId);
 
         if (allMessages.length === 0) {
             setErrorMsg('Nenhuma mensagem para enfileirar. Verifique os remetentes e a lista de contatos.');
@@ -195,6 +199,7 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                 const newRecords: DispatchRecord[] = allMessages.map((m, idx) => ({
                     id: `disp_${Date.now()}_${idx}`,
                     transmissionId: `tx_${Date.now()}_${idx}`,
+                    campaignId: campaignBatchId,
                     campaignName: campaignName.trim(),
                     listName: listName || 'Lista_Principal',
                     timestamp: new Date().toISOString(),
