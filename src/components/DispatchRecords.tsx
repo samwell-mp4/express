@@ -68,27 +68,24 @@ export const DispatchRecords: React.FC = () => {
 
     const loadRecords = async () => {
         try {
-            // 1. Try fetching from server API
+            // 1. Logs oficiais do servidor (Postgres + Redis com relatórios da Infobip)
             const serverLogs = await api.getDispatchLogs();
             
-            // 2. Read local recorded dispatches from localStorage
+            // 2. Registros locais temporários
             const localRaw = localStorage.getItem('express_live_dispatch_records');
             const localLogs: DispatchRecord[] = localRaw ? JSON.parse(localRaw) : [];
 
-            // Combine and deduplicate by id
-            const combinedMap = new Map<string, DispatchRecord>();
-            localLogs.forEach(r => combinedMap.set(r.id, r));
-            serverLogs.forEach(r => {
-                const existing = combinedMap.get(r.id);
-                // Se o server já tem DELIVERED, priorizar
-                if (!existing || r.status === 'DELIVERED') {
-                    combinedMap.set(r.id, r);
-                } else {
-                    combinedMap.set(r.id, { ...existing, ...r });
-                }
-            });
+            // Se o servidor já gravou os logs, removemos os placeholders locais para não duplicar
+            // nem deixar mensagens antigas presas em "Enviado"
+            const serverRecipientSet = new Set(serverLogs.map(s => s.recipient));
+            const pendingLocalLogs = localLogs.filter(l => !serverRecipientSet.has(l.recipient));
 
-            const sorted = Array.from(combinedMap.values()).sort((a, b) => 
+            if (pendingLocalLogs.length !== localLogs.length) {
+                localStorage.setItem('express_live_dispatch_records', JSON.stringify(pendingLocalLogs));
+            }
+
+            // Unificação oficial
+            const sorted = [...serverLogs, ...pendingLocalLogs].sort((a, b) => 
                 new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
             );
 
@@ -103,12 +100,14 @@ export const DispatchRecords: React.FC = () => {
         setIsSyncingInfobip(true);
         setSyncBanner(null);
         try {
+            // Limpa placeholders locais para prevalecerem os dados oficiais da Infobip
+            localStorage.removeItem('express_live_dispatch_records');
             const res = await api.syncDeliveryReports();
             await loadRecords();
             if (res.updated > 0) {
-                setSyncBanner(`✓ Sincronização concluída! ${res.updated} mensagens atualizadas para "Delivered" via Infobip.`);
+                setSyncBanner(`✓ Sincronização concluída! ${res.updated} status de entrega/rejeição atualizados via Infobip.`);
             } else {
-                setSyncBanner(`✓ Conexão Infobip OK (${res.synced} relatórios checados). Todos os status já estão sincronizados.`);
+                setSyncBanner(`✓ Conexão Infobip OK (${res.synced} relatórios checados). Todos os status estão sincronizados.`);
             }
             setTimeout(() => setSyncBanner(null), 5000);
         } catch (err: any) {
@@ -1455,9 +1454,17 @@ export const DispatchRecords: React.FC = () => {
                                                                     <span>Falha</span>
                                                                     <Info size={11} style={{ opacity: 0.7 }} />
                                                                 </button>
+                                                                {r.deliveryReason && (
+                                                                    <div 
+                                                                        style={{ fontSize: '10px', color: '#b91c1c', fontFamily: 'monospace', marginTop: '2px', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} 
+                                                                        title={r.errorReason || r.deliveryReason}
+                                                                    >
+                                                                        {r.deliveryReason}
+                                                                    </div>
+                                                                )}
 
                                                                 {/* Hover Tooltip */}
-                                                                {isHovered && diag && (
+                                                                {isHovered && (
                                                                     <div style={{
                                                                         position: 'absolute',
                                                                         bottom: '100%',
@@ -1476,10 +1483,10 @@ export const DispatchRecords: React.FC = () => {
                                                                         pointerEvents: 'none'
                                                                     }}>
                                                                         <strong style={{ color: '#F87171', display: 'block', marginBottom: '3px' }}>
-                                                                            {diag.code ? `[${diag.code}] ` : ''}{diag.title}
+                                                                            {r.errorName || (diag?.title) || 'Falha na Entrega'}
                                                                         </strong>
                                                                         <p style={{ margin: 0, color: '#E2E8F0', fontSize: '11px' }}>
-                                                                            {diag.description}
+                                                                            {r.errorReason || (diag?.description) || r.deliveryReason || 'Rejeitado pela operadora ou não entregue no handset.'}
                                                                         </p>
                                                                     </div>
                                                                 )}
@@ -1523,7 +1530,9 @@ export const DispatchRecords: React.FC = () => {
             {selectedRecordForLog && (() => {
                 const r = selectedRecordForLog;
                 const diag = parseInfobipErrorDiagnostic(r.rawPayload);
-                const rawJsonString = JSON.stringify(r.rawPayload || { error: r.errorReason || 'Erro sem payload retornado' }, null, 2);
+                const title = r.errorName || diag.title || 'Falha no Disparo WhatsApp';
+                const description = r.errorReason || diag.description || r.deliveryReason || 'A mensagem não foi entregue ao destinatário.';
+                const rawJsonString = JSON.stringify(r.rawPayload || { error: description, reason: r.deliveryReason, code: r.errorName }, null, 2);
 
                 return (
                     <div style={{
@@ -1608,16 +1617,21 @@ export const DispatchRecords: React.FC = () => {
                                 marginBottom: '16px'
                             }}>
                                 <strong style={{ color: '#991B1B', fontSize: '13.5px', display: 'block', marginBottom: '4px' }}>
-                                    {diag.title}
+                                    {title}
                                 </strong>
                                 <p style={{ fontSize: '13px', color: '#7F1D1D', margin: '0 0 6px 0', lineHeight: '1.4' }}>
-                                    {diag.description}
+                                    {description}
                                 </p>
-                                {diag.suggestion && (
-                                    <div style={{ fontSize: '12px', color: '#991B1B', borderTop: '1px dashed #FCA5A5', paddingTop: '6px', marginTop: '6px' }}>
-                                        💡 <strong>Como resolver:</strong> {diag.suggestion}
+                                {r.deliveryReason && (
+                                    <div style={{ fontSize: '11.5px', color: '#991B1B', marginTop: '4px', fontFamily: 'monospace' }}>
+                                        <strong>Motivo Infobip:</strong> {r.deliveryReason}
                                     </div>
                                 )}
+                                <div style={{ fontSize: '12px', color: '#991B1B', borderTop: '1px dashed #FCA5A5', paddingTop: '6px', marginTop: '6px' }}>
+                                    💡 <strong>Diagnóstico:</strong> {r.deliveryReason?.includes('REJECTED_OPERATOR') 
+                                        ? 'O número de remetente (ex: WABA de teste internacional) não possui rota para esta operadora (Claro/TIM/Vivo) ou o número de destino está inoperante.' 
+                                        : (diag.suggestion || 'Verifique se o remetente possui permissão de envio e template aprovado.')}
+                                </div>
                             </div>
 
                             {/* JSON Bruto */}

@@ -1552,28 +1552,34 @@ const server = http.createServer(async (req, res) => {
           const statusGroup = rep.status?.groupName;
           const statusName = rep.status?.name;
           const doneAt = rep.doneAt;
-          const errorGroup = rep.error?.groupName;
-          const errorDesc = rep.error?.description;
+          const errorGroup = rep.error?.groupName || rep.status?.groupName;
+          const errorDesc = rep.error?.description || rep.status?.description;
+          const errorId = rep.error?.id || rep.status?.id;
           const price = rep.price?.pricePerMessage;
 
           const match = parsedLogs.find(l => 
             (mId && l.transmission_id === mId) || 
-            (toNum && l.recipient === toNum && l.status !== 'DELIVERED')
+            (toNum && l.recipient === toNum)
           );
 
           if (match) {
             let newStatus = match.status;
+            let logType = match.log_type;
             if (statusGroup === 'DELIVERED') {
               newStatus = 'DELIVERED';
-            } else if (statusGroup === 'UNDELIVERABLE' || statusGroup === 'REJECTED') {
+              logType = 'SUCCESS';
+            } else if (statusGroup === 'UNDELIVERABLE' || statusGroup === 'REJECTED' || statusGroup === 'FAILED') {
               newStatus = 'FAILED';
+              logType = 'ERROR';
             }
 
             match.status = newStatus;
+            match.log_type = logType;
             match.delivery_status = statusName || statusGroup || match.delivery_status;
+            match.deliveryReason = statusName || statusGroup;
             match.done_at = doneAt || match.done_at || new Date().toISOString();
             match.error_group = errorGroup || match.error_group;
-            match.error_name = errorDesc || match.error_name;
+            match.error_name = errorDesc ? (errorId ? `${errorDesc} (code ${errorId})` : errorDesc) : match.error_name;
             match.price = price !== undefined ? price : match.price;
             updatedCount++;
           }
@@ -1587,17 +1593,28 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      // Atualiza também no PostgreSQL
+      // Atualiza também no PostgreSQL para DELIVERED e ERROS (UNDELIVERABLE / REJECTED)
       if (isPostgresConnected && reports.length > 0) {
         for (const rep of reports) {
-          if (rep.messageId && rep.status?.groupName === 'DELIVERED') {
+          if (rep.messageId || rep.to) {
+            const statusGroup = rep.status?.groupName;
+            const statusName = rep.status?.name;
+            const logType = statusGroup === 'DELIVERED' ? 'DELIVERED' : (statusGroup === 'UNDELIVERABLE' || statusGroup === 'REJECTED' ? 'ERROR' : 'SENT');
+            const doneAtVal = rep.doneAt ? new Date(rep.doneAt) : new Date();
+
             await pgPool.query(
               `UPDATE dispatch_records 
-               SET log_type = 'DELIVERED', 
-                   delivery_status = $1,
-                   done_at = $2
-               WHERE transmission_id = $3`,
-              [rep.status?.name || 'DELIVERED_TO_HANDSET', rep.doneAt ? new Date(rep.doneAt) : new Date(), rep.messageId]
+               SET log_type = $1, 
+                   delivery_status = $2,
+                   done_at = $3
+               WHERE (transmission_id = $4 AND transmission_id IS NOT NULL) OR (recipient = $5)`,
+              [
+                logType, 
+                statusName || statusGroup || 'DELIVERED_TO_HANDSET', 
+                doneAtVal, 
+                rep.messageId,
+                rep.to
+              ]
             ).catch(() => {});
           }
         }
@@ -1630,10 +1647,23 @@ const server = http.createServer(async (req, res) => {
         results.forEach((rep) => {
           const match = parsedLogs.find(l => (rep.messageId && l.transmission_id === rep.messageId) || (rep.to && l.recipient === rep.to));
           if (match) {
-            if (rep.status?.groupName === 'DELIVERED') match.status = 'DELIVERED';
-            else if (rep.status?.groupName === 'UNDELIVERABLE' || rep.status?.groupName === 'REJECTED') match.status = 'FAILED';
-            match.delivery_status = rep.status?.name || rep.status?.groupName;
+            const statusGroup = rep.status?.groupName;
+            const statusName = rep.status?.name;
+            const errorDesc = rep.error?.description || rep.status?.description;
+            const errorId = rep.error?.id || rep.status?.id;
+
+            if (statusGroup === 'DELIVERED') {
+              match.status = 'DELIVERED';
+              match.log_type = 'SUCCESS';
+            } else if (statusGroup === 'UNDELIVERABLE' || statusGroup === 'REJECTED' || statusGroup === 'FAILED') {
+              match.status = 'FAILED';
+              match.log_type = 'ERROR';
+            }
+
+            match.delivery_status = statusName || statusGroup || match.delivery_status;
+            match.deliveryReason = statusName || statusGroup;
             match.done_at = rep.doneAt || new Date().toISOString();
+            match.error_name = errorDesc ? (errorId ? `${errorDesc} (code ${errorId})` : errorDesc) : match.error_name;
             didUpdate = true;
           }
         });

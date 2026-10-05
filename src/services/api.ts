@@ -324,22 +324,38 @@ export const api = {
                 }
 
                 const isSuccess = r.log_type === 'SUCCESS' || r.log_type === 'DELIVERED';
-                const statusName = parsedPayload?.messages?.[0]?.status?.groupName || parsedPayload?.messages?.[0]?.status?.name;
-                const deliveryStatus = r.delivery_status || r.deliveryReason || statusName;
+                const statusName = parsedPayload?.messages?.[0]?.status?.groupName || parsedPayload?.messages?.[0]?.status?.name || parsedPayload?.status?.name || parsedPayload?.status?.groupName;
+                const deliveryStatus = r.delivery_status || r.deliveryReason || statusName || '';
+                const deliveryUpper = String(deliveryStatus).toUpperCase();
+
+                const isDelivered = r.status === 'DELIVERED' || r.log_type === 'DELIVERED' || statusName === 'DELIVERED' || deliveryUpper.includes('DELIVERED');
+                const isFailed = r.status === 'FAILED' || r.log_type === 'ERROR' || statusName === 'REJECTED' || statusName === 'UNDELIVERABLE' ||
+                    deliveryUpper.includes('UNDELIVERABLE') || 
+                    deliveryUpper.includes('REJECTED') || 
+                    deliveryUpper.includes('FAILED') || 
+                    deliveryUpper.includes('ERROR') ||
+                    deliveryUpper.includes('EXPIRED');
 
                 let recordStatus: 'DELIVERED' | 'SENT' | 'PENDING' | 'FAILED' = 'PENDING';
-                if (r.status === 'DELIVERED' || r.log_type === 'DELIVERED' || statusName === 'DELIVERED' || deliveryStatus === 'DELIVERED_TO_HANDSET' || deliveryStatus === 'DELIVERED') {
+                if (isDelivered) {
                     recordStatus = 'DELIVERED';
-                } else if (r.status === 'FAILED' || r.log_type === 'ERROR' || statusName === 'REJECTED' || statusName === 'UNDELIVERABLE') {
+                } else if (isFailed) {
                     recordStatus = 'FAILED';
                 } else if (isSuccess || r.status === 'SENT') {
                     recordStatus = 'SENT';
                 }
 
+                const errDesc = parsedPayload?.error?.description || parsedPayload?.status?.description || r.error_name || r.errorName;
+                const errId = parsedPayload?.error?.id || parsedPayload?.status?.id || parsedPayload?.messages?.[0]?.error?.id;
                 const diagnostic = recordStatus === 'FAILED' ? parseInfobipErrorDiagnostic(parsedPayload) : null;
-                const finalErrorReason = diagnostic 
+                
+                let finalErrorReason = diagnostic 
                     ? (diagnostic.code ? `[${diagnostic.code}] ${diagnostic.description}` : diagnostic.description) 
-                    : (recordStatus === 'FAILED' ? (r.errorReason || 'Falha no envio') : undefined);
+                    : (r.errorReason || errDesc || (recordStatus === 'FAILED' ? (deliveryStatus || 'Falha no envio') : undefined));
+
+                if (isFailed && deliveryStatus && (!finalErrorReason || finalErrorReason === 'Falha no envio')) {
+                    finalErrorReason = errId ? `${errDesc || 'Erro no envio'} (code ${errId}) · Reason: ${deliveryStatus}` : `Reason: ${deliveryStatus}`;
+                }
 
                 const toNum = r.recipient || '';
                 const operatorName = r.network_name || r.operator || api.detectOperator(toNum);
@@ -359,9 +375,9 @@ export const api = {
                     errorReason: finalErrorReason,
                     rawPayload: parsedPayload,
                     doneAt: r.done_at || r.doneAt || (recordStatus === 'DELIVERED' ? r.timestamp : undefined),
-                    deliveryReason: deliveryStatus || (recordStatus === 'DELIVERED' ? 'DELIVERED_TO_HANDSET' : (recordStatus === 'FAILED' ? 'REJECTED' : 'SENT_TO_NETWORK')),
-                    errorGroup: r.error_group || r.errorGroup || (recordStatus === 'DELIVERED' ? 'No Errors' : (recordStatus === 'FAILED' ? 'HANDSET_ERRORS' : 'No Errors')),
-                    errorName: r.error_name || r.errorName || (recordStatus === 'DELIVERED' ? 'No Error (code 0)' : (recordStatus === 'FAILED' ? (finalErrorReason || 'Erro no envio') : 'No Error (code 0)')),
+                    deliveryReason: deliveryStatus || (recordStatus === 'DELIVERED' ? 'DELIVERED_TO_HANDSET' : (recordStatus === 'FAILED' ? 'UNDELIVERABLE_REJECTED_OPERATOR' : 'SENT_TO_NETWORK')),
+                    errorGroup: r.error_group || r.errorGroup || parsedPayload?.error?.groupName || parsedPayload?.status?.groupName || (recordStatus === 'DELIVERED' ? 'No Errors' : (recordStatus === 'FAILED' ? 'HANDSET_ERRORS' : 'No Errors')),
+                    errorName: r.error_name || r.errorName || errDesc || (recordStatus === 'DELIVERED' ? 'No Error (code 0)' : (recordStatus === 'FAILED' ? (finalErrorReason || 'Erro no envio') : 'No Error (code 0)')),
                     operator: operatorName,
                     mediaUrl: r.media_url || r.mediaUrl || '',
                     headerType: r.header_type || r.headerType || 'NONE',
