@@ -10,6 +10,9 @@ interface QueueConfirmModalProps {
     mappings: PlaceholderMapping[];
     targetUrl: string;
     mediaUrl: string;
+    campaignName?: string;
+    onCampaignNameChange?: (name: string) => void;
+    listName?: string;
     onClose: () => void;
     onSuccess: () => void;
 }
@@ -20,6 +23,9 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
     mappings,
     targetUrl,
     mediaUrl: initialMediaUrl,
+    campaignName: propCampaignName,
+    onCampaignNameChange,
+    listName = 'Lista_Principal',
     onClose,
     onSuccess
 }) => {
@@ -29,6 +35,9 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
     const [isDone, setIsDone] = useState(false);
     const [selectedRateLimit, setSelectedRateLimit] = useState(0.5);
     const [currentMediaUrl, setCurrentMediaUrl] = useState(initialMediaUrl || '');
+    const [campaignName, setCampaignName] = useState(() => {
+        return propCampaignName?.trim() || `Campanha_${new Date().toISOString().slice(5, 10).replace('-', '')}_${Math.floor(Math.random() * 90 + 10)}`;
+    });
     const [localMappings, setLocalMappings] = useState<PlaceholderMapping[]>(() => {
         return mappings.map(m => ({ ...m }));
     });
@@ -121,6 +130,11 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                 messages.push({
                     from: senderNum,
                     to: c.telefone,
+                    campaignName: campaignName.trim(),
+                    campaign_name: campaignName.trim(),
+                    listName: listName || 'Lista_Principal',
+                    mediaUrl: effectiveMediaUrl,
+                    headerType: s.headerType,
                     content: {
                         templateName: s.templateName || 'template_padrao',
                         templateData: Object.keys(templateData).length > 0 ? templateData : undefined,
@@ -178,13 +192,22 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
 
             // 3. Save to live records in localStorage for the "Registro" tab
             try {
-                const newRecords = allMessages.map((m, idx) => ({
+                const newRecords: DispatchRecord[] = allMessages.map((m, idx) => ({
                     id: `disp_${Date.now()}_${idx}`,
+                    transmissionId: `tx_${Date.now()}_${idx}`,
+                    campaignName: campaignName.trim(),
+                    listName: listName || 'Lista_Principal',
                     timestamp: new Date().toISOString(),
                     recipient: m.to,
                     senderNumber: m.from,
                     templateName: m.content.templateName,
-                    status: 'SENT' as const
+                    status: 'SENT' as const,
+                    deliveryReason: 'SENT_TO_NETWORK',
+                    errorGroup: 'No Errors',
+                    errorName: 'No Error (code 0)',
+                    operator: api.detectOperator(m.to),
+                    mediaUrl: m.mediaUrl || currentMediaUrl || '',
+                    headerType: m.headerType || 'NONE'
                 }));
 
                 const existingRaw = localStorage.getItem('express_live_dispatch_records');
@@ -265,6 +288,36 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                     <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
                         Os disparos serão enfileirados e enviados sequencialmente pelo worker via Infobip com as variáveis e mídia mapeadas.
                     </p>
+                </div>
+
+                {/* Identificação da Campanha */}
+                <div style={{ 
+                    background: '#f8fafc', 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '8px', 
+                    padding: '12px 14px', 
+                    marginBottom: '16px' 
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <FileText size={15} color="var(--primary-color)" />
+                            Nome da Campanha / Transmissão:
+                        </label>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            Para relatórios no Monitor (Estilo Infobip)
+                        </span>
+                    </div>
+                    <input 
+                        type="text"
+                        className="form-input"
+                        value={campaignName}
+                        onChange={(e) => {
+                            setCampaignName(e.target.value);
+                            if (onCampaignNameChange) onCampaignNameChange(e.target.value);
+                        }}
+                        placeholder="Ex: JVL_Promotora_0510_05"
+                        style={{ width: '100%', height: '36px', fontSize: '13px', borderRadius: '6px', fontWeight: 600, fontFamily: 'inherit' }}
+                    />
                 </div>
 
                 {/* Error Banner */}

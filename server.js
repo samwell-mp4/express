@@ -158,15 +158,23 @@ async function initDB() {
       CREATE TABLE IF NOT EXISTS dispatch_records (
         id SERIAL PRIMARY KEY,
         transmission_id TEXT,
+        campaign_name TEXT,
+        list_name TEXT,
         log_type TEXT,
+        delivery_status TEXT,
         waba TEXT,
         recipient TEXT,
         message TEXT,
         payload JSONB,
         user_id INTEGER,
+        done_at TIMESTAMPTZ,
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    await client.query(`ALTER TABLE dispatch_records ADD COLUMN IF NOT EXISTS campaign_name TEXT;`).catch(() => {});
+    await client.query(`ALTER TABLE dispatch_records ADD COLUMN IF NOT EXISTS list_name TEXT;`).catch(() => {});
+    await client.query(`ALTER TABLE dispatch_records ADD COLUMN IF NOT EXISTS done_at TIMESTAMPTZ;`).catch(() => {});
+    await client.query(`ALTER TABLE dispatch_records ADD COLUMN IF NOT EXISTS delivery_status TEXT;`).catch(() => {});
 
     // 6. Tabela audit_logs
     await client.query(`
@@ -613,21 +621,41 @@ async function runDispatchWorker() {
         payload = { error: sendErr.message };
       }
 
+      const campaignName = job.campaignName || job.campaign_name || 'Campanha_Padrao';
+      const listName = job.listName || 'Lista_Contatos';
+      const messageId = payload?.messages?.[0]?.messageId || `tx_${Date.now()}`;
+      const statusGroup = payload?.messages?.[0]?.status?.groupName;
+      const statusName = payload?.messages?.[0]?.status?.name;
+
+      let initialStatus = 'SENT';
+      if (logType === 'ERROR' || statusGroup === 'REJECTED' || statusGroup === 'UNDELIVERABLE') {
+        initialStatus = 'FAILED';
+      } else if (statusGroup === 'DELIVERED') {
+        initialStatus = 'DELIVERED';
+      }
+
       const logRecord = {
         id: `disp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        transmission_id: payload?.messages?.[0]?.messageId || `tx_${Date.now()}`,
+        transmission_id: messageId,
+        campaign_name: campaignName,
+        list_name: listName,
         timestamp: startTime,
         recipient: targetNumber,
         waba: senderNumber,
         message: templateName,
         log_type: logType,
+        status: initialStatus,
+        delivery_status: statusName || statusGroup || 'SENT_TO_NETWORK',
+        done_at: null,
+        media_url: job.content?.templateData?.header?.mediaUrl || job.mediaUrl || '',
+        header_type: job.content?.templateData?.header?.type || job.headerType || 'NONE',
         payload: payload
       };
 
       // Gravação do log no Redis
       try {
         await redisClient.lPush('dispatch_logs', JSON.stringify(logRecord));
-        await redisClient.lTrim('dispatch_logs', 0, 499);
+        await redisClient.lTrim('dispatch_logs', 0, 999);
         await redisClient.incr('dispatch_processed');
       } catch (logErr) {
         console.warn('[Worker] Erro ao gravar log no Redis:', logErr);
@@ -637,11 +665,14 @@ async function runDispatchWorker() {
       if (isPostgresConnected) {
         try {
           await pgPool.query(
-            `INSERT INTO dispatch_records (transmission_id, log_type, waba, recipient, message, payload, user_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            `INSERT INTO dispatch_records (transmission_id, campaign_name, list_name, log_type, delivery_status, waba, recipient, message, payload, user_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
             [
               logRecord.transmission_id,
+              campaignName,
+              listName,
               logRecord.log_type,
+              logRecord.delivery_status,
               logRecord.waba,
               logRecord.recipient,
               logRecord.message,
@@ -1461,13 +1492,13 @@ const server = http.createServer(async (req, res) => {
     try {
       if (!isRedisConnected) {
         if (isPostgresConnected) {
-          const pgLogs = await pgPool.query('SELECT * FROM dispatch_records ORDER BY id DESC LIMIT 200');
+          const pgLogs = await pgPool.query('SELECT * FROM dispatch_records ORDER BY id DESC LIMIT 500');
           return sendJson(pgLogs.rows);
         }
         return sendJson([]);
       }
 
-      const rawLogs = await redisClient.lRange('dispatch_logs', 0, 199);
+      const rawLogs = await redisClient.lRange('dispatch_logs', 0, 999);
       const logs = rawLogs.map(str => {
         try { return JSON.parse(str); } catch { return null; }
       }).filter(Boolean);
@@ -1475,6 +1506,145 @@ const server = http.createServer(async (req, res) => {
       return sendJson(logs);
     } catch (err) {
       return sendError(err.message, 500);
+    }
+  }
+
+  // Sincronizar Relatórios de Entrega (DLR) em tempo real diretamente da Infobip
+  if ((pathname === '/api/dispatch/sync-reports' || pathname === '/api/dispatch/sync-reports/') && (req.method === 'GET' || req.method === 'POST')) {
+    try {
+      const apiKey = INFOBIP_API_KEY;
+      const baseUrl = INFOBIP_BASE_URL;
+
+      let reports = [];
+      try {
+        const rRes = await getJson(baseUrl, '/whatsapp/1/reports?limit=1000', apiKey);
+        if (rRes?.results && Array.isArray(rRes.results)) {
+          reports.push(...rRes.results);
+        }
+      } catch (e) {
+        console.warn('[SyncReports] Erro ao consultar /whatsapp/1/reports:', e.message);
+      }
+
+      try {
+        const lRes = await getJson(baseUrl, '/whatsapp/1/logs?limit=500', apiKey);
+        if (lRes?.results && Array.isArray(lRes.results)) {
+          reports.push(...lRes.results);
+        }
+      } catch (e) {
+        console.warn('[SyncReports] Erro ao consultar /whatsapp/1/logs:', e.message);
+      }
+
+      let updatedCount = 0;
+
+      if (isRedisConnected && reports.length > 0) {
+        const rawLogs = await redisClient.lRange('dispatch_logs', 0, 999);
+        const parsedLogs = rawLogs.map(str => {
+          try { return JSON.parse(str); } catch { return null; }
+        }).filter(Boolean);
+
+        for (const rep of reports) {
+          const mId = rep.messageId;
+          const toNum = rep.to;
+          const statusGroup = rep.status?.groupName;
+          const statusName = rep.status?.name;
+          const doneAt = rep.doneAt;
+          const errorGroup = rep.error?.groupName;
+          const errorDesc = rep.error?.description;
+          const price = rep.price?.pricePerMessage;
+
+          const match = parsedLogs.find(l => 
+            (mId && l.transmission_id === mId) || 
+            (toNum && l.recipient === toNum && l.status !== 'DELIVERED')
+          );
+
+          if (match) {
+            let newStatus = match.status;
+            if (statusGroup === 'DELIVERED') {
+              newStatus = 'DELIVERED';
+            } else if (statusGroup === 'UNDELIVERABLE' || statusGroup === 'REJECTED') {
+              newStatus = 'FAILED';
+            }
+
+            match.status = newStatus;
+            match.delivery_status = statusName || statusGroup || match.delivery_status;
+            match.done_at = doneAt || match.done_at || new Date().toISOString();
+            match.error_group = errorGroup || match.error_group;
+            match.error_name = errorDesc || match.error_name;
+            match.price = price !== undefined ? price : match.price;
+            updatedCount++;
+          }
+        }
+
+        if (updatedCount > 0) {
+          await redisClient.del('dispatch_logs');
+          for (let i = parsedLogs.length - 1; i >= 0; i--) {
+            await redisClient.rPush('dispatch_logs', JSON.stringify(parsedLogs[i]));
+          }
+        }
+      }
+
+      // Atualiza também no PostgreSQL
+      if (isPostgresConnected && reports.length > 0) {
+        for (const rep of reports) {
+          if (rep.messageId && rep.status?.groupName === 'DELIVERED') {
+            await pgPool.query(
+              `UPDATE dispatch_records 
+               SET log_type = 'DELIVERED', 
+                   delivery_status = $1,
+                   done_at = $2
+               WHERE transmission_id = $3`,
+              [rep.status?.name || 'DELIVERED_TO_HANDSET', rep.doneAt ? new Date(rep.doneAt) : new Date(), rep.messageId]
+            ).catch(() => {});
+          }
+        }
+      }
+
+      return sendJson({ 
+        success: true, 
+        synced: reports.length, 
+        updated: updatedCount,
+        sample: reports.slice(0, 3) 
+      });
+    } catch (err) {
+      return sendError(err.message, 500);
+    }
+  }
+
+  // Webhook para receber Delivery Reports (DLR) em tempo real da Infobip
+  if ((pathname === '/api/webhook/whatsapp' || pathname === '/api/webhook/infobip') && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const results = body?.results || body?.messages || (Array.isArray(body) ? body : []);
+
+      if (isRedisConnected && results.length > 0) {
+        const rawLogs = await redisClient.lRange('dispatch_logs', 0, 999);
+        const parsedLogs = rawLogs.map(str => {
+          try { return JSON.parse(str); } catch { return null; }
+        }).filter(Boolean);
+
+        let didUpdate = false;
+        results.forEach((rep) => {
+          const match = parsedLogs.find(l => (rep.messageId && l.transmission_id === rep.messageId) || (rep.to && l.recipient === rep.to));
+          if (match) {
+            if (rep.status?.groupName === 'DELIVERED') match.status = 'DELIVERED';
+            else if (rep.status?.groupName === 'UNDELIVERABLE' || rep.status?.groupName === 'REJECTED') match.status = 'FAILED';
+            match.delivery_status = rep.status?.name || rep.status?.groupName;
+            match.done_at = rep.doneAt || new Date().toISOString();
+            didUpdate = true;
+          }
+        });
+
+        if (didUpdate) {
+          await redisClient.del('dispatch_logs');
+          for (let i = parsedLogs.length - 1; i >= 0; i--) {
+            await redisClient.rPush('dispatch_logs', JSON.stringify(parsedLogs[i]));
+          }
+        }
+      }
+
+      return sendJson({ received: true, count: results.length });
+    } catch (e) {
+      return sendJson({ received: true });
     }
   }
 

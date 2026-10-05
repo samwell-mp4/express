@@ -323,36 +323,116 @@ export const api = {
                     parsedPayload = r.payload;
                 }
 
-                const isSuccess = r.log_type === 'SUCCESS';
+                const isSuccess = r.log_type === 'SUCCESS' || r.log_type === 'DELIVERED';
                 const statusName = parsedPayload?.messages?.[0]?.status?.groupName || parsedPayload?.messages?.[0]?.status?.name;
-                
-                let recordStatus: 'DELIVERED' | 'SENT' | 'PENDING' | 'FAILED' = 'PENDING';
-                if (statusName === 'DELIVERED') recordStatus = 'DELIVERED';
-                else if (isSuccess) recordStatus = 'SENT';
-                else if (r.log_type === 'ERROR') recordStatus = 'FAILED';
+                const deliveryStatus = r.delivery_status || r.deliveryReason || statusName;
 
-                const diagnostic = !isSuccess ? parseInfobipErrorDiagnostic(parsedPayload) : null;
+                let recordStatus: 'DELIVERED' | 'SENT' | 'PENDING' | 'FAILED' = 'PENDING';
+                if (r.status === 'DELIVERED' || r.log_type === 'DELIVERED' || statusName === 'DELIVERED' || deliveryStatus === 'DELIVERED_TO_HANDSET' || deliveryStatus === 'DELIVERED') {
+                    recordStatus = 'DELIVERED';
+                } else if (r.status === 'FAILED' || r.log_type === 'ERROR' || statusName === 'REJECTED' || statusName === 'UNDELIVERABLE') {
+                    recordStatus = 'FAILED';
+                } else if (isSuccess || r.status === 'SENT') {
+                    recordStatus = 'SENT';
+                }
+
+                const diagnostic = recordStatus === 'FAILED' ? parseInfobipErrorDiagnostic(parsedPayload) : null;
                 const finalErrorReason = diagnostic 
                     ? (diagnostic.code ? `[${diagnostic.code}] ${diagnostic.description}` : diagnostic.description) 
-                    : undefined;
+                    : (recordStatus === 'FAILED' ? (r.errorReason || 'Falha no envio') : undefined);
+
+                const toNum = r.recipient || '';
+                const operatorName = r.network_name || r.operator || api.detectOperator(toNum);
 
                 return {
                     id: String(r.id || r.transmission_id || Math.random()),
                     transmissionId: r.transmission_id,
+                    campaignName: r.campaign_name || r.campaignName || 'Campanha_Principal',
+                    listName: r.list_name || r.listName || 'Lista_Padrao',
                     timestamp: r.timestamp || new Date().toISOString(),
-                    recipient: r.recipient || '',
-                    senderNumber: r.waba || '',
-                    templateName: r.message || '',
+                    recipient: toNum,
+                    senderNumber: r.waba || r.senderNumber || '',
+                    templateName: r.message || r.templateName || '',
                     status: recordStatus,
                     messageId: r.transmission_id,
                     errorReason: finalErrorReason,
-                    rawPayload: parsedPayload
+                    rawPayload: parsedPayload,
+                    doneAt: r.done_at || r.doneAt || (recordStatus === 'DELIVERED' ? r.timestamp : undefined),
+                    deliveryReason: deliveryStatus || (recordStatus === 'DELIVERED' ? 'DELIVERED_TO_HANDSET' : (recordStatus === 'FAILED' ? 'REJECTED' : 'SENT_TO_NETWORK')),
+                    errorGroup: r.error_group || r.errorGroup || (recordStatus === 'DELIVERED' ? 'No Errors' : (recordStatus === 'FAILED' ? 'HANDSET_ERRORS' : 'No Errors')),
+                    errorName: r.error_name || r.errorName || (recordStatus === 'DELIVERED' ? 'No Error (code 0)' : (recordStatus === 'FAILED' ? (finalErrorReason || 'Erro no envio') : 'No Error (code 0)')),
+                    operator: operatorName,
+                    mediaUrl: r.media_url || r.mediaUrl || '',
+                    headerType: r.header_type || r.headerType || 'NONE',
+                    price: r.price !== undefined ? r.price : 0
                 };
             });
         } catch (err) {
             console.warn('Erro ao carregar logs de envio:', err);
             return [];
         }
+    },
+
+    // 8.1 Sincronizar Relatórios de Entrega (DLR) com a Infobip
+    async syncDeliveryReports(): Promise<{ success: boolean; synced: number; updated: number; sample?: any[] }> {
+        try {
+            const res = await fetch('/api/dispatch/sync-reports', { method: 'POST' });
+            if (!res.ok) return { success: false, synced: 0, updated: 0 };
+            return await res.json();
+        } catch (err) {
+            console.warn('Erro ao sincronizar relatórios Infobip:', err);
+            return { success: false, synced: 0, updated: 0 };
+        }
+    },
+
+    // 8.2 Detector de Operadora Brasileira por DDD
+    detectOperator(phone: string): string {
+        const clean = phone.replace(/\D/g, '');
+        let ddd = '';
+        if (clean.startsWith('55') && clean.length >= 12) {
+            ddd = clean.slice(2, 4);
+        } else if (clean.length >= 10) {
+            ddd = clean.slice(0, 2);
+        }
+        const dddNum = parseInt(ddd, 10);
+        const map: Record<number, string> = {
+            11: 'Vivo // SP',
+            12: 'Claro // SP',
+            13: 'TIM Brasil',
+            14: 'Vivo // SP',
+            15: 'Claro // SP',
+            16: 'TIM Brasil',
+            17: 'Vivo // SP',
+            18: 'TIM Brasil',
+            19: 'Claro // SP',
+            21: 'Claro // RJ',
+            22: 'Vivo // RJ',
+            24: 'TIM Brasil',
+            27: 'Vivo // ES',
+            28: 'Claro // ES',
+            31: 'Claro // MG - Belo Horiz',
+            32: 'TIM Brasil // MG',
+            33: 'Vivo // MG',
+            34: 'Claro // MG',
+            35: 'TIM Brasil',
+            37: 'Vivo // MG',
+            38: 'Claro // MG',
+            41: 'TIM Brasil // PR',
+            47: 'Claro // SC',
+            48: 'Vivo // SC',
+            49: 'Claro // SC',
+            51: 'Claro // RS',
+            53: 'Vivo // RS',
+            54: 'TIM Brasil',
+            61: 'Vivo // DF',
+            62: 'Claro // GO',
+            71: 'Claro // BA',
+            81: 'TIM Brasil // PE',
+            84: 'Claro // RN',
+            85: 'Claro // CE',
+            91: 'Vivo // PA'
+        };
+        return (dddNum && map[dddNum]) ? map[dddNum] : 'TIM Brasil';
     },
 
     // 9. Shorten URL

@@ -74,6 +74,8 @@ export interface RedisQueueStatus {
 export interface DispatchRecord {
     id: string;
     transmissionId?: string;
+    campaignName?: string;
+    listName?: string;
     timestamp: string;
     recipient: string;
     senderNumber: string;
@@ -82,11 +84,24 @@ export interface DispatchRecord {
     messageId?: string;
     errorReason?: string;
     rawPayload?: any;
+    doneAt?: string;
+    deliveryReason?: string;
+    errorGroup?: string;
+    errorName?: string;
+    operator?: string;
+    mediaUrl?: string;
+    headerType?: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE';
+    price?: number;
 }
 
 export interface InfobipQueueMessage {
     from: string;
     to: string;
+    campaignName?: string;
+    campaign_name?: string;
+    listName?: string;
+    mediaUrl?: string;
+    headerType?: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE';
     content: {
         templateName: string;
         templateData?: {

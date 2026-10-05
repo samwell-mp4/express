@@ -346,21 +346,42 @@ export const App: React.FC = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                               {/* Header Bar */}
                         <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px', borderRadius: '8px', border: '1px solid var(--border-subtle)', background: '#fff' }}>
-                            <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                    <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)', margin: 0, letterSpacing: '-0.01em' }}>
-                                        {selectedClient}
-                                    </h2>
-                                    <span className="badge badge-approved" style={{ fontSize: '11px', height: '20px', padding: '0 6px', borderRadius: '4px', fontWeight: 500 }}>Painel de Disparo</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '320px', flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                        Campanha / Transmissão:
+                                    </span>
+                                    <span className="badge badge-approved" style={{ fontSize: '11px', height: '20px', padding: '0 6px', borderRadius: '4px', fontWeight: 500 }}>Multi-Remetente</span>
                                 </div>
-                                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <input 
+                                        type="text"
+                                        value={selectedClient}
+                                        onChange={(e) => setSelectedClient(e.target.value)}
+                                        placeholder="Ex: JVL_Promotora_0510_05"
+                                        style={{
+                                            fontSize: '16px',
+                                            fontWeight: 600,
+                                            color: 'var(--text-main)',
+                                            padding: '6px 12px',
+                                            borderRadius: '6px',
+                                            border: '1px solid var(--border-subtle)',
+                                            background: '#f8fafc',
+                                            width: '100%',
+                                            maxWidth: '420px',
+                                            outline: 'none'
+                                        }}
+                                        title="Nome da Campanha para os Relatórios do Monitor e Infobip"
+                                    />
+                                </div>
+                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
                                     {contacts.length > 0 
                                         ? `${contacts.length} contatos carregados e prontos para envio na BM do Luiz.` 
                                         : 'Carregue sua planilha abaixo ou defina seus remetentes para iniciar.'}
                                 </p>
                             </div>
 
-                            <div style={{ display: 'flex', gap: '8px' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                 <button 
                                     className="btn-secondary" 
                                     onClick={() => setActiveTab('registry')}
@@ -428,6 +449,8 @@ export const App: React.FC = () => {
                         mappings={mappings}
                         targetUrl={targetUrl}
                         mediaUrl={mediaUrl}
+                        campaignName={selectedClient}
+                        onCampaignNameChange={setSelectedClient}
                         onClose={() => setShowConfirmModal(false)}
                         onSuccess={handleQueueSuccess}
                     />

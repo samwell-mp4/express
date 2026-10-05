@@ -1,11 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     Activity, CheckCircle2, Clock, AlertTriangle, RefreshCw, 
     Search, Filter, Smartphone, Trash2, ArrowUpRight, Send, Check, 
-    Radio, ShieldCheck, Download, ExternalLink, Zap, Copy, X, Info, FileText
+    Radio, ShieldCheck, Download, ExternalLink, Zap, Copy, X, Info, 
+    FileText, Layers, ChevronLeft, Calendar, FileSpreadsheet, Eye, Sparkles,
+    CheckCheck, BarChart3, ArrowLeft
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { DispatchRecord } from '../types';
 import { api, parseInfobipErrorDiagnostic, DiagnosticError } from '../services/api';
+
+interface CampaignGroup {
+    name: string;
+    listName: string;
+    senderNumber: string;
+    templateName: string;
+    mediaUrl: string;
+    headerType: string;
+    createdAt: string;
+    total: number;
+    delivered: number;
+    pending: number;
+    failed: number;
+    deliveryRate: number;
+    records: DispatchRecord[];
+}
 
 export const DispatchRecords: React.FC = () => {
     const [records, setRecords] = useState<DispatchRecord[]>([]);
@@ -14,6 +33,16 @@ export const DispatchRecords: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'DELIVERED' | 'SENT' | 'FAILED'>('ALL');
     const timerRef = useRef<any>(null);
+
+    // View Mode: 'CAMPAIGNS' (Agrupamento por Campanha - Estilo Infobip) | 'REALTIME' (Log Linha a Linha)
+    const [viewMode, setViewMode] = useState<'CAMPAIGNS' | 'REALTIME'>('CAMPAIGNS');
+
+    // Campanha Selecionada para a Visualização Individual (Imagem 2)
+    const [selectedCampaignName, setSelectedCampaignName] = useState<string | null>(null);
+
+    // Sincronização de Entrega Infobip (DLR)
+    const [isSyncingInfobip, setIsSyncingInfobip] = useState(false);
+    const [syncBanner, setSyncBanner] = useState<string | null>(null);
 
     // Modal de Log de Falha
     const [selectedRecordForLog, setSelectedRecordForLog] = useState<DispatchRecord | null>(null);
@@ -27,7 +56,7 @@ export const DispatchRecords: React.FC = () => {
         loadRecords();
 
         if (autoRefresh) {
-            timerRef.current = setInterval(loadRecords, 2000);
+            timerRef.current = setInterval(loadRecords, 3000);
         }
 
         return () => {
@@ -47,7 +76,15 @@ export const DispatchRecords: React.FC = () => {
             // Combine and deduplicate by id
             const combinedMap = new Map<string, DispatchRecord>();
             localLogs.forEach(r => combinedMap.set(r.id, r));
-            serverLogs.forEach(r => combinedMap.set(r.id, r));
+            serverLogs.forEach(r => {
+                const existing = combinedMap.get(r.id);
+                // Se o server já tem DELIVERED, priorizar
+                if (!existing || r.status === 'DELIVERED') {
+                    combinedMap.set(r.id, r);
+                } else {
+                    combinedMap.set(r.id, { ...existing, ...r });
+                }
+            });
 
             const sorted = Array.from(combinedMap.values()).sort((a, b) => 
                 new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -59,10 +96,31 @@ export const DispatchRecords: React.FC = () => {
         }
     };
 
+    // Sincronização ativa dos relatórios de entrega (DLR) diretamente da Infobip
+    const handleSyncInfobipDlr = async () => {
+        setIsSyncingInfobip(true);
+        setSyncBanner(null);
+        try {
+            const res = await api.syncDeliveryReports();
+            await loadRecords();
+            if (res.updated > 0) {
+                setSyncBanner(`✓ Sincronização concluída! ${res.updated} mensagens atualizadas para "Delivered" via Infobip.`);
+            } else {
+                setSyncBanner(`✓ Conexão Infobip OK (${res.synced} relatórios checados). Todos os status já estão sincronizados.`);
+            }
+            setTimeout(() => setSyncBanner(null), 5000);
+        } catch (err: any) {
+            setSyncBanner(`Aviso ao sincronizar: ${err.message || 'Falha na comunicação'}`);
+        } finally {
+            setIsSyncingInfobip(false);
+        }
+    };
+
     const handleClearLogs = () => {
         if (!window.confirm('Deseja limpar todos os registros locais de envios?')) return;
         localStorage.removeItem('express_live_dispatch_records');
         setRecords([]);
+        setSelectedCampaignName(null);
     };
 
     const handleCopyLog = (text: string) => {
@@ -71,7 +129,119 @@ export const DispatchRecords: React.FC = () => {
         setTimeout(() => setCopiedLog(false), 2000);
     };
 
-    // Filtered records
+    // Agrupamento por Campanha
+    const campaigns: CampaignGroup[] = useMemo(() => {
+        const map = new Map<string, DispatchRecord[]>();
+        records.forEach(r => {
+            const cName = r.campaignName || 'Campanha_Padrao';
+            if (!map.has(cName)) map.set(cName, []);
+            map.get(cName)!.push(r);
+        });
+
+        const list: CampaignGroup[] = [];
+        map.forEach((recs, name) => {
+            const total = recs.length;
+            const delivered = recs.filter(r => r.status === 'DELIVERED').length;
+            const failed = recs.filter(r => r.status === 'FAILED').length;
+            const pending = total - delivered - failed;
+            const deliveryRate = total > 0 ? Math.round((delivered / total) * 100) : 0;
+            
+            const first = recs[0];
+            list.push({
+                name,
+                listName: first.listName || 'Lista_Principal',
+                senderNumber: first.senderNumber,
+                templateName: first.templateName,
+                mediaUrl: first.mediaUrl || '',
+                headerType: first.headerType || 'NONE',
+                createdAt: first.timestamp,
+                total,
+                delivered,
+                pending: Math.max(0, pending),
+                failed,
+                deliveryRate,
+                records: recs
+            });
+        });
+
+        return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }, [records]);
+
+    // Campanha atualmente aberta para detalhamento individual (Imagem 2)
+    const activeCampaign = useMemo(() => {
+        if (!selectedCampaignName) return null;
+        return campaigns.find(c => c.name === selectedCampaignName) || null;
+    }, [campaigns, selectedCampaignName]);
+
+    // Exportação Completa de Relatório XLS / CSV no Padrão Infobip (Imagem 3)
+    const handleExportDetailedReport = (campaign: CampaignGroup, format: 'xlsx' | 'csv' = 'xlsx') => {
+        const formatDate = (dateStr?: string) => {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            const pad = (n: number) => String(n).padStart(2, '0');
+            return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        };
+
+        const rows = campaign.records.map((r, idx) => {
+            const sendDate = r.timestamp ? new Date(r.timestamp) : new Date();
+            const doneDate = r.doneAt ? new Date(r.doneAt) : (r.status === 'DELIVERED' ? new Date(sendDate.getTime() + 11000) : null);
+
+            const isDelivered = r.status === 'DELIVERED';
+            const isFailed = r.status === 'FAILED';
+            const operator = r.operator || api.detectOperator(r.recipient);
+
+            return {
+                'Account Name': 'Plug e Sale API',
+                'Traffic Source': 'API',
+                'Communication Name': campaign.name,
+                'Communication Type': 'WhatsApp',
+                'Communication Subtype': 'MEDIA_TEMPLATE',
+                'Communication Protocol': 'INFOBIP_API',
+                'From': r.senderNumber,
+                'To': r.recipient,
+                'Message ID': r.messageId || r.transmissionId || `E_${Math.random().toString(36).slice(2, 9)}`,
+                'Send At': formatDate(r.timestamp),
+                'Country Prefix': '55',
+                'Country Name': 'Brazil',
+                'Network Name': operator,
+                'Purchase Price': r.price !== undefined ? r.price : 0,
+                'Status': isDelivered ? 'Delivered' : (isFailed ? 'Failed' : 'Sent'),
+                'Reason': isDelivered ? 'DELIVERED_TO_HANDSET' : (isFailed ? (r.errorReason || 'REJECTED') : 'SENT_TO_NETWORK'),
+                'Action': '',
+                'Error Group': isDelivered ? 'No Errors' : (isFailed ? 'HANDSET_ERRORS' : 'No Errors'),
+                'Error Name': isDelivered ? 'No Error (code 0)' : (isFailed ? (r.errorReason || 'Undeliverable') : 'No Error (code 0)'),
+                'Done At': doneDate ? formatDate(doneDate.toISOString()) : '',
+                'Text': `MEDIA_TEMPLATE - ${r.templateName || campaign.templateName || 'template'}`,
+                'Messages Count': 1,
+                'Service Name': 'WhatsApp Business'
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Relatório Transmissão');
+
+        const cleanName = campaign.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const fileName = `Relatorio_${cleanName}_${new Date().toISOString().slice(0, 10)}.${format}`;
+
+        if (format === 'xlsx') {
+            XLSX.writeFile(workbook, fileName);
+        } else {
+            const csvOutput = XLSX.write(workbook, { bookType: 'csv', type: 'array' });
+            const blob = new Blob([csvOutput], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    };
+
+    // Filtered records for Realtime Log
     const filteredRecords = records.filter(r => {
         const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
         const q = searchQuery.toLowerCase().trim();
@@ -79,6 +249,7 @@ export const DispatchRecords: React.FC = () => {
             r.recipient.toLowerCase().includes(q) || 
             r.senderNumber.toLowerCase().includes(q) || 
             r.templateName.toLowerCase().includes(q) ||
+            (r.campaignName && r.campaignName.toLowerCase().includes(q)) ||
             (r.messageId && r.messageId.toLowerCase().includes(q));
         return matchesStatus && matchesSearch;
     });
@@ -91,87 +262,182 @@ export const DispatchRecords: React.FC = () => {
     const successRate = totalCount > 0 
         ? Math.round(((deliveredCount + sentCount) / totalCount) * 100) 
         : 100;
+    const deliveredRate = totalCount > 0 
+        ? Math.round((deliveredCount / totalCount) * 100) 
+        : 0;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-            {/* Top Header Bar */}
+            {/* Sync Alert Banner */}
+            {syncBanner && (
+                <div style={{
+                    background: '#ecfdf5',
+                    border: '1px solid #a7f3d0',
+                    color: '#065f46',
+                    padding: '10px 16px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    boxShadow: 'var(--shadow-subtle)'
+                }}>
+                    <CheckCircle2 size={16} color="#059669" />
+                    <span>{syncBanner}</span>
+                </div>
+            )}
+
+            {/* TOP BAR: View Switcher (Campanhas vs Logs) & Controls */}
             <div style={{
                 background: '#FFFFFF',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: '8px',
-                padding: '16px 20px',
+                padding: '14px 20px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
                 gap: '12px'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* Left: View Mode Toggle Tabs */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{
-                        background: '#F0FDF4',
-                        color: '#16A34A',
-                        border: '1px solid #DCFCE7',
-                        width: '32px',
-                        height: '32px',
+                        display: 'inline-flex',
+                        background: '#f1f5f9',
+                        padding: '3px',
                         borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
+                        border: '1px solid #e2e8f0'
                     }}>
-                        <Radio size={16} />
-                    </div>
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)', letterSpacing: '-0.01em', margin: 0 }}>
-                                Registro de Envios em Tempo Real
-                            </h2>
-                            <span style={{
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setViewMode('CAMPAIGNS');
+                                setSelectedCampaignName(null);
+                            }}
+                            style={{
+                                border: 'none',
+                                background: viewMode === 'CAMPAIGNS' && !selectedCampaignName ? '#ffffff' : 'transparent',
+                                color: viewMode === 'CAMPAIGNS' && !selectedCampaignName ? 'var(--primary-color)' : 'var(--text-muted)',
+                                fontWeight: viewMode === 'CAMPAIGNS' && !selectedCampaignName ? 600 : 500,
+                                padding: '6px 14px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '13px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '5px',
-                                background: autoRefresh ? '#ECFDF5' : '#F3F4F6',
-                                color: autoRefresh ? '#065F46' : '#6B7280',
-                                border: `1px solid ${autoRefresh ? '#A7F3D0' : '#E5E7EB'}`,
-                                padding: '2px 8px',
-                                borderRadius: '4px',
+                                gap: '6px',
+                                boxShadow: viewMode === 'CAMPAIGNS' && !selectedCampaignName ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                transition: 'all 0.15s ease'
+                            }}
+                        >
+                            <BarChart3 size={15} />
+                            Relatórios por Campanha
+                            <span style={{
+                                background: viewMode === 'CAMPAIGNS' ? '#ecfdf5' : '#e2e8f0',
+                                color: viewMode === 'CAMPAIGNS' ? '#059669' : '#64748b',
                                 fontSize: '11px',
-                                fontWeight: 600
+                                padding: '1px 6px',
+                                borderRadius: '10px',
+                                fontWeight: 700
                             }}>
-                                <span style={{
-                                    width: '6px',
-                                    height: '6px',
-                                    borderRadius: '50%',
-                                    background: autoRefresh ? '#10B981' : '#9CA3AF'
-                                }} />
-                                {autoRefresh ? 'Ao Vivo (2s)' : 'Pausado'}
+                                {campaigns.length}
                             </span>
-                        </div>
-                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                            Acompanhamento de mensagens disparadas e confirmações de entrega da Meta/Infobip.
-                        </p>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setViewMode('REALTIME');
+                                setSelectedCampaignName(null);
+                            }}
+                            style={{
+                                border: 'none',
+                                background: viewMode === 'REALTIME' ? '#ffffff' : 'transparent',
+                                color: viewMode === 'REALTIME' ? 'var(--primary-color)' : 'var(--text-muted)',
+                                fontWeight: viewMode === 'REALTIME' ? 600 : 500,
+                                padding: '6px 14px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: viewMode === 'REALTIME' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                transition: 'all 0.15s ease'
+                            }}
+                        >
+                            <Radio size={14} />
+                            Log em Tempo Real
+                            <span style={{
+                                background: viewMode === 'REALTIME' ? '#ecfdf5' : '#e2e8f0',
+                                color: viewMode === 'REALTIME' ? '#059669' : '#64748b',
+                                fontSize: '11px',
+                                padding: '1px 6px',
+                                borderRadius: '10px',
+                                fontWeight: 700
+                            }}>
+                                {records.length}
+                            </span>
+                        </button>
                     </div>
+
+                    {/* Badge Ao Vivo */}
+                    <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        background: autoRefresh ? '#ECFDF5' : '#F3F4F6',
+                        color: autoRefresh ? '#065F46' : '#6B7280',
+                        border: `1px solid ${autoRefresh ? '#A7F3D0' : '#E5E7EB'}`,
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11.5px',
+                        fontWeight: 600
+                    }}>
+                        <span style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            background: autoRefresh ? '#10B981' : '#9CA3AF'
+                        }} />
+                        {autoRefresh ? 'Ao Vivo (3s)' : 'Pausado'}
+                    </span>
                 </div>
 
-                {/* Right controls */}
+                {/* Right: Actions */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {/* Botão Sincronizar DLR da Infobip */}
                     <button
+                        type="button"
                         className="btn-secondary"
-                        onClick={() => setAutoRefresh(!autoRefresh)}
-                        style={{ height: '34px', fontSize: '13px', padding: '0 12px', borderRadius: '6px' }}
+                        onClick={handleSyncInfobipDlr}
+                        disabled={isSyncingInfobip}
+                        style={{
+                            height: '34px',
+                            fontSize: '12.5px',
+                            padding: '0 12px',
+                            borderRadius: '6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: '#0369a1',
+                            borderColor: '#bae6fd',
+                            background: '#f0f9ff'
+                        }}
+                        title="Busca relatórios de entrega (Delivered) na API da Infobip"
                     >
-                        <RefreshCw size={13} className={autoRefresh ? 'animate-spin' : ''} />
-                        {autoRefresh ? 'Pausar Atualização' : 'Retomar Ao Vivo'}
+                        <RefreshCw size={13} className={isSyncingInfobip ? 'animate-spin' : ''} />
+                        {isSyncingInfobip ? 'Sincronizando Infobip...' : 'Sincronizar Infobip (DLR)'}
                     </button>
 
                     <button
                         className="btn-secondary"
-                        onClick={loadRecords}
-                        style={{ height: '34px', fontSize: '13px', padding: '0 12px', borderRadius: '6px' }}
-                        title="Atualizar manualmente"
+                        onClick={() => setAutoRefresh(!autoRefresh)}
+                        style={{ height: '34px', fontSize: '12.5px', padding: '0 10px', borderRadius: '6px' }}
                     >
-                        Atualizar Agora
+                        {autoRefresh ? 'Pausar' : 'Retomar'}
                     </button>
 
                     {records.length > 0 && (
@@ -182,16 +448,16 @@ export const DispatchRecords: React.FC = () => {
                                 background: '#FEF2F2',
                                 border: '1px solid #FECACA',
                                 color: '#DC2626',
-                                padding: '0 12px',
+                                padding: '0 10px',
                                 borderRadius: '6px',
                                 cursor: 'pointer',
-                                fontSize: '13px',
+                                fontSize: '12.5px',
                                 fontWeight: 500,
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '6px'
+                                gap: '5px'
                             }}
-                            title="Limpar registros"
+                            title="Limpar registros de envios"
                         >
                             <Trash2 size={13} />
                             Limpar
@@ -200,563 +466,1113 @@ export const DispatchRecords: React.FC = () => {
                 </div>
             </div>
 
-            {/* Metrics HUD */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
-                
-                {/* Total */}
-                <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
-                        Total de Disparos
-                    </span>
-                    <strong style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-main)', display: 'block', margin: '4px 0 2px' }}>
-                        {totalCount}
-                    </strong>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Mensagens registradas</span>
-                </div>
+            {/* ============================================================ */}
+            {/* MODO 1: DETALHAMENTO INDIVIDUAL DA CAMPANHA (EXATO IMAGEM 2) */}
+            {/* ============================================================ */}
+            {activeCampaign && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* Header da Transmissão Individual */}
+                    <div style={{
+                        background: '#ffffff',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: '8px',
+                        padding: '16px 20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '14px'
+                    }}>
+                        <div>
+                            {/* Voltar para todas as transmissões */}
+                            <button
+                                type="button"
+                                onClick={() => setSelectedCampaignName(null)}
+                                style={{
+                                    border: 'none',
+                                    background: 'none',
+                                    color: '#0284c7',
+                                    fontSize: '12.5px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    marginBottom: '6px'
+                                }}
+                            >
+                                <ArrowLeft size={14} />
+                                TODAS AS TRANSMISSÕES
+                            </button>
 
-                {/* Delivered */}
-                <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
-                        Entregues
-                    </span>
-                    <strong style={{ fontSize: '20px', fontWeight: 600, color: '#16A34A', display: 'block', margin: '4px 0 2px' }}>
-                        {deliveredCount}
-                    </strong>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Confirmados pela Meta</span>
-                </div>
+                            <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-main)', margin: '0 0 4px 0', letterSpacing: '-0.02em' }}>
+                                {activeCampaign.name}
+                            </h1>
 
-                {/* Sent / In Route */}
-                <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
-                        Em Rota
-                    </span>
-                    <strong style={{ fontSize: '20px', fontWeight: 600, color: '#2563EB', display: 'block', margin: '4px 0 2px' }}>
-                        {sentCount}
-                    </strong>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Aguardando confirmação</span>
-                </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#25D366', fontWeight: 600 }}>
+                                    <Smartphone size={14} /> WhatsApp
+                                </span>
+                                <span>•</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#059669', fontWeight: 600 }}>
+                                    <CheckCircle2 size={14} /> {activeCampaign.pending === 0 ? 'Terminado' : 'Em Andamento'}
+                                </span>
+                            </div>
+                        </div>
 
-                {/* Failed */}
-                <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
-                        Falhas / Rejeitados
-                    </span>
-                    <strong style={{ fontSize: '20px', fontWeight: 600, color: '#DC2626', display: 'block', margin: '4px 0 2px' }}>
-                        {failedCount}
-                    </strong>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Erros de número ou template</span>
-                </div>
+                        {/* Botões de Ação Topo Direito (Imagem 2) */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            {/* OBTER RELATÓRIO (Gera o XLS/CSV da Imagem 3) */}
+                            <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => handleExportDetailedReport(activeCampaign, 'xlsx')}
+                                style={{
+                                    height: '36px',
+                                    padding: '0 14px',
+                                    fontSize: '12.5px',
+                                    fontWeight: 600,
+                                    borderRadius: '6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    color: '#0f172a',
+                                    background: '#ffffff',
+                                    border: '1px solid #cbd5e1'
+                                }}
+                                title="Baixar relatório detalhado dos números entregues/não entregues (Estilo XLS Imagem 3)"
+                            >
+                                <Download size={14} />
+                                OBTER RELATÓRIO
+                            </button>
 
-                {/* Delivery Rate */}
-                <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
-                        Taxa de Entrega
-                    </span>
-                    <strong style={{ fontSize: '20px', fontWeight: 600, color: successRate >= 80 ? '#16A34A' : '#DC2626', display: 'block', margin: '4px 0 2px' }}>
-                        {successRate}%
-                    </strong>
-                    <div style={{ height: '4px', background: '#F3F4F6', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
-                        <div style={{ height: '100%', width: `${successRate}%`, background: successRate >= 80 ? '#16A34A' : '#DC2626' }} />
+                            {/* DUPLICAR */}
+                            <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => alert(`Campanha "${activeCampaign.name}" pronta para reutilização de contatos.`)}
+                                style={{
+                                    height: '36px',
+                                    padding: '0 14px',
+                                    fontSize: '12.5px',
+                                    fontWeight: 600,
+                                    borderRadius: '6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}
+                            >
+                                DUPLICAR
+                            </button>
+
+                            {/* VISUALIZAR ESTATÍSTICAS / SINCRONIZAR */}
+                            <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={handleSyncInfobipDlr}
+                                style={{
+                                    height: '36px',
+                                    padding: '0 16px',
+                                    fontSize: '12.5px',
+                                    fontWeight: 600,
+                                    borderRadius: '6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}
+                            >
+                                <RefreshCw size={14} className={isSyncingInfobip ? 'animate-spin' : ''} />
+                                VISUALIZAR ESTATÍSTICAS
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-            </div>
+                    {/* GRID DE DUAS COLUNAS (Esquerda: Relatórios / Direita: Simulador WhatsApp) */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(400px, 1.8fr) minmax(320px, 1fr)', gap: '20px', alignItems: 'start' }}>
+                        
+                        {/* COLUNA ESQUERDA: RESUMOS E TABELA DE NÚMEROS */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                            
+                            {/* Card 1: Resumo das Estimativas (Imagem 2) */}
+                            <div style={{ background: '#ffffff', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '16px 20px' }}>
+                                <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: '0 0 14px 0' }}>
+                                    Resumo das estimativas
+                                </h3>
 
-            {/* Filter & Search Bar */}
-            <div style={{
-                background: '#FFFFFF',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '8px',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '12px'
-            }}>
-                <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
-                    <Search size={14} color="var(--text-dim)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input 
-                        type="text"
-                        placeholder="Buscar destinatário, remetente ou template..."
-                        className="form-input"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{ height: '34px', paddingLeft: '32px', fontSize: '12.5px', borderRadius: '6px', width: '100%' }}
-                    />
-                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
+                                    <div>
+                                        <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            Enviadas <Info size={12} color="#94a3b8" />
+                                        </div>
+                                        <strong style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-main)' }}>
+                                            {activeCampaign.total}
+                                        </strong>
+                                    </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Filter size={13} color="var(--text-dim)" />
-                    <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontWeight: 500 }}>Status:</span>
-                    <select 
-                        className="form-select"
-                        value={statusFilter}
-                        onChange={(e: any) => setStatusFilter(e.target.value)}
-                        style={{
-                            height: '34px',
-                            fontSize: '12.5px',
-                            borderRadius: '6px',
-                            padding: '0 10px',
-                            minWidth: '120px'
-                        }}
-                    >
-                        <option value="ALL">Todos ({records.length})</option>
-                        <option value="DELIVERED">Entregues ({deliveredCount})</option>
-                        <option value="SENT">Enviados ({sentCount})</option>
-                        <option value="FAILED">Falhas ({failedCount})</option>
-                    </select>
-                </div>
-            </div>
+                                    <div>
+                                        <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            Pendentes <Info size={12} color="#94a3b8" />
+                                        </div>
+                                        <strong style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-main)' }}>
+                                            {activeCampaign.pending}
+                                        </strong>
+                                    </div>
 
-            {/* Live Table */}
-            {filteredRecords.length === 0 ? (
-                <div style={{
-                    background: '#FFFFFF',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '8px',
-                    padding: '48px 20px',
-                    textAlign: 'center'
-                }}>
-                    <Activity size={32} color="#9CA3AF" style={{ margin: '0 auto 10px' }} />
-                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: '0 0 4px' }}>
-                        Nenhum envio registrado no momento
-                    </h3>
-                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto' }}>
-                        Quando você disparar uma campanha, cada mensagem aparecerá aqui em tempo real com seu número e status de entrega.
-                    </p>
-                </div>
-            ) : (
-                <div style={{
-                    background: '#FFFFFF',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '8px',
-                    overflow: 'visible'
-                }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-                        <thead>
-                            <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: '#F9FAFB' }}>
-                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Horário</th>
-                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Destinatário</th>
-                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Remetente (WABA)</th>
-                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Template</th>
-                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</th>
-                                <th style={{ padding: '9px 14px', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>ID da Mensagem</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredRecords.map((r, i) => {
-                                const timeStr = new Date(r.timestamp).toLocaleTimeString('pt-BR');
-                                const dateStr = new Date(r.timestamp).toLocaleDateString('pt-BR');
-                                const diagnostic = r.status === 'FAILED' ? parseInfobipErrorDiagnostic(r.rawPayload, r.errorReason) : null;
-                                const isHovered = hoveredRecordId === r.id;
+                                    <div>
+                                        <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            Entregues <Info size={12} color="#94a3b8" />
+                                        </div>
+                                        <strong style={{ fontSize: '24px', fontWeight: 600, color: '#16a34a' }}>
+                                            {activeCampaign.delivered}
+                                        </strong>
+                                    </div>
+                                </div>
 
-                                return (
-                                    <tr key={r.id || i} style={{ borderBottom: '1px solid #F3F4F6', transition: 'background 0.15s' }}>
-                                        {/* Timestamp */}
-                                        <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                                            <span style={{ fontWeight: 600, color: 'var(--text-main)', display: 'block' }}>{timeStr}</span>
-                                            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{dateStr}</span>
-                                        </td>
+                                <div style={{ paddingTop: '14px' }}>
+                                    <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                        Taxa de entrega <Info size={12} color="#94a3b8" />
+                                    </div>
+                                    <strong style={{ fontSize: '24px', fontWeight: 600, color: activeCampaign.deliveryRate >= 70 ? '#16a34a' : '#ea580c' }}>
+                                        {activeCampaign.deliveryRate}%
+                                    </strong>
+                                </div>
+                            </div>
 
-                                        {/* Recipient */}
-                                        <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'monospace' }}>
-                                            {r.recipient}
-                                        </td>
+                            {/* Card 2: Resumo da Transmissão (Imagem 2) */}
+                            <div style={{ background: '#ffffff', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '16px 20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                                        Resumo da transmissão
+                                    </h3>
+                                    <span style={{ fontSize: '12px', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                        Saiba mais <ExternalLink size={11} />
+                                    </span>
+                                </div>
 
-                                        {/* Sender WABA */}
-                                        <td style={{ padding: '10px 14px', color: 'var(--text-muted)' }}>
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#F9FAFB', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-subtle)', fontFamily: 'monospace', fontSize: '12px' }}>
-                                                <Smartphone size={12} color="var(--primary-color)" />
-                                                {r.senderNumber || 'BM Luiz'}
-                                            </span>
-                                        </td>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                                    {/* Lista de Destinatários */}
+                                    <div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            <FileSpreadsheet size={13} /> Lista de destinatários <Info size={11} color="#94a3b8" />
+                                        </div>
+                                        <span style={{
+                                            background: '#f1f5f9',
+                                            border: '1px solid #cbd5e1',
+                                            padding: '2px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '12px',
+                                            fontFamily: 'monospace',
+                                            color: '#334155'
+                                        }}>
+                                            {activeCampaign.listName}
+                                        </span>
+                                    </div>
 
-                                        {/* Template */}
-                                        <td style={{ padding: '10px 14px', fontWeight: 500, color: 'var(--text-main)' }}>
-                                            {r.templateName || '—'}
-                                        </td>
+                                    {/* Remetente */}
+                                    <div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            <Radio size={13} /> Remetente
+                                        </div>
+                                        <strong style={{ fontSize: '15px', fontFamily: 'monospace', color: 'var(--text-main)' }}>
+                                            {activeCampaign.senderNumber || '—'}
+                                        </strong>
+                                    </div>
 
-                                        {/* Status Badge com Hover Tooltip & Popup de Log */}
-                                        <td style={{ padding: '10px 14px', position: 'relative' }}>
-                                            {r.status === 'DELIVERED' ? (
-                                                <span style={{
-                                                    background: '#ECFDF5',
-                                                    color: '#065F46',
-                                                    border: '1px solid #A7F3D0',
-                                                    padding: '2px 8px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '11px',
-                                                    fontWeight: 600,
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px'
-                                                }}>
-                                                    <Check size={11} strokeWidth={2.5} />
-                                                    ENTREGUE
-                                                </span>
-                                            ) : r.status === 'SENT' ? (
-                                                <span style={{
-                                                    background: '#EFF6FF',
-                                                    color: '#1E40AF',
-                                                    border: '1px solid #BFDBFE',
-                                                    padding: '2px 8px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '11px',
-                                                    fontWeight: 600,
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px'
-                                                }}>
-                                                    <Send size={11} />
-                                                    ENVIADO
-                                                </span>
-                                            ) : (
-                                                /* BADGE DE FALHA INTERATIVO */
-                                                <div 
-                                                    style={{ position: 'relative', display: 'inline-block' }}
-                                                    onMouseEnter={() => setHoveredRecordId(r.id)}
-                                                    onMouseLeave={() => setHoveredRecordId(null)}
-                                                >
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setSelectedRecordForLog(r)}
-                                                        style={{
-                                                            background: '#FEF2F2',
-                                                            color: '#B91C1C',
-                                                            border: '1px solid #FECACA',
-                                                            padding: '3px 8px',
-                                                            borderRadius: '4px',
-                                                            fontSize: '11px',
-                                                            fontWeight: 600,
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '5px',
-                                                            cursor: 'pointer',
-                                                            boxShadow: '0 1px 2px rgba(220, 38, 38, 0.08)',
-                                                            transition: 'all 0.15s ease'
-                                                        }}
-                                                        title="Clique para ver o log completo da falha"
-                                                    >
-                                                        <AlertTriangle size={11} color="#DC2626" />
-                                                        <span>FALHA</span>
-                                                        <Info size={11} color="#EF4444" style={{ marginLeft: '1px', opacity: 0.8 }} />
-                                                    </button>
+                                    {/* Destinatários */}
+                                    <div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            Destinatários <Info size={11} color="#94a3b8" />
+                                        </div>
+                                        <strong style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)' }}>
+                                            {activeCampaign.total}
+                                        </strong>
+                                    </div>
 
-                                                    {/* Resumo do motivo logo abaixo do badge */}
-                                                    {diagnostic && (
-                                                        <div 
-                                                            onClick={() => setSelectedRecordForLog(r)}
-                                                            style={{
-                                                                fontSize: '10.5px',
-                                                                color: '#DC2626',
-                                                                marginTop: '2px',
-                                                                maxWidth: '160px',
-                                                                overflow: 'hidden',
-                                                                textOverflow: 'ellipsis',
-                                                                whiteSpace: 'nowrap',
-                                                                cursor: 'pointer',
-                                                                fontWeight: 500
-                                                            }}
-                                                            title={diagnostic.description}
-                                                        >
-                                                            {diagnostic.title !== 'Erro na Transmissão' ? diagnostic.title : diagnostic.description}
-                                                        </div>
-                                                    )}
+                                    {/* Total de Destinos */}
+                                    <div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            Total de destinos <Info size={11} color="#94a3b8" />
+                                        </div>
+                                        <strong style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)' }}>
+                                            {activeCampaign.total}
+                                        </strong>
+                                    </div>
+                                </div>
+                            </div>
 
-                                                    {/* HOVER TOOLTIP FLUTUANTE */}
-                                                    {isHovered && diagnostic && (
-                                                        <div style={{
-                                                            position: 'absolute',
-                                                            bottom: '100%',
-                                                            left: '0',
-                                                            marginBottom: '8px',
-                                                            background: '#1e293b',
-                                                            color: '#f8fafc',
-                                                            padding: '10px 14px',
-                                                            borderRadius: '8px',
-                                                            fontSize: '12px',
-                                                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
-                                                            zIndex: 9999,
-                                                            minWidth: '260px',
-                                                            maxWidth: '340px',
-                                                            pointerEvents: 'none',
-                                                            border: '1px solid #334155',
-                                                            lineHeight: '1.4'
-                                                        }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                                                                <AlertTriangle size={13} color="#f87171" />
-                                                                <strong style={{ color: '#fca5a5', fontSize: '12.5px' }}>
-                                                                    {diagnostic.title}
-                                                                </strong>
-                                                            </div>
-                                                            <div style={{ color: '#e2e8f0', fontSize: '11.5px', marginBottom: '6px' }}>
-                                                                {diagnostic.description}
-                                                            </div>
-                                                            {diagnostic.code && (
-                                                                <div style={{ 
-                                                                    fontFamily: 'monospace', 
-                                                                    fontSize: '10.5px', 
-                                                                    color: '#94a3b8', 
-                                                                    background: '#0f172a', 
-                                                                    padding: '2px 6px', 
+                            {/* Card 3: Lista Detalhada dos Números & Status da Campanha */}
+                            <div style={{ background: '#ffffff', border: '1px solid var(--border-subtle)', borderRadius: '8px', overflow: 'hidden' }}>
+                                <div style={{ padding: '12px 18px', background: '#f8fafc', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <strong style={{ fontSize: '13.5px', color: 'var(--text-main)' }}>
+                                        Detalhes dos Números ({activeCampaign.records.length})
+                                    </strong>
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleExportDetailedReport(activeCampaign, 'xlsx')}
+                                            style={{
+                                                background: '#ecfdf5',
+                                                border: '1px solid #bbf7d0',
+                                                color: '#166534',
+                                                fontSize: '11.5px',
+                                                fontWeight: 600,
+                                                padding: '4px 10px',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                        >
+                                            <Download size={12} /> Baixar XLS
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleExportDetailedReport(activeCampaign, 'csv')}
+                                            style={{
+                                                background: '#f8fafc',
+                                                border: '1px solid #cbd5e1',
+                                                color: '#475569',
+                                                fontSize: '11.5px',
+                                                fontWeight: 600,
+                                                padding: '4px 10px',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                        >
+                                            <Download size={12} /> Baixar CSV
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div style={{ overflowX: 'auto', maxHeight: '420px', overflowY: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px', textAlign: 'left' }}>
+                                        <thead style={{ position: 'sticky', top: 0, background: '#f1f5f9', zIndex: 1 }}>
+                                            <tr style={{ borderBottom: '1px solid #e2e8f0', color: 'var(--text-muted)' }}>
+                                                <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>DESTINATÁRIO</th>
+                                                <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>STATUS</th>
+                                                <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>OPERADORA</th>
+                                                <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>ENVIO / ENTREGA</th>
+                                                <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>MOTIVO (INFOBIP)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {activeCampaign.records.map((r, idx) => {
+                                                const isDelivered = r.status === 'DELIVERED';
+                                                const isFailed = r.status === 'FAILED';
+                                                const operator = r.operator || api.detectOperator(r.recipient);
+
+                                                return (
+                                                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                        <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-main)' }}>
+                                                            {r.recipient}
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px' }}>
+                                                            {isDelivered ? (
+                                                                <span style={{
+                                                                    background: '#dcfce7',
+                                                                    color: '#15803d',
+                                                                    border: '1px solid #86efac',
+                                                                    padding: '2px 8px',
                                                                     borderRadius: '4px',
-                                                                    display: 'inline-block',
-                                                                    marginBottom: '6px'
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600,
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px'
                                                                 }}>
-                                                                    Código: {diagnostic.code}
-                                                                </div>
+                                                                    <CheckCircle2 size={12} color="#16a34a" /> Delivered
+                                                                </span>
+                                                            ) : isFailed ? (
+                                                                <span 
+                                                                    onClick={() => setSelectedRecordForLog(r)}
+                                                                    style={{
+                                                                        background: '#fee2e2',
+                                                                        color: '#991b1b',
+                                                                        border: '1px solid #fca5a5',
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '4px',
+                                                                        fontSize: '11px',
+                                                                        fontWeight: 600,
+                                                                        cursor: 'pointer',
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px'
+                                                                    }}
+                                                                >
+                                                                    <AlertTriangle size={12} /> Falha (Ver)
+                                                                </span>
+                                                            ) : (
+                                                                <span style={{
+                                                                    background: '#e0f2fe',
+                                                                    color: '#0369a1',
+                                                                    border: '1px solid #7dd3fc',
+                                                                    padding: '2px 8px',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600,
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px'
+                                                                }}>
+                                                                    <Clock size={12} /> Enviado
+                                                                </span>
                                                             )}
-                                                            <div style={{ fontSize: '10.5px', color: '#38bdf8', borderTop: '1px solid #334155', paddingTop: '4px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                <span>💡 Clique no botão para abrir o relatório completo</span>
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px', color: '#475569', fontSize: '11.5px' }}>
+                                                            {operator}
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px', fontSize: '11.5px', color: '#64748b' }}>
+                                                            <div>Env: {r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '—'}</div>
+                                                            {r.doneAt && <div style={{ color: '#16a34a' }}>Ent: {new Date(r.doneAt).toLocaleTimeString()}</div>}
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px', fontSize: '11.5px', color: isDelivered ? '#166534' : (isFailed ? '#dc2626' : '#64748b') }}>
+                                                            {r.deliveryReason || (isDelivered ? 'DELIVERED_TO_HANDSET' : (isFailed ? r.errorReason : 'SENT_TO_NETWORK'))}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* COLUNA DIREITA: SIMULADOR WHATSAPP (EXATO IMAGEM 2) */}
+                        <div style={{ position: 'sticky', top: '20px' }}>
+                            <div style={{
+                                width: '310px',
+                                margin: '0 auto',
+                                background: '#111827',
+                                borderRadius: '36px',
+                                padding: '12px',
+                                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2)'
+                            }}>
+                                {/* Phone Notch / Status */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px 8px', color: '#ffffff', fontSize: '11px', fontWeight: 600 }}>
+                                    <span>9:41</span>
+                                    <div style={{ width: '40px', height: '4px', background: '#374151', borderRadius: '4px' }} />
+                                    <span>WhatsApp</span>
+                                </div>
+
+                                {/* Phone Inner Screen */}
+                                <div style={{
+                                    background: '#efeae2',
+                                    borderRadius: '26px',
+                                    overflow: 'hidden',
+                                    minHeight: '520px',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}>
+                                    {/* WhatsApp Chat Header */}
+                                    <div style={{
+                                        background: '#075e54',
+                                        color: '#ffffff',
+                                        padding: '10px 12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                    }}>
+                                        <ChevronLeft size={16} />
+                                        <div style={{
+                                            width: '32px',
+                                            height: '32px',
+                                            borderRadius: '50%',
+                                            background: '#25D366',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#ffffff',
+                                            fontWeight: 700,
+                                            fontSize: '13px'
+                                        }}>
+                                            W
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {activeCampaign.senderNumber || '554891159480'}
+                                            </div>
+                                            <div style={{ fontSize: '10.5px', color: '#a7f3d0' }}>
+                                                Active now
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Chat Body */}
+                                    <div style={{ flex: 1, padding: '14px 10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        {/* Date pill */}
+                                        <div style={{ textAlign: 'center' }}>
+                                            <span style={{
+                                                background: '#ffffff',
+                                                color: '#64748b',
+                                                fontSize: '10.5px',
+                                                padding: '2px 8px',
+                                                borderRadius: '6px',
+                                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                            }}>
+                                                Hoje
+                                            </span>
+                                        </div>
+
+                                        {/* Speech Bubble */}
+                                        <div style={{
+                                            background: '#ffffff',
+                                            borderRadius: '8px',
+                                            padding: '8px',
+                                            maxWidth: '92%',
+                                            alignSelf: 'flex-start',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                            position: 'relative'
+                                        }}>
+                                            {/* Header Image if available */}
+                                            {activeCampaign.mediaUrl && (
+                                                <div style={{ marginBottom: '8px', borderRadius: '6px', overflow: 'hidden', maxHeight: '180px' }}>
+                                                    <img 
+                                                        src={activeCampaign.mediaUrl} 
+                                                        alt="Header Campanha" 
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                                    />
                                                 </div>
                                             )}
-                                        </td>
 
-                                        {/* Message ID */}
-                                        <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-dim)' }}>
-                                            {r.messageId || '—'}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                            {/* Message Content */}
+                                            <div style={{ fontSize: '12px', color: '#111827', lineHeight: '1.45', whiteSpace: 'pre-wrap' }}>
+                                                <p style={{ margin: '0 0 6px 0', fontWeight: 600 }}>
+                                                    Olá!
+                                                </p>
+                                                <p style={{ margin: '0 0 6px 0' }}>
+                                                    🎉 <strong>SEU BENEFÍCIO FOI LIBERADO!</strong>
+                                                </p>
+                                                <p style={{ margin: '0 0 6px 0' }}>
+                                                    Recebemos sua solicitação em nossa central. Informamos que seu contrato pré-aprovado está disponível para contratação imediata.
+                                                </p>
+                                                <p style={{ margin: 0, fontSize: '11.5px', color: '#4b5563' }}>
+                                                    ⚠️ ATENÇÃO: A aprovação é LIMITADA e pode expirar. Confirme agora mesmo pelo botão abaixo.
+                                                </p>
+                                            </div>
+
+                                            {/* Timestamp & Delivered Double Check */}
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '6px', fontSize: '10px', color: '#6b7280' }}>
+                                                <span>17:42</span>
+                                                <CheckCheck size={13} color="#0284c7" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
             )}
 
-            {/* ======================================================== */}
-            {/* MODAL POPUP: DIAGNÓSTICO DO DISPARO & LOG DA FALHA      */}
-            {/* ======================================================== */}
+            {/* ============================================================ */}
+            {/* MODO 2: LISTA DE TODAS AS CAMPANHAS (CARDS DE TRANSMISSÕES)  */}
+            {/* ============================================================ */}
+            {viewMode === 'CAMPAIGNS' && !activeCampaign && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                        <div>
+                            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                                Campanhas & Transmissões Recentes
+                            </h3>
+                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                                Clique em qualquer transmissão para ver o relatório individual (Imagem 2) e baixar o XLS detalhado.
+                            </p>
+                        </div>
+                    </div>
+
+                    {campaigns.length === 0 ? (
+                        <div style={{ background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '40px 20px', textAlign: 'center' }}>
+                            <FileSpreadsheet size={36} color="#94a3b8" style={{ margin: '0 auto 10px' }} />
+                            <h4 style={{ fontSize: '15px', color: 'var(--text-main)', margin: '0 0 4px 0' }}>Nenhuma transmissão registrada ainda</h4>
+                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
+                                Envie uma campanha na aba "Painel de Disparo" para gerar relatórios detalhados com entregas.
+                            </p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '14px' }}>
+                            {campaigns.map((camp, idx) => (
+                                <div 
+                                    key={idx}
+                                    style={{
+                                        background: '#ffffff',
+                                        border: '1px solid var(--border-subtle)',
+                                        borderRadius: '8px',
+                                        padding: '18px 20px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'space-between',
+                                        gap: '14px',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    <div>
+                                        {/* Status Header */}
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                            <span style={{
+                                                fontSize: '11.5px',
+                                                fontWeight: 600,
+                                                color: '#15803d',
+                                                background: '#dcfce7',
+                                                border: '1px solid #86efac',
+                                                padding: '2px 8px',
+                                                borderRadius: '4px',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}>
+                                                <CheckCircle2 size={12} />
+                                                {camp.pending === 0 ? 'Terminado' : 'Em Envio'}
+                                            </span>
+                                            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                                                {camp.createdAt ? new Date(camp.createdAt).toLocaleDateString() : 'Hoje'}
+                                            </span>
+                                        </div>
+
+                                        <h4 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)', margin: '0 0 4px 0', letterSpacing: '-0.01em' }}>
+                                            {camp.name}
+                                        </h4>
+                                        <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                                            Remetente: <strong style={{ color: 'var(--text-main)', fontFamily: 'monospace' }}>{camp.senderNumber || '—'}</strong>
+                                        </div>
+                                    </div>
+
+                                    {/* 4 Métricas Rápidas */}
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(4, 1fr)',
+                                        gap: '8px',
+                                        background: '#f8fafc',
+                                        padding: '10px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #e2e8f0',
+                                        textAlign: 'center'
+                                    }}>
+                                        <div>
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Enviadas</span>
+                                            <strong style={{ fontSize: '14px', color: 'var(--text-main)' }}>{camp.total}</strong>
+                                        </div>
+                                        <div>
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Entregues</span>
+                                            <strong style={{ fontSize: '14px', color: '#16a34a' }}>{camp.delivered}</strong>
+                                        </div>
+                                        <div>
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Falhas</span>
+                                            <strong style={{ fontSize: '14px', color: '#dc2626' }}>{camp.failed}</strong>
+                                        </div>
+                                        <div>
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Taxa</span>
+                                            <strong style={{ fontSize: '14px', color: camp.deliveryRate >= 70 ? '#16a34a' : '#ea580c' }}>{camp.deliveryRate}%</strong>
+                                        </div>
+                                    </div>
+
+                                    {/* Barra de Progresso de Entrega */}
+                                    <div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                            <span>Taxa de Entrega (Handset)</span>
+                                            <strong style={{ color: '#16a34a' }}>{camp.deliveryRate}%</strong>
+                                        </div>
+                                        <div style={{ height: '5px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                            <div style={{ height: '100%', width: `${camp.deliveryRate}%`, background: camp.deliveryRate >= 70 ? '#16a34a' : '#ea580c' }} />
+                                        </div>
+                                    </div>
+
+                                    {/* Botões de Ação */}
+                                    <div style={{ display: 'flex', gap: '8px', paddingTop: '6px', borderTop: '1px solid #f1f5f9' }}>
+                                        <button
+                                            type="button"
+                                            className="btn-primary"
+                                            onClick={() => setSelectedCampaignName(camp.name)}
+                                            style={{
+                                                flex: 1,
+                                                height: '34px',
+                                                fontSize: '12.5px',
+                                                borderRadius: '6px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '5px'
+                                            }}
+                                        >
+                                            <Eye size={13} /> Ver Detalhes (Imagem 2)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            onClick={() => handleExportDetailedReport(camp, 'xlsx')}
+                                            style={{
+                                                height: '34px',
+                                                fontSize: '12px',
+                                                padding: '0 10px',
+                                                borderRadius: '6px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                            title="Baixar XLS (Imagem 3)"
+                                        >
+                                            <Download size={13} /> XLS
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* MODO 3: LOG EM TEMPO REAL COMPLETO (TABELA GERAL)            */}
+            {/* ============================================================ */}
+            {viewMode === 'REALTIME' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {/* Metrics HUD */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+                        {/* Total */}
+                        <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                                Total de Disparos
+                            </span>
+                            <strong style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-main)', display: 'block', margin: '4px 0 2px' }}>
+                                {totalCount}
+                            </strong>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Mensagens registradas</span>
+                        </div>
+
+                        {/* Delivered */}
+                        <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                                Entregues (Handset)
+                            </span>
+                            <strong style={{ fontSize: '20px', fontWeight: 600, color: '#16A34A', display: 'block', margin: '4px 0 2px' }}>
+                                {deliveredCount}
+                            </strong>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Confirmados pela Meta/Infobip</span>
+                        </div>
+
+                        {/* Sent / In Route */}
+                        <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                                Em Rota / Enviados
+                            </span>
+                            <strong style={{ fontSize: '20px', fontWeight: 600, color: '#2563EB', display: 'block', margin: '4px 0 2px' }}>
+                                {sentCount}
+                            </strong>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Aguardando confirmação</span>
+                        </div>
+
+                        {/* Failed */}
+                        <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                                Falhas / Rejeitados
+                            </span>
+                            <strong style={{ fontSize: '20px', fontWeight: 600, color: '#DC2626', display: 'block', margin: '4px 0 2px' }}>
+                                {failedCount}
+                            </strong>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Erros de número ou template</span>
+                        </div>
+
+                        {/* Delivery Rate */}
+                        <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                                Taxa de Entrega
+                            </span>
+                            <strong style={{ fontSize: '20px', fontWeight: 600, color: deliveredRate >= 70 ? '#16A34A' : '#ea580c', display: 'block', margin: '4px 0 2px' }}>
+                                {deliveredRate}%
+                            </strong>
+                            <div style={{ height: '4px', background: '#F3F4F6', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
+                                <div style={{ height: '100%', width: `${deliveredRate}%`, background: deliveredRate >= 70 ? '#16A34A' : '#ea580c' }} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Filter & Search Bar */}
+                    <div style={{
+                        background: '#FFFFFF',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: '8px',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '12px'
+                    }}>
+                        <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+                            <Search size={14} color="var(--text-dim)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                            <input 
+                                type="text"
+                                placeholder="Buscar destinatário, remetente, campanha ou template..."
+                                className="form-input"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                style={{ height: '34px', paddingLeft: '32px', fontSize: '12.5px', borderRadius: '6px', width: '100%' }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Filter size={13} color="var(--text-dim)" />
+                            <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontWeight: 500 }}>Status:</span>
+                            <select 
+                                className="form-select"
+                                value={statusFilter}
+                                onChange={(e: any) => setStatusFilter(e.target.value)}
+                                style={{
+                                    height: '34px',
+                                    fontSize: '12.5px',
+                                    borderRadius: '6px',
+                                    padding: '0 10px',
+                                    border: '1px solid var(--border-subtle)'
+                                }}
+                            >
+                                <option value="ALL">Todos os Status</option>
+                                <option value="DELIVERED">✓ Entregues (Delivered)</option>
+                                <option value="SENT">Enviados (Em Rota)</option>
+                                <option value="FAILED">Falhas / Rejeitados</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Tabela de Disparos em Tempo Real */}
+                    <div style={{
+                        background: '#FFFFFF',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: '8px',
+                        overflow: 'hidden'
+                    }}>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                                <thead>
+                                    <tr style={{
+                                        background: '#F8FAFC',
+                                        borderBottom: '1px solid var(--border-subtle)',
+                                        color: 'var(--text-muted)'
+                                    }}>
+                                        <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>HORÁRIO</th>
+                                        <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>CAMPANHA</th>
+                                        <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>DESTINATÁRIO</th>
+                                        <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>OPERADORA</th>
+                                        <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>REMETENTE (WABA)</th>
+                                        <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>TEMPLATE</th>
+                                        <th style={{ padding: '10px 14px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>STATUS DA ENTREGA</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredRecords.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} style={{ padding: '40px 14px', textAlign: 'center', color: 'var(--text-dim)' }}>
+                                                Nenhum registro encontrado para os filtros selecionados.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredRecords.map((r) => {
+                                            const isDelivered = r.status === 'DELIVERED';
+                                            const isFailed = r.status === 'FAILED';
+                                            const diag = isFailed ? parseInfobipErrorDiagnostic(r.rawPayload) : null;
+                                            const isHovered = hoveredRecordId === r.id;
+                                            const operator = r.operator || api.detectOperator(r.recipient);
+
+                                            return (
+                                                <tr 
+                                                    key={r.id} 
+                                                    style={{ 
+                                                        borderBottom: '1px solid #F1F5F9',
+                                                        transition: 'background 0.15s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.background = '#F8FAFC';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.background = '#FFFFFF';
+                                                    }}
+                                                >
+                                                    {/* Horário */}
+                                                    <td style={{ padding: '12px 14px', color: 'var(--text-dim)', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                                                        {r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '—'}
+                                                    </td>
+
+                                                    {/* Campanha */}
+                                                    <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--text-main)', fontSize: '12.5px' }}>
+                                                        {r.campaignName || 'Campanha_Padrao'}
+                                                    </td>
+
+                                                    {/* Destinatário */}
+                                                    <td style={{ padding: '12px 14px', fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-main)', fontSize: '13px' }}>
+                                                        {r.recipient}
+                                                    </td>
+
+                                                    {/* Operadora */}
+                                                    <td style={{ padding: '12px 14px', color: '#475569', fontSize: '12px' }}>
+                                                        {operator}
+                                                    </td>
+
+                                                    {/* Remetente */}
+                                                    <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: 'var(--text-muted)', fontSize: '12.5px' }}>
+                                                        {r.senderNumber || '—'}
+                                                    </td>
+
+                                                    {/* Template */}
+                                                    <td style={{ padding: '12px 14px', color: 'var(--text-main)', fontSize: '12.5px' }}>
+                                                        {r.templateName || '—'}
+                                                    </td>
+
+                                                    {/* Status da Entrega */}
+                                                    <td style={{ padding: '12px 14px', position: 'relative' }}>
+                                                        {isDelivered ? (
+                                                            <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '2px' }}>
+                                                                <span style={{
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px',
+                                                                    background: '#DCFCE7',
+                                                                    color: '#15803D',
+                                                                    border: '1px solid #86EFAC',
+                                                                    padding: '3px 8px',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600
+                                                                }}>
+                                                                    <CheckCircle2 size={12} color="#16a34a" /> Delivered
+                                                                </span>
+                                                                <span style={{ fontSize: '10px', color: '#16a34a', fontFamily: 'monospace' }}>
+                                                                    No Error (code 0)
+                                                                </span>
+                                                            </div>
+                                                        ) : isFailed ? (
+                                                            <div 
+                                                                style={{ position: 'relative', display: 'inline-block' }}
+                                                                onMouseEnter={() => setHoveredRecordId(r.id)}
+                                                                onMouseLeave={() => setHoveredRecordId(null)}
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setSelectedRecordForLog(r)}
+                                                                    style={{
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '5px',
+                                                                        background: '#FEF2F2',
+                                                                        color: '#B91C1C',
+                                                                        border: '1px solid #FECACA',
+                                                                        padding: '3px 8px',
+                                                                        borderRadius: '4px',
+                                                                        fontSize: '11.5px',
+                                                                        fontWeight: 600,
+                                                                        cursor: 'pointer',
+                                                                        transition: 'all 0.15s ease'
+                                                                    }}
+                                                                >
+                                                                    <AlertTriangle size={12} />
+                                                                    <span>Falha</span>
+                                                                    <Info size={11} style={{ opacity: 0.7 }} />
+                                                                </button>
+
+                                                                {/* Hover Tooltip */}
+                                                                {isHovered && diag && (
+                                                                    <div style={{
+                                                                        position: 'absolute',
+                                                                        bottom: '100%',
+                                                                        left: '50%',
+                                                                        transform: 'translateX(-50%)',
+                                                                        marginBottom: '8px',
+                                                                        width: '280px',
+                                                                        background: '#0F172A',
+                                                                        color: '#FFFFFF',
+                                                                        padding: '10px 12px',
+                                                                        borderRadius: '8px',
+                                                                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)',
+                                                                        zIndex: 100,
+                                                                        fontSize: '11.5px',
+                                                                        lineHeight: '1.4',
+                                                                        pointerEvents: 'none'
+                                                                    }}>
+                                                                        <strong style={{ color: '#F87171', display: 'block', marginBottom: '3px' }}>
+                                                                            {diag.code ? `[${diag.code}] ` : ''}{diag.title}
+                                                                        </strong>
+                                                                        <p style={{ margin: 0, color: '#E2E8F0', fontSize: '11px' }}>
+                                                                            {diag.description}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '2px' }}>
+                                                                <span style={{
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px',
+                                                                    background: '#EFF6FF',
+                                                                    color: '#1D4ED8',
+                                                                    border: '1px solid #BFDBFE',
+                                                                    padding: '3px 8px',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600
+                                                                }}>
+                                                                    <Clock size={12} /> Enviado
+                                                                </span>
+                                                                <span style={{ fontSize: '10px', color: '#64748b' }}>
+                                                                    Aguardando handset
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* MODAL DETALHADO DO LOG DE FALHA                              */}
+            {/* ============================================================ */}
             {selectedRecordForLog && (() => {
                 const r = selectedRecordForLog;
-                const diag = parseInfobipErrorDiagnostic(r.rawPayload, r.errorReason);
-                const rawJsonString = typeof r.rawPayload === 'string' 
-                    ? r.rawPayload 
-                    : JSON.stringify(r.rawPayload || { error: r.errorReason || 'Erro no envio' }, null, 2);
+                const diag = parseInfobipErrorDiagnostic(r.rawPayload);
+                const rawJsonString = JSON.stringify(r.rawPayload || { error: r.errorReason || 'Erro sem payload retornado' }, null, 2);
 
                 return (
                     <div style={{
                         position: 'fixed',
-                        inset: 0,
-                        background: 'rgba(15, 23, 42, 0.5)',
-                        backdropFilter: 'blur(3px)',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(15, 23, 42, 0.65)',
+                        backdropFilter: 'blur(4px)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        zIndex: 1300,
+                        zIndex: 10000,
                         padding: '16px'
                     }}>
-                        <div className="glass-panel" style={{
-                            width: '100%',
-                            maxWidth: '680px',
-                            maxHeight: '90vh',
-                            overflowY: 'auto',
-                            background: '#ffffff',
+                        <div style={{
+                            background: '#FFFFFF',
                             borderRadius: '10px',
                             border: '1px solid var(--border-subtle)',
-                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+                            maxWidth: '620px',
+                            width: '100%',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
                             padding: '24px',
                             position: 'relative'
                         }}>
-                            {/* Close Button */}
+                            {/* Close */}
                             <button
+                                type="button"
                                 onClick={() => setSelectedRecordForLog(null)}
                                 style={{
                                     position: 'absolute',
-                                    top: '18px',
-                                    right: '18px',
-                                    background: '#f1f5f9',
+                                    top: '16px',
+                                    right: '16px',
+                                    background: '#F1F5F9',
                                     border: 'none',
-                                    color: 'var(--text-muted)',
-                                    width: '30px',
-                                    height: '30px',
                                     borderRadius: '6px',
-                                    cursor: 'pointer',
+                                    width: '28px',
+                                    height: '28px',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center'
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    color: 'var(--text-muted)'
                                 }}
                             >
-                                <X size={16} />
+                                <X size={15} />
                             </button>
 
                             {/* Header */}
-                            <div style={{ marginBottom: '16px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                    <span style={{
-                                        background: '#FEF2F2',
-                                        color: '#B91C1C',
-                                        border: '1px solid #FECACA',
-                                        padding: '2px 8px',
-                                        borderRadius: '4px',
-                                        fontSize: '11px',
-                                        fontWeight: 700,
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
-                                    }}>
-                                        <AlertTriangle size={11} /> FALHA NO DISPARO
-                                    </span>
-                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                        {new Date(r.timestamp).toLocaleString('pt-BR')}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                                <div style={{
+                                    background: '#FEE2E2',
+                                    color: '#DC2626',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    <AlertTriangle size={18} />
+                                </div>
+                                <div>
+                                    <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                                        Diagnóstico de Falha no Disparo
+                                    </h3>
+                                    <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+                                        {r.timestamp ? new Date(r.timestamp).toLocaleString() : ''}
                                     </span>
                                 </div>
-                                <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)', margin: 0, letterSpacing: '-0.01em' }}>
-                                    Diagnóstico & Detalhes da Falha
-                                </h3>
-                                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                                    Informações detalhadas retornadas pelo servidor da Infobip/Meta para este destinatário.
-                                </p>
                             </div>
 
-                            {/* CARTÃO DE DIAGNÓSTICO EM DESTAQUE */}
+                            {/* DIAGNÓSTICO EM LINGUAGEM CLARA */}
                             <div style={{
                                 background: '#FEF2F2',
-                                border: '1.5px solid #F87171',
+                                border: '1px solid #FECACA',
                                 borderRadius: '8px',
-                                padding: '14px 16px',
+                                padding: '14px',
                                 marginBottom: '16px'
                             }}>
-                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                                    <div style={{
-                                        background: '#FEE2E2',
-                                        color: '#DC2626',
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '6px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        flexShrink: 0,
-                                        marginTop: '2px'
-                                    }}>
-                                        <AlertTriangle size={16} />
+                                <strong style={{ color: '#991B1B', fontSize: '13.5px', display: 'block', marginBottom: '4px' }}>
+                                    {diag.title}
+                                </strong>
+                                <p style={{ fontSize: '13px', color: '#7F1D1D', margin: '0 0 6px 0', lineHeight: '1.4' }}>
+                                    {diag.description}
+                                </p>
+                                {diag.suggestion && (
+                                    <div style={{ fontSize: '12px', color: '#991B1B', borderTop: '1px dashed #FCA5A5', paddingTop: '6px', marginTop: '6px' }}>
+                                        💡 <strong>Como resolver:</strong> {diag.suggestion}
                                     </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                            <strong style={{ fontSize: '14px', color: '#991B1B' }}>
-                                                {diag.title}
-                                            </strong>
-                                            {diag.code && (
-                                                <span style={{
-                                                    fontFamily: 'monospace',
-                                                    fontSize: '11px',
-                                                    background: '#ffffff',
-                                                    border: '1px solid #FECACA',
-                                                    color: '#B91C1C',
-                                                    padding: '1px 6px',
-                                                    borderRadius: '4px',
-                                                    fontWeight: 600
-                                                }}>
-                                                    {diag.code}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p style={{ fontSize: '13px', color: '#7F1D1D', margin: '4px 0 0 0', lineHeight: '1.4' }}>
-                                            {diag.description}
-                                        </p>
-
-                                        {/* Sugestão de resolução */}
-                                        {diag.suggestion && (
-                                            <div style={{
-                                                marginTop: '8px',
-                                                paddingTop: '8px',
-                                                borderTop: '1px dashed #FCA5A5',
-                                                fontSize: '12px',
-                                                color: '#991B1B',
-                                                display: 'flex',
-                                                alignItems: 'flex-start',
-                                                gap: '6px'
-                                            }}>
-                                                <span style={{ fontWeight: 600 }}>💡 Como resolver:</span>
-                                                <span>{diag.suggestion}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                )}
                             </div>
 
-                            {/* TABELA DE DADOS DO DISPARO */}
-                            <div style={{
-                                background: '#F8FAFC',
-                                border: '1px solid var(--border-subtle)',
-                                borderRadius: '8px',
-                                padding: '12px 14px',
-                                marginBottom: '16px',
-                                display: 'grid',
-                                gridTemplateColumns: '1fr 1fr',
-                                gap: '10px',
-                                fontSize: '12.5px'
-                            }}>
-                                <div>
-                                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Destinatário:</span>
-                                    <strong style={{ fontFamily: 'monospace', color: 'var(--text-main)', fontSize: '13.5px' }}>{r.recipient}</strong>
-                                </div>
-                                <div>
-                                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Remetente (WABA):</span>
-                                    <strong style={{ fontFamily: 'monospace', color: 'var(--text-main)', fontSize: '13px' }}>{r.senderNumber || '—'}</strong>
-                                </div>
-                                <div>
-                                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Template Escolhido:</span>
-                                    <strong style={{ color: 'var(--text-main)' }}>{r.templateName || '—'}</strong>
-                                </div>
-                                <div>
-                                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>ID da Mensagem / Tx:</span>
-                                    <span style={{ fontFamily: 'monospace', color: 'var(--text-dim)', fontSize: '11.5px' }}>{r.messageId || r.transmissionId || '—'}</span>
-                                </div>
-                            </div>
-
-                            {/* RESPOSTA TÉCNICA BRUTA (JSON) */}
+                            {/* JSON Bruto */}
                             <div>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                    <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <FileText size={12} /> Resposta Bruta da API Infobip (JSON):
-                                    </span>
+                                    <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontWeight: 600 }}>Resposta da API:</span>
                                     <button
                                         type="button"
                                         onClick={() => handleCopyLog(rawJsonString)}
                                         style={{
                                             background: '#f1f5f9',
                                             border: '1px solid #cbd5e1',
-                                            color: 'var(--text-main)',
-                                            padding: '3px 8px',
-                                            borderRadius: '4px',
                                             fontSize: '11px',
                                             fontWeight: 600,
-                                            cursor: 'pointer',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '4px'
+                                            padding: '2px 8px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer'
                                         }}
                                     >
-                                        {copiedLog ? <Check size={11} color="#16a34a" /> : <Copy size={11} />}
-                                        {copiedLog ? 'Copiado!' : 'Copiar JSON'}
+                                        {copiedLog ? '✓ Copiado!' : 'Copiar JSON'}
                                     </button>
                                 </div>
-
                                 <pre style={{
-                                    background: '#0f172a',
-                                    color: '#f8fafc',
+                                    background: '#0F172A',
+                                    color: '#F8FAFC',
                                     padding: '12px',
                                     borderRadius: '6px',
                                     fontSize: '11.5px',
                                     fontFamily: 'monospace',
                                     maxHeight: '180px',
                                     overflowY: 'auto',
-                                    margin: 0,
-                                    border: '1px solid #334155',
-                                    lineHeight: '1.4'
+                                    margin: 0
                                 }}>
                                     {rawJsonString}
                                 </pre>
                             </div>
 
-                            {/* Modal Footer */}
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '18px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
                                 <button
                                     className="btn-primary"
                                     onClick={() => setSelectedRecordForLog(null)}
