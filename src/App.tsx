@@ -254,6 +254,9 @@ export const App: React.FC = () => {
         setContacts(loadedContacts);
         setHeaders(loadedHeaders);
         setSelectedClient(clientName || 'Lista de Clientes Sanitizada');
+        const analysis = templateHelper.analyzeTemplate(currentActiveTemplate, null, availableTemplates);
+        const newMappings = templateHelper.generateMappingsForVariables(analysis.variablesCount, mappings, loadedHeaders);
+        setMappings(newMappings);
         setActiveTab('dispatch');
     };
 

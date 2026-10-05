@@ -697,38 +697,58 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                             <div style={{ padding: '6px 12px', background: '#f8fafc', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <Eye size={13} />
-                                    Amostra dos Primeiros Contatos Higienizados (Padrão 13D Brasil):
+                                    Amostra dos Primeiros Contatos Higienizados (Padrão 13D Brasil & Colunas da Planilha):
                                 </span>
                                 <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Mostrando {Math.min(5, contacts.length)} de {contacts.length}</span>
                             </div>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px', textAlign: 'left', background: '#fff' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', background: '#F8FAFC' }}>
-                                        <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>#</th>
-                                        <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>TELEFONE (13 DÍGITOS)</th>
-                                        <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>NOME / INFO 2</th>
-                                        <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>STATUS</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {contacts.slice(0, 5).map((c, idx) => (
-                                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                            <td style={{ padding: '8px 12px', color: 'var(--text-dim)' }}>{idx + 1}</td>
-                                            <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'monospace' }}>
-                                                {c.telefone}
-                                            </td>
-                                            <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>
-                                                {c.nome || '—'}
-                                            </td>
-                                            <td style={{ padding: '8px 12px' }}>
-                                                <span className="badge badge-approved" style={{ fontSize: '11px', height: '20px', padding: '0 6px', borderRadius: '4px', fontWeight: 500 }}>
-                                                    ✓ Válido (13D)
-                                                </span>
-                                            </td>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px', textAlign: 'left', background: '#fff' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', background: '#F8FAFC' }}>
+                                            <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>#</th>
+                                            <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>TELEFONE (13 DÍGITOS)</th>
+                                            <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>NOME / INFO 2</th>
+                                            {(excelAnalysis.headers || [])
+                                                .filter((h, idx) => idx !== selectedPhoneCol && idx !== selectedNameCol && h.toLowerCase() !== 'telefone' && h.toLowerCase() !== 'nome')
+                                                .map((eh, i) => (
+                                                    <th key={i} style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#0284c7' }}>
+                                                        {eh}
+                                                    </th>
+                                                ))
+                                            }
+                                            <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>STATUS</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {contacts.slice(0, 5).map((c, idx) => {
+                                            const extraCols = (excelAnalysis.headers || []).filter(
+                                                (h, cIdx) => cIdx !== selectedPhoneCol && cIdx !== selectedNameCol && h.toLowerCase() !== 'telefone' && h.toLowerCase() !== 'nome'
+                                            );
+                                            return (
+                                                <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                    <td style={{ padding: '8px 12px', color: 'var(--text-dim)' }}>{idx + 1}</td>
+                                                    <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-main)', fontFamily: 'monospace' }}>
+                                                        {c.telefone}
+                                                    </td>
+                                                    <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>
+                                                        {c.nome || '—'}
+                                                    </td>
+                                                    {extraCols.map((eh, i) => (
+                                                        <td key={i} style={{ padding: '8px 12px', color: '#334155' }}>
+                                                            {c[eh] || c[eh.toLowerCase()] || '—'}
+                                                        </td>
+                                                    ))}
+                                                    <td style={{ padding: '8px 12px' }}>
+                                                        <span className="badge badge-approved" style={{ fontSize: '11px', height: '20px', padding: '0 6px', borderRadius: '4px', fontWeight: 500 }}>
+                                                            ✓ Válido (13D)
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
                     </div>

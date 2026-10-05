@@ -113,37 +113,54 @@ export const templateHelper = {
         const newMappings: PlaceholderMapping[] = [];
 
         // Colunas candidatas padrão
-        const phoneHeaders = headers.filter(h => /tel|phone|cel|whatsapp/i.test(h));
-        const nameHeaders = headers.filter(h => /nome|name|cliente/i.test(h));
+        const phoneHeaders = headers.filter(h => /tel|phone|cel|whatsapp|wpp|numero|número/i.test(h));
+        const nameHeaders = headers.filter(h => /nome|name|cliente|lead|contato|destinat/i.test(h));
+        const otherHeaders = headers.filter(h => 
+            !phoneHeaders.includes(h) && 
+            !nameHeaders.includes(h) &&
+            h.toLowerCase() !== 'nome' &&
+            h.toLowerCase() !== 'telefone'
+        );
 
         for (let i = 1; i <= count; i++) {
             const existing = currentMappings.find(m => m.id === i);
-            if (existing) {
+            // Se já tem um mapping que possui coluna selecionada ou valor fixo preenchido, manter
+            if (existing && ((existing.type === 'column' && existing.columnName) || (existing.type === 'fixed' && existing.fixedValue))) {
                 newMappings.push(existing);
             } else {
-                // Auto-sugestão inteligente
+                // Auto-sugestão inteligente baseada nas colunas reais da planilha
                 let defaultCol = '';
                 let defaultType: 'column' | 'fixed' = 'column';
+                let defaultFixed = '';
 
                 if (i === 1) {
                     defaultCol = nameHeaders[0] || (headers.includes('nome') ? 'nome' : (headers[0] || 'nome'));
                 } else if (i === 2) {
-                    // Se for variável 2, sugerir coluna subsequente se houver, ou fixo
-                    const otherHeaders = headers.filter(h => h.toLowerCase() !== 'nome' && !phoneHeaders.includes(h));
+                    // Se for variável 2, sugerir coluna subsequente da planilha se houver
                     if (otherHeaders.length > 0) {
                         defaultCol = otherHeaders[0];
+                    } else if (nameHeaders.length > 1) {
+                        defaultCol = nameHeaders[1];
                     } else {
+                        // Planilha só tem telefone e nome: sugere fixo preenchido para evitar erro 'must not be empty'
                         defaultType = 'fixed';
+                        defaultFixed = 'Atendimento';
                     }
                 } else {
-                    defaultType = 'fixed';
+                    const extraIdx = i - 3;
+                    if (extraIdx >= 0 && otherHeaders[extraIdx + 1]) {
+                        defaultCol = otherHeaders[extraIdx + 1];
+                    } else {
+                        defaultType = 'fixed';
+                        defaultFixed = `Info ${i}`;
+                    }
                 }
 
                 newMappings.push({
                     id: i,
                     type: defaultType,
                     columnName: defaultCol,
-                    fixedValue: ''
+                    fixedValue: defaultFixed
                 });
             }
         }

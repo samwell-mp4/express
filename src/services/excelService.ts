@@ -106,17 +106,37 @@ export const excelService = {
 
                 const contact: ParsedContact = {
                     telefone: phone,
-                    nome: contactName
+                    nome: contactName || 'Cliente'
                 };
 
-                // Add any additional columns
+                // Add ALL columns from the spreadsheet to the contact so any column can be mapped to template variables
                 if (finalHeaders && finalHeaders.length > 0) {
-                    finalHeaders.forEach((h: string, cIdx: number) => {
-                        if (cIdx !== phoneColIndex && cIdx !== nameColIndex && h) {
-                            contact[h] = String(row[cIdx] !== undefined && row[cIdx] !== null ? row[cIdx] : '');
+                    finalHeaders.forEach((rawH: string, cIdx: number) => {
+                        const h = String(rawH || '').trim();
+                        if (!h) return;
+
+                        let cellVal = '';
+                        if (cIdx === phoneColIndex) {
+                            cellVal = phone;
+                        } else if (cIdx === nameColIndex) {
+                            cellVal = contactName;
+                        } else {
+                            const raw = row[cIdx];
+                            cellVal = (raw !== undefined && raw !== null) ? String(raw).trim() : '';
+                        }
+
+                        // Store under original header, lowercase key, and trimmed key
+                        contact[h] = cellVal;
+                        const lowerKey = h.toLowerCase();
+                        if (contact[lowerKey] === undefined || contact[lowerKey] === '') {
+                            contact[lowerKey] = cellVal;
                         }
                     });
                 }
+
+                // Guarantee nome and telefone are populated
+                if (!contact.nome && contactName) contact.nome = contactName;
+                if (!contact.telefone && phone) contact.telefone = phone;
 
                 extracted.push(contact);
             } else {
@@ -187,12 +207,24 @@ export const excelService = {
                     const rawHeaders = (json[headerRowIndex] || []).map((h: any, idx: number) => String(h || `Coluna_${idx + 1}`).trim());
                     const lowerHeaders = rawHeaders.map((h: string) => h.toLowerCase());
 
-                    // Check if row is really a header row (contains text keywords) or raw data
-                    const isHeaderRow = lowerHeaders.some(h => 
+                    // Check if row is really a header row (contains text keywords or non-numeric header titles)
+                    let isHeaderRow = lowerHeaders.some(h => 
                         h.includes('nome') || h.includes('tel') || h.includes('cel') || h.includes('fone') || 
                         h.includes('whats') || h.includes('contato') || h.includes('numero') || 
-                        h.includes('número') || h.includes('phone') || h.includes('lead') || h.includes('destinat')
+                        h.includes('número') || h.includes('phone') || h.includes('lead') || h.includes('destinat') ||
+                        h.includes('cliente') || h.includes('client') || h.includes('valor') || h.includes('chave') ||
+                        h.includes('código') || h.includes('codigo') || h.includes('cidade') || h.includes('cpf')
                     );
+
+                    // If not detected by keywords, check if rawHeaders cells are text and the next row contains phone numbers
+                    if (!isHeaderRow && json.length > headerRowIndex + 1) {
+                        const nextRow = json[headerRowIndex + 1] || [];
+                        const currentRowHasPhone = rawHeaders.some(h => excelService.normalizePhone(h).length >= 10);
+                        const nextRowHasPhone = nextRow.some((c: any) => excelService.normalizePhone(c).length >= 10);
+                        if (!currentRowHasPhone && nextRowHasPhone) {
+                            isHeaderRow = true;
+                        }
+                    }
 
                     const dataStartIndex = isHeaderRow ? headerRowIndex + 1 : headerRowIndex;
                     const finalHeaders = isHeaderRow ? rawHeaders : rawHeaders.map((_, i) => `Coluna_${i + 1}`);
@@ -209,7 +241,8 @@ export const excelService = {
                     // Look for name column by header name keywords
                     let nameColIndex = lowerHeaders.findIndex((h: string) =>
                         h === 'nome' || h === 'name' || h.includes('nome') || 
-                        h === 'cliente' || h === 'lead' || h === 'info_2' || h === 'contato_nome'
+                        h === 'cliente' || h === 'lead' || h === 'info_2' || h === 'contato_nome' ||
+                        h.includes('destinat')
                     );
 
                     // If phone column wasn't identified by header, scan up to 50 rows to detect which column has phone numbers
@@ -322,7 +355,12 @@ export const excelService = {
                     duplicates++;
                 } else {
                     seen.add(phone);
-                    contacts.push({ telefone: phone, nome: name });
+                    contacts.push({ 
+                        telefone: phone, 
+                        nome: name || 'Cliente',
+                        'Telefone': phone,
+                        'Nome': name || 'Cliente'
+                    });
                 }
             } else {
                 invalid++;

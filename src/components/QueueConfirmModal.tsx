@@ -53,6 +53,31 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
         setLocalMappings(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
     };
 
+    // Helper para obter valor de variável do contato de maneira segura e tolerante
+    const resolveContactVar = (c: ParsedContact, colName: string, fallback: string): string => {
+        if (!colName) return fallback;
+        const trimmed = colName.trim();
+        const lower = trimmed.toLowerCase();
+
+        if (lower === 'nome' || lower === 'cliente' || lower === 'destinatario') {
+            return c.nome || c[trimmed] || c[lower] || fallback;
+        }
+        if (lower === 'telefone' || lower === 'celular' || lower === 'whatsapp') {
+            return c.telefone || c[trimmed] || c[lower] || fallback;
+        }
+        if (c[trimmed] !== undefined && c[trimmed] !== null && String(c[trimmed]).trim() !== '') {
+            return String(c[trimmed]).trim();
+        }
+        if (c[lower] !== undefined && c[lower] !== null && String(c[lower]).trim() !== '') {
+            return String(c[lower]).trim();
+        }
+        const matchingKey = Object.keys(c).find(k => k.trim().toLowerCase() === lower);
+        if (matchingKey && c[matchingKey] !== undefined && c[matchingKey] !== null && String(c[matchingKey]).trim() !== '') {
+            return String(c[matchingKey]).trim();
+        }
+        return fallback;
+    };
+
     // Build all queue messages
     const buildMessages = (): InfobipQueueMessage[] => {
         const messages: InfobipQueueMessage[] = [];
@@ -65,18 +90,18 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
             contactsList.forEach(c => {
                 const placeholders = localMappings.map((m, idx) => {
                     let val = '';
+                    const safeFallback = m.fixedValue?.trim() || (idx === 0 ? (c.nome || 'Cliente') : `Valor ${idx + 1}`);
+
                     if (m.type === 'column') {
-                        if (m.columnName === 'nome') val = c.nome || 'Cliente';
-                        else if (m.columnName === 'telefone') val = c.telefone;
-                        else val = c[m.columnName] || '';
+                        val = resolveContactVar(c, m.columnName, safeFallback);
                     } else {
-                        val = m.fixedValue || '';
+                        val = m.fixedValue?.trim() || safeFallback;
                     }
 
                     // Proteção contra erro 'must not be empty' da Infobip/Meta:
-                    // Se o valor estiver vazio, aplicar fallback seguro e nunca enviar string vazia
+                    // Se o valor estiver vazio, aplicar fallback seguro e NUNCA enviar string vazia
                     if (!val || !val.trim()) {
-                        val = m.fixedValue?.trim() || (m.type === 'column' ? (c.nome || 'Cliente') : `Valor ${idx + 1}`);
+                        val = safeFallback;
                     }
 
                     return val.trim();

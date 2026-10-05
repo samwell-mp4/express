@@ -46,6 +46,14 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
     const [imageError, setImageError] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+    // Helper para extrair valor de exemplo de forma tolerante a maiúsculas/minúsculas
+    const getSampleValueForCol = (col: string) => {
+        if (!sampleContact) return '';
+        if (col === 'nome') return sampleContact.nome || sampleContact['nome'] || '';
+        if (col === 'telefone') return sampleContact.telefone || sampleContact['telefone'] || '';
+        return sampleContact[col] || sampleContact[col.toLowerCase()] || '';
+    };
+
     // Colunas disponíveis para mapeamento
     const availableColumns = [
         'nome', 
@@ -69,6 +77,19 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
             setMappings(updated);
         }
     }, [templateName, availableTemplates]);
+
+    // Sincroniza automaticamente mapeamentos quando a planilha é carregada ou alterada
+    useEffect(() => {
+        if (headers.length > 0) {
+            setMappings(prev => {
+                const hasUnmapped = prev.some(m => (m.type === 'column' && !m.columnName) || (m.type === 'fixed' && !m.fixedValue));
+                if (hasUnmapped) {
+                    return templateHelper.generateMappingsForVariables(prev.length || 2, prev, headers);
+                }
+                return prev;
+            });
+        }
+    }, [headers]);
 
     // Carregar mídias salvas ao abrir o seletor
     const openMediaPicker = () => {
@@ -432,13 +453,65 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
                             </button>
                         </div>
 
+                        {/* Banner de Colunas Detectadas na Planilha */}
+                        {headers && headers.length > 0 && (
+                            <div style={{
+                                background: '#f0fdf4',
+                                border: '1px solid #bbf7d0',
+                                borderRadius: '8px',
+                                padding: '10px 14px',
+                                marginBottom: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <FileSpreadsheet size={14} color="#16a34a" />
+                                        Colunas Detectadas na Planilha ({headers.length}):
+                                    </span>
+                                    <span style={{ fontSize: '11px', color: '#15803d' }}>
+                                        {sampleContact ? 'Valores extraídos com sucesso do primeiro contato' : 'Aguardando dados'}
+                                    </span>
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                    {headers.map((h, i) => {
+                                        const sampleVal = getSampleValueForCol(h);
+                                        return (
+                                            <span 
+                                                key={i}
+                                                style={{
+                                                    background: '#ffffff',
+                                                    border: '1px solid #86efac',
+                                                    color: '#14532d',
+                                                    fontSize: '11.5px',
+                                                    fontWeight: 500,
+                                                    padding: '3px 8px',
+                                                    borderRadius: '4px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '5px'
+                                                }}
+                                            >
+                                                <strong>{h}:</strong>
+                                                <span style={{ color: '#475569', fontSize: '11px' }}>
+                                                    {sampleVal ? (sampleVal.length > 20 ? sampleVal.slice(0, 20) + '...' : sampleVal) : '—'}
+                                                </span>
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {mappings.map((m, idx) => {
                                 const varIndex = idx + 1;
                                 const exampleVal = templateInfo.examples?.[idx];
                                 const previewVal = m.type === 'column'
-                                    ? (sampleContact ? (sampleContact[m.columnName] || sampleContact.nome || '') : 'Exemplo')
+                                    ? (m.columnName ? getSampleValueForCol(m.columnName) : '')
                                     : m.fixedValue;
+                                const isUnset = (m.type === 'column' && !m.columnName) || (m.type === 'fixed' && !m.fixedValue?.trim());
 
                                 return (
                                     <div 
@@ -447,10 +520,10 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
                                             display: 'flex', 
                                             alignItems: 'center', 
                                             gap: '10px', 
-                                            background: '#f8fafc', 
+                                            background: isUnset ? '#fffbeb' : '#f8fafc', 
                                             padding: '10px 14px', 
                                             borderRadius: '8px',
-                                            border: '1px solid #e2e8f0',
+                                            border: isUnset ? '1px solid #fde68a' : '1px solid #e2e8f0',
                                             flexWrap: 'wrap'
                                         }}
                                     >
@@ -487,14 +560,17 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
                                                     className="form-select"
                                                     value={m.columnName}
                                                     onChange={(e) => updateMapping(m.id, { columnName: e.target.value })}
-                                                    style={{ width: '100%', height: '34px', padding: '0 8px', fontSize: '12.5px', borderRadius: '6px' }}
+                                                    style={{ width: '100%', height: '34px', padding: '0 8px', fontSize: '12.5px', borderRadius: '6px', borderColor: !m.columnName ? '#f59e0b' : undefined }}
                                                 >
                                                     <option value="">Selecione a Coluna...</option>
-                                                    {availableColumns.map(col => (
-                                                        <option key={col} value={col}>
-                                                            {col} {sampleContact?.[col] ? `(Ex: "${sampleContact[col].substring(0, 15)}")` : ''}
-                                                        </option>
-                                                    ))}
+                                                    {availableColumns.map(col => {
+                                                        const sVal = getSampleValueForCol(col);
+                                                        return (
+                                                            <option key={col} value={col}>
+                                                                {col} {sVal ? `(Ex: "${sVal.length > 18 ? sVal.substring(0, 18) + '...' : sVal}")` : ''}
+                                                            </option>
+                                                        );
+                                                    })}
                                                 </select>
                                             </div>
                                         ) : (
@@ -505,15 +581,21 @@ export const VariableMapper: React.FC<VariableMapperProps> = ({
                                                     className="form-input"
                                                     value={m.fixedValue}
                                                     onChange={(e) => updateMapping(m.id, { fixedValue: e.target.value })}
-                                                    style={{ width: '100%', height: '34px', padding: '0 10px', fontSize: '12.5px', borderRadius: '6px' }}
+                                                    style={{ width: '100%', height: '34px', padding: '0 10px', fontSize: '12.5px', borderRadius: '6px', borderColor: !m.fixedValue?.trim() ? '#f59e0b' : undefined }}
                                                 />
                                             </div>
                                         )}
 
                                         {/* Valor ao Vivo */}
                                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', minWidth: '120px' }}>
-                                            Valor: <strong style={{ color: 'var(--text-main)', fontWeight: 600 }}>{previewVal || (exampleVal ? `(${exampleVal})` : '—')}</strong>
+                                            Valor: <strong style={{ color: previewVal ? 'var(--text-main)' : '#dc2626', fontWeight: 600 }}>{previewVal || (exampleVal ? `(${exampleVal})` : '— Vazio —')}</strong>
                                         </div>
+
+                                        {isUnset && (
+                                            <span style={{ fontSize: '11px', color: '#b45309', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }} title="Preencha este campo para evitar rejeição da Infobip">
+                                                <AlertTriangle size={12} /> Obrigatório
+                                            </span>
+                                        )}
 
                                         {/* Botão Remover */}
                                         {mappings.length > 1 && (
