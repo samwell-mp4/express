@@ -18,6 +18,7 @@ import { api } from './services/api';
 import { wabaStorage } from './services/wabaStorage';
 import { bmSheetService } from './services/bmSheetService';
 import { templateService } from './services/templateService';
+import { templateHelper } from './services/templateHelper';
 import { Login } from './components/Login';
 
 const isLocalhost = typeof window !== 'undefined' && (
@@ -199,16 +200,54 @@ export const App: React.FC = () => {
         setActiveTab('registry');
     };
 
+    const currentActiveTemplate = senders[0]?.templateName || 'ivo_01';
+    const currentHeaderType = senders[0]?.headerType || 'NONE';
+    const availableTemplates = senders[0]?.templates || [];
+
     const handleSelectTemplateForDispatch = (templateName: string) => {
+        const analysis = templateHelper.analyzeTemplate(templateName, null, availableTemplates);
         setSenders(prev => {
             if (prev.length > 0) {
-                const next = [...prev];
-                next[0] = { ...next[0], templateName };
-                return next;
+                return prev.map(s => ({
+                    ...s,
+                    templateName,
+                    headerType: analysis.headerType === 'IMAGE' ? 'IMAGE' : (analysis.headerType === 'VIDEO' ? 'VIDEO' : 'NONE'),
+                    mediaUrl: s.mediaUrl || mediaUrl
+                }));
             }
             return prev;
         });
+
+        const newMappings = templateHelper.generateMappingsForVariables(analysis.variablesCount, mappings, headers);
+        setMappings(newMappings);
         setActiveTab('dispatch');
+    };
+
+    const handleTemplateChangeFromMapper = (newTemplateName: string) => {
+        const analysis = templateHelper.analyzeTemplate(newTemplateName, null, availableTemplates);
+        setSenders(prev => prev.map(s => ({
+            ...s,
+            templateName: newTemplateName,
+            headerType: analysis.headerType === 'IMAGE' ? 'IMAGE' : (analysis.headerType === 'VIDEO' ? 'VIDEO' : 'NONE'),
+            mediaUrl: s.mediaUrl || mediaUrl
+        })));
+        const newMappings = templateHelper.generateMappingsForVariables(analysis.variablesCount, mappings, headers);
+        setMappings(newMappings);
+    };
+
+    const handleHeaderTypeChangeFromMapper = (hType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE') => {
+        setSenders(prev => prev.map(s => ({ ...s, headerType: hType })));
+    };
+
+    const handleMediaUrlChange = (url: string) => {
+        setMediaUrl(url);
+        setSenders(prev => prev.map(s => ({ ...s, mediaUrl: url })));
+    };
+
+    const handleSenderTemplateSelected = (chosenName: string, _hType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE') => {
+        const analysis = templateHelper.analyzeTemplate(chosenName, null, availableTemplates);
+        const newMappings = templateHelper.generateMappingsForVariables(analysis.variablesCount, mappings, headers);
+        setMappings(newMappings);
     };
 
     const handleContactsFromUpload = (loadedContacts: ParsedContact[], loadedHeaders: string[], clientName: string) => {
@@ -337,6 +376,21 @@ export const App: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Configuração de Variáveis do Modelo & Cabeçalho de Imagem (Padrão Infobip) */}
+                        <VariableMapper 
+                            mappings={mappings}
+                            setMappings={setMappings}
+                            headers={headers}
+                            sampleContact={contacts[0]}
+                            templateName={currentActiveTemplate}
+                            onTemplateChange={handleTemplateChangeFromMapper}
+                            availableTemplates={availableTemplates}
+                            mediaUrl={mediaUrl}
+                            onMediaUrlChange={handleMediaUrlChange}
+                            headerType={currentHeaderType}
+                            onHeaderTypeChange={handleHeaderTypeChangeFromMapper}
+                        />
+
                         {/* Senders Configuration (Includes Direct Excel Uploader, Saved WABAs & Card/List Views) */}
                         <SenderManager 
                             senders={senders}
@@ -345,18 +399,10 @@ export const App: React.FC = () => {
                             setContacts={setContacts}
                             setHeaders={setHeaders}
                             mediaUrl={mediaUrl}
+                            onMediaUrlChange={handleMediaUrlChange}
+                            onTemplateSelected={handleSenderTemplateSelected}
                             onAdvanceToReview={() => setShowConfirmModal(true)}
                         />
-
-                        {/* Variable Mapper ({{1}}, {{2}}) */}
-                        {contacts.length > 0 && (
-                            <VariableMapper 
-                                mappings={mappings}
-                                setMappings={setMappings}
-                                headers={headers}
-                                sampleContact={contacts[0]}
-                            />
-                        )}
                     </div>
                 )}
 

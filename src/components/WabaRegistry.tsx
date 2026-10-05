@@ -17,7 +17,7 @@ export const WabaRegistry: React.FC = () => {
     const [formLimit, setFormLimit] = useState(250);
     const [formAccount, setFormAccount] = useState('BM do Luiz');
     const [formTemplate, setFormTemplate] = useState('');
-    const [formHeaderType, setFormHeaderType] = useState<'NONE' | 'IMAGE' | 'VIDEO'>('NONE');
+    const [formHeaderType, setFormHeaderType] = useState<'NONE' | 'IMAGE' | 'VIDEO' | 'TEXT'>('NONE');
     const [templatesList, setTemplatesList] = useState<InfobipTemplateSummary[]>([]);
     const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
     const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);

@@ -28,7 +28,7 @@ export interface SavedWaba {
     templateName?: string;
     templateLanguage?: string;
     templates?: InfobipTemplateSummary[];
-    headerType?: 'IMAGE' | 'VIDEO' | 'NONE';
+    headerType?: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE';
     mediaUrl?: string;
     createdAt: string;
 }
@@ -42,7 +42,7 @@ export interface SenderConfig {
     templateLanguage: string;
     templates: InfobipTemplateSummary[];
     isLoadingTemplates?: boolean;
-    headerType: 'IMAGE' | 'VIDEO' | 'NONE';
+    headerType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE';
     mediaUrl: string;
     allocatedContacts?: ParsedContact[];
 }

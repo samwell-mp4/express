@@ -17,6 +17,8 @@ interface SenderManagerProps {
     setContacts: React.Dispatch<React.SetStateAction<ParsedContact[]>>;
     setHeaders: React.Dispatch<React.SetStateAction<string[]>>;
     mediaUrl: string;
+    onMediaUrlChange?: (url: string) => void;
+    onTemplateSelected?: (templateName: string, headerType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE') => void;
     onAdvanceToReview: () => void;
 }
 
@@ -27,6 +29,8 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
     setContacts,
     setHeaders,
     mediaUrl,
+    onMediaUrlChange,
+    onTemplateSelected,
     onAdvanceToReview
 }) => {
     // Views
@@ -971,8 +975,12 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                             }
                                             updateSender(s.id, { 
                                                 templateName: chosen,
-                                                headerType: hType
+                                                headerType: hType,
+                                                mediaUrl: s.mediaUrl || mediaUrl
                                             });
+                                            if (onTemplateSelected) {
+                                                onTemplateSelected(chosen, hType);
+                                            }
                                         }}
                                         style={{ height: '36px', fontSize: '13px', borderRadius: '6px', fontWeight: 500 }}
                                     >
@@ -991,7 +999,13 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                             className="form-input"
                                             style={{ height: '36px', fontSize: '13px', borderRadius: '6px' }}
                                             value={s.templateName}
-                                            onChange={(e) => updateSender(s.id, { templateName: e.target.value })}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                updateSender(s.id, { templateName: val });
+                                                if (onTemplateSelected && val) {
+                                                    onTemplateSelected(val, s.headerType);
+                                                }
+                                            }}
                                         />
                                         <span style={{ fontSize: '11px', color: '#b45309' }}>
                                             ⚠️ Digite o número acima e clique em "Buscar" para listar os templates da Meta.
@@ -1023,7 +1037,13 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                     <select 
                                         className="form-select"
                                         value={s.headerType}
-                                        onChange={(e: any) => updateSender(s.id, { headerType: e.target.value })}
+                                        onChange={(e: any) => {
+                                            const hVal = e.target.value;
+                                            updateSender(s.id, { headerType: hVal });
+                                            if (onTemplateSelected && s.templateName) {
+                                                onTemplateSelected(s.templateName, hVal);
+                                            }
+                                        }}
                                         style={{ height: '36px', fontSize: '13px', borderRadius: '6px' }}
                                     >
                                         <option value="NONE">Sem Mídia</option>
@@ -1032,6 +1052,34 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                     </select>
                                 </div>
                             </div>
+
+                            {/* URL da Imagem Original se Cabeçalho for Imagem */}
+                            {s.headerType === 'IMAGE' && (
+                                <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', padding: '8px 10px' }}>
+                                    <label style={{ fontSize: '11px', color: '#0369a1', fontWeight: 600, display: 'block', marginBottom: '3px' }}>
+                                        URL da Imagem Original:
+                                    </label>
+                                    <input 
+                                        type="url"
+                                        placeholder="https://exemplo.com/imagem.jpg"
+                                        className="form-input"
+                                        value={s.mediaUrl || mediaUrl || ''}
+                                        onChange={(e) => {
+                                            const url = e.target.value;
+                                            updateSender(s.id, { mediaUrl: url });
+                                            if (onMediaUrlChange && !mediaUrl) {
+                                                onMediaUrlChange(url);
+                                            }
+                                        }}
+                                        style={{ height: '30px', fontSize: '11.5px', borderRadius: '4px' }}
+                                    />
+                                    {(s.mediaUrl || mediaUrl) && (
+                                        <span style={{ fontSize: '10.5px', color: '#16a34a', display: 'inline-block', marginTop: '2px', fontWeight: 500 }}>
+                                            ✓ Imagem vinculada ao envio
+                                        </span>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Footer indicator */}
                             <div style={{ 

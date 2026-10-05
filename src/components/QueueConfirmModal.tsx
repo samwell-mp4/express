@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Database, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Smartphone, Send } from 'lucide-react';
+import { X, Database, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Smartphone, Send, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import { SenderConfig, ParsedContact, PlaceholderMapping, InfobipQueueMessage } from '../types';
-import { api, LUIS_BASE } from '../services/api';
+import { api } from '../services/api';
 import { excelService } from '../services/excelService';
 
 interface QueueConfirmModalProps {
@@ -19,7 +19,7 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
     contacts,
     mappings,
     targetUrl,
-    mediaUrl,
+    mediaUrl: initialMediaUrl,
     onClose,
     onSuccess
 }) => {
@@ -28,11 +28,16 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
     const [errorMsg, setErrorMsg] = useState('');
     const [isDone, setIsDone] = useState(false);
     const [selectedRateLimit, setSelectedRateLimit] = useState(0.5);
+    const [currentMediaUrl, setCurrentMediaUrl] = useState(initialMediaUrl || '');
 
     // Compute partitions
     const partitionedSenders = excelService.partitionContacts(contacts, senders);
     const activePartitions = partitionedSenders.filter(s => s.allocatedContacts && s.allocatedContacts.length > 0);
     const totalAllocated = activePartitions.reduce((acc, s) => acc + (s.allocatedContacts?.length || 0), 0);
+
+    // Detectar se algum remetente ativo exige cabeçalho de imagem
+    const requiresImage = activePartitions.some(s => s.headerType === 'IMAGE');
+    const isImageMissing = requiresImage && !currentMediaUrl.trim() && !activePartitions.some(s => s.mediaUrl);
 
     // Build all queue messages
     const buildMessages = (): InfobipQueueMessage[] => {
@@ -41,6 +46,7 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
         activePartitions.forEach(s => {
             const senderNum = s.senderNumber.replace(/\D/g, '');
             const contactsList = s.allocatedContacts || [];
+            const effectiveMediaUrl = s.mediaUrl || currentMediaUrl || '';
 
             contactsList.forEach(c => {
                 const placeholders = mappings.map(m => {
@@ -56,10 +62,10 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                 if (placeholders.length > 0) {
                     templateData.body = { placeholders };
                 }
-                if (s.headerType !== 'NONE' && (s.mediaUrl || mediaUrl)) {
+                if (s.headerType !== 'NONE' && effectiveMediaUrl) {
                     templateData.header = {
                         type: s.headerType,
-                        mediaUrl: s.mediaUrl || mediaUrl
+                        mediaUrl: effectiveMediaUrl
                     };
                 }
 
@@ -80,6 +86,12 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
 
     const handleConfirmDispatch = async () => {
         setErrorMsg('');
+
+        if (isImageMissing) {
+            setErrorMsg('O template selecionado requer cabeçalho de Imagem. Por favor, insira a URL da Imagem Original abaixo antes de enviar.');
+            return;
+        }
+
         const allMessages = buildMessages();
 
         if (allMessages.length === 0) {
@@ -152,13 +164,13 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
         }}>
             <div className="glass-panel" style={{
                 width: '100%',
-                maxWidth: '680px',
+                maxWidth: '720px',
                 maxHeight: '90vh',
                 overflowY: 'auto',
-                padding: '22px',
+                padding: '24px',
                 position: 'relative',
                 background: '#ffffff',
-                borderRadius: '8px',
+                borderRadius: '10px',
                 border: '1px solid var(--border-subtle)',
                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
             }}>
@@ -189,14 +201,14 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                 {/* Modal Title */}
                 <div style={{ marginBottom: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span className="badge badge-approved" style={{ fontSize: '11px', height: '20px', padding: '0 6px', borderRadius: '4px', fontWeight: 500 }}>Etapa Final</span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Confirmação de Fila</span>
+                        <span className="badge badge-approved" style={{ fontSize: '11px', height: '20px', padding: '0 6px', borderRadius: '4px', fontWeight: 600 }}>Etapa Final</span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Confirmação de Transmissão</span>
                     </div>
                     <h2 style={{ fontSize: '18px', fontWeight: 600, marginTop: '4px', margin: '4px 0 0 0', color: 'var(--text-main)', letterSpacing: '-0.01em' }}>
-                        Confirmar Envio para a Fila Redis
+                        Revisar & Enfileirar Disparos no Redis
                     </h2>
                     <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                        Os disparos serão enfileirados e enviados sequencialmente pelo worker via Infobip.
+                        Os disparos serão enfileirados e enviados sequencialmente pelo worker via Infobip com as variáveis e mídia mapeadas.
                     </p>
                 </div>
 
@@ -260,13 +272,65 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                             </div>
 
                             <div className="glass-card" style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
-                                <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Conta Destino</span>
-                                <strong style={{ fontSize: '14px', color: 'var(--text-main)', display: 'block', marginTop: '2px', fontWeight: 600 }}>BM do Luiz</strong>
+                                <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Variáveis</span>
+                                <strong style={{ fontSize: '16px', color: '#0284c7', display: 'block', marginTop: '2px', fontWeight: 600 }}>
+                                    {mappings.length} {mappings.length === 1 ? 'Variável' : 'Variáveis'}
+                                </strong>
+                            </div>
+
+                            <div className="glass-card" style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                                <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cabeçalho</span>
+                                <strong style={{ fontSize: '14px', color: requiresImage ? '#0369a1' : 'var(--text-main)', display: 'block', marginTop: '2px', fontWeight: 600 }}>
+                                    {requiresImage ? '🖼️ Imagem' : 'Nenhum (Texto)'}
+                                </strong>
                             </div>
                         </div>
 
+                        {/* BLOCO DE VALIDAÇÃO DE IMAGEM ORIGINAL SE OBRIGATÓRIA */}
+                        {requiresImage && (
+                            <div style={{
+                                background: isImageMissing ? '#fffbeb' : '#f0f9ff',
+                                border: isImageMissing ? '1.5px solid #f59e0b' : '1px solid #bae6fd',
+                                borderRadius: '8px',
+                                padding: '12px 14px',
+                                marginBottom: '14px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <ImageIcon size={15} color={isImageMissing ? '#d97706' : '#0284c7'} />
+                                        <strong style={{ fontSize: '13px', color: isImageMissing ? '#92400e' : '#0369a1' }}>
+                                            URL da Imagem Original (Cabeçalho da Infobip)
+                                        </strong>
+                                    </div>
+                                    {isImageMissing && (
+                                        <span style={{ fontSize: '10.5px', background: '#fef3c7', color: '#b45309', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                            Obrigatório
+                                        </span>
+                                    )}
+                                </div>
+
+                                <input 
+                                    type="url"
+                                    placeholder="https://exemplo.com/imagem-original.jpg"
+                                    className="form-input"
+                                    value={currentMediaUrl}
+                                    onChange={(e) => setCurrentMediaUrl(e.target.value)}
+                                    style={{ width: '100%', height: '34px', fontSize: '12.5px', borderRadius: '6px' }}
+                                />
+
+                                {currentMediaUrl && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', fontSize: '11.5px' }}>
+                                        <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ Imagem configurada</span>
+                                        <a href={currentMediaUrl} target="_blank" rel="noreferrer" style={{ color: '#0284c7', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                            Abrir link <ExternalLink size={10} />
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Remetentes Allocation Table */}
-                        <div className="glass-card" style={{ padding: '12px', marginBottom: '14px', maxHeight: '160px', overflowY: 'auto', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                        <div className="glass-card" style={{ padding: '12px', marginBottom: '14px', maxHeight: '140px', overflowY: 'auto', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
                             <h4 style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em', margin: '0 0 6px 0' }}>
                                 Distribuição de Cargas por Remetente
                             </h4>
@@ -296,17 +360,18 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                         {sampleMessage && (
                             <div style={{ marginBottom: '14px' }}>
                                 <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                    Amostra do Payload (1º Contato):
+                                    Amostra do Payload Infobip (1º Contato):
                                 </span>
                                 <pre style={{
                                     background: '#0f172a',
                                     padding: '10px 12px',
                                     borderRadius: '6px',
-                                    fontSize: '12px',
+                                    fontSize: '11.5px',
                                     fontFamily: 'monospace',
                                     color: '#cbd5e1',
                                     overflowX: 'auto',
-                                    margin: 0
+                                    margin: 0,
+                                    maxHeight: '140px'
                                 }}>
                                     {JSON.stringify({
                                         from: sampleMessage.from,
@@ -403,8 +468,9 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                             <button 
                                 className="btn-primary" 
                                 onClick={handleConfirmDispatch} 
-                                disabled={isEnqueuing || totalAllocated === 0}
+                                disabled={isEnqueuing || totalAllocated === 0 || isImageMissing}
                                 style={{ height: '36px', padding: '0 16px', fontSize: '13px', borderRadius: '6px' }}
+                                title={isImageMissing ? 'Insira a URL da Imagem Original antes de continuar' : 'Iniciar disparo'}
                             >
                                 <Send size={14} />
                                 {isEnqueuing ? 'Enfileirando...' : 'Iniciar Envio para o Redis'}
