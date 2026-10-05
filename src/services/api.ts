@@ -47,11 +47,39 @@ export function parseInfobipErrorDiagnostic(payload: any, fallbackMessage = 'Err
         description = firstMsg.error.description || (typeof firstMsg.error === 'string' ? firstMsg.error : '');
     }
 
-    // 2. RequestError da Infobip (ServiceException)
-    if (!description && raw.requestError?.serviceException) {
-        const sexc = raw.requestError.serviceException;
+    // 2. RequestError da Infobip (ServiceException e validationErrors)
+    const sexc = raw.requestError?.serviceException;
+    if (sexc) {
         code = sexc.messageId || 'SERVICE_EXCEPTION';
         description = sexc.text || '';
+
+        // Inspecionar validationErrors (ex: placeholders[1]: ["must not be empty"])
+        const valErrors = sexc.validationErrors;
+        if (valErrors && typeof valErrors === 'object') {
+            const errorKeys = Object.keys(valErrors);
+            if (errorKeys.length > 0) {
+                const details: string[] = [];
+                for (const k of errorKeys) {
+                    const msgs = Array.isArray(valErrors[k]) ? valErrors[k].join(', ') : String(valErrors[k]);
+                    const matchPlaceholder = k.match(/placeholders\[(\d+)\]/);
+                    if (matchPlaceholder) {
+                        const varIdx = parseInt(matchPlaceholder[1], 10) + 1;
+                        if (msgs.includes('must not be empty')) {
+                            details.push(`A variável {{${varIdx}}} não pode estar vazia (obrigatória no template).`);
+                        } else {
+                            details.push(`Variável {{${varIdx}}}: ${msgs}`);
+                        }
+                    } else if (k.includes('header') || k.includes('mediaUrl')) {
+                        details.push(`Cabeçalho/Imagem: ${msgs}`);
+                    } else {
+                        details.push(`${k}: ${msgs}`);
+                    }
+                }
+                if (details.length > 0) {
+                    description = details.join(' ');
+                }
+            }
+        }
     }
 
     // 3. Objeto error na raiz

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Database, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Smartphone, Send, Image as ImageIcon, ExternalLink } from 'lucide-react';
+import { X, Database, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Smartphone, Send, Image as ImageIcon, ExternalLink, Type } from 'lucide-react';
 import { SenderConfig, ParsedContact, PlaceholderMapping, InfobipQueueMessage } from '../types';
 import { api } from '../services/api';
 import { excelService } from '../services/excelService';
@@ -29,6 +29,9 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
     const [isDone, setIsDone] = useState(false);
     const [selectedRateLimit, setSelectedRateLimit] = useState(0.5);
     const [currentMediaUrl, setCurrentMediaUrl] = useState(initialMediaUrl || '');
+    const [localMappings, setLocalMappings] = useState<PlaceholderMapping[]>(() => {
+        return mappings.map(m => ({ ...m }));
+    });
 
     // Compute partitions
     const partitionedSenders = excelService.partitionContacts(contacts, senders);
@@ -38,6 +41,17 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
     // Detectar se algum remetente ativo exige cabeçalho de imagem
     const requiresImage = activePartitions.some(s => s.headerType === 'IMAGE');
     const isImageMissing = requiresImage && !currentMediaUrl.trim() && !activePartitions.some(s => s.mediaUrl);
+
+    // Detectar se alguma variável está completamente sem preenchimento
+    const unconfiguredVariables = localMappings.filter(m => {
+        if (m.type === 'fixed') return !m.fixedValue || !m.fixedValue.trim();
+        if (m.type === 'column') return !m.columnName;
+        return false;
+    });
+
+    const updateLocalMapping = (id: number, updates: Partial<PlaceholderMapping>) => {
+        setLocalMappings(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    };
 
     // Build all queue messages
     const buildMessages = (): InfobipQueueMessage[] => {
@@ -49,13 +63,23 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
             const effectiveMediaUrl = s.mediaUrl || currentMediaUrl || '';
 
             contactsList.forEach(c => {
-                const placeholders = mappings.map(m => {
+                const placeholders = localMappings.map((m, idx) => {
+                    let val = '';
                     if (m.type === 'column') {
-                        if (m.columnName === 'nome') return c.nome || 'Cliente';
-                        if (m.columnName === 'telefone') return c.telefone;
-                        return c[m.columnName] || '';
+                        if (m.columnName === 'nome') val = c.nome || 'Cliente';
+                        else if (m.columnName === 'telefone') val = c.telefone;
+                        else val = c[m.columnName] || '';
+                    } else {
+                        val = m.fixedValue || '';
                     }
-                    return m.fixedValue || '';
+
+                    // Proteção contra erro 'must not be empty' da Infobip/Meta:
+                    // Se o valor estiver vazio, aplicar fallback seguro e nunca enviar string vazia
+                    if (!val || !val.trim()) {
+                        val = m.fixedValue?.trim() || (m.type === 'column' ? (c.nome || 'Cliente') : `Valor ${idx + 1}`);
+                    }
+
+                    return val.trim();
                 });
 
                 const templateData: any = {};
@@ -89,6 +113,12 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
 
         if (isImageMissing) {
             setErrorMsg('O template selecionado requer cabeçalho de Imagem. Por favor, insira a URL da Imagem Original abaixo antes de enviar.');
+            return;
+        }
+
+        if (unconfiguredVariables.length > 0) {
+            const varsList = unconfiguredVariables.map(v => `{{${v.id}}}`).join(', ');
+            setErrorMsg(`Atenção: A variável ${varsList} está vazia. O WhatsApp rejeita o envio de templates com variáveis vazias ("must not be empty"). Preencha abaixo.`);
             return;
         }
 
@@ -274,7 +304,7 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                             <div className="glass-card" style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
                                 <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Variáveis</span>
                                 <strong style={{ fontSize: '16px', color: '#0284c7', display: 'block', marginTop: '2px', fontWeight: 600 }}>
-                                    {mappings.length} {mappings.length === 1 ? 'Variável' : 'Variáveis'}
+                                    {localMappings.length} {localMappings.length === 1 ? 'Variável' : 'Variáveis'}
                                 </strong>
                             </div>
 
@@ -285,6 +315,53 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                                 </strong>
                             </div>
                         </div>
+
+                        {/* BLOCO DE VALIDAÇÃO DE VARIÁVEIS PENDENTES */}
+                        {unconfiguredVariables.length > 0 && (
+                            <div style={{
+                                background: '#fffbeb',
+                                border: '1.5px solid #f59e0b',
+                                borderRadius: '8px',
+                                padding: '12px 14px',
+                                marginBottom: '14px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                                    <AlertTriangle size={15} color="#d97706" />
+                                    <strong style={{ fontSize: '13px', color: '#92400e' }}>
+                                        Variáveis Obrigatórias Pendentes ({unconfiguredVariables.length})
+                                    </strong>
+                                </div>
+                                <p style={{ fontSize: '12px', color: '#78350f', margin: '0 0 10px 0' }}>
+                                    A Meta/Infobip rejeita mensagens com variáveis vazias (<code>must not be empty</code>). Preencha o valor fixo abaixo:
+                                </p>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {unconfiguredVariables.map(v => (
+                                        <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ 
+                                                background: '#0284c7', 
+                                                color: '#fff', 
+                                                padding: '2px 6px', 
+                                                borderRadius: '4px', 
+                                                fontFamily: 'monospace', 
+                                                fontSize: '11.5px', 
+                                                fontWeight: 700 
+                                            }}>
+                                                {`{{${v.id}}}`}
+                                            </span>
+                                            <input 
+                                                type="text"
+                                                placeholder={`Digite o valor fixo para a variável {{${v.id}}}...`}
+                                                className="form-input"
+                                                value={v.fixedValue || ''}
+                                                onChange={(e) => updateLocalMapping(v.id, { type: 'fixed', fixedValue: e.target.value })}
+                                                style={{ flex: 1, height: '32px', fontSize: '12.5px', borderRadius: '6px' }}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* BLOCO DE VALIDAÇÃO DE IMAGEM ORIGINAL SE OBRIGATÓRIA */}
                         {requiresImage && (
@@ -468,9 +545,9 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                             <button 
                                 className="btn-primary" 
                                 onClick={handleConfirmDispatch} 
-                                disabled={isEnqueuing || totalAllocated === 0 || isImageMissing}
+                                disabled={isEnqueuing || totalAllocated === 0 || isImageMissing || unconfiguredVariables.length > 0}
                                 style={{ height: '36px', padding: '0 16px', fontSize: '13px', borderRadius: '6px' }}
-                                title={isImageMissing ? 'Insira a URL da Imagem Original antes de continuar' : 'Iniciar disparo'}
+                                title={isImageMissing ? 'Insira a URL da Imagem Original antes de continuar' : unconfiguredVariables.length > 0 ? 'Preencha as variáveis pendentes' : 'Iniciar disparo'}
                             >
                                 <Send size={14} />
                                 {isEnqueuing ? 'Enfileirando...' : 'Iniciar Envio para o Redis'}
