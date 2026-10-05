@@ -53,12 +53,14 @@ export const DispatchRecords: React.FC = () => {
     // Hover Tooltip State
     const [hoveredRecordId, setHoveredRecordId] = useState<string | null>(null);
 
+    const pollCountRef = useRef(0);
+
     // Initial load & Polling
     useEffect(() => {
-        loadRecords();
+        loadRecords(true);
 
         if (autoRefresh) {
-            timerRef.current = setInterval(loadRecords, 3000);
+            timerRef.current = setInterval(() => loadRecords(false), 3000);
         }
 
         return () => {
@@ -66,8 +68,14 @@ export const DispatchRecords: React.FC = () => {
         };
     }, [autoRefresh]);
 
-    const loadRecords = async () => {
+    const loadRecords = async (triggerDlrImmediate = false) => {
         try {
+            pollCountRef.current++;
+            // Sincroniza DLR com a Infobip imediatamente na carga ou a cada 2 ciclos (6s)
+            if (triggerDlrImmediate || (pollCountRef.current % 2 === 0)) {
+                await api.syncDeliveryReports().catch(() => {});
+            }
+
             // 1. Logs oficiais do servidor (Postgres + Redis com relatórios da Infobip)
             const serverLogs = await api.getDispatchLogs();
             
