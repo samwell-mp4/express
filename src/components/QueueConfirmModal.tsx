@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Database, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Smartphone, Send, Image as ImageIcon, ExternalLink, Type } from 'lucide-react';
+import { X, Database, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Smartphone, Send, Image as ImageIcon, ExternalLink, Type, FileText } from 'lucide-react';
 import { SenderConfig, ParsedContact, PlaceholderMapping, InfobipQueueMessage } from '../types';
 import { api } from '../services/api';
 import { excelService } from '../services/excelService';
