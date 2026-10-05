@@ -381,7 +381,11 @@ function postJson(host, reqPath, key, bodyData) {
       resp.on('data', chunk => data += chunk);
       resp.on('end', () => {
         try {
-          resolve(JSON.parse(data));
+          const parsed = JSON.parse(data);
+          if (resp.statusCode && resp.statusCode >= 400 && typeof parsed === 'object') {
+            parsed.statusCode = resp.statusCode;
+          }
+          resolve(parsed);
         } catch {
           resolve({ raw: data, statusCode: resp.statusCode });
         }
@@ -594,7 +598,14 @@ async function runDispatchWorker() {
 
         const firstMsg = res?.messages?.[0];
         const statusGroup = firstMsg?.status?.groupName;
-        if (statusGroup === 'REJECTED' || statusGroup === 'UNDELIVERABLE' || res?.requestError) {
+        if (
+          res?.statusCode >= 400 ||
+          statusGroup === 'REJECTED' || 
+          statusGroup === 'UNDELIVERABLE' || 
+          res?.requestError ||
+          res?.error ||
+          res?.errorMessage
+        ) {
           logType = 'ERROR';
         }
       } catch (sendErr) {

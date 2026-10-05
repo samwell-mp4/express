@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
     Activity, CheckCircle2, Clock, AlertTriangle, RefreshCw, 
     Search, Filter, Smartphone, Trash2, ArrowUpRight, Send, Check, 
-    Radio, ShieldCheck, Download, ExternalLink, Zap
+    Radio, ShieldCheck, Download, ExternalLink, Zap, Copy, X, Info, FileText
 } from 'lucide-react';
 import { DispatchRecord } from '../types';
-import { api } from '../services/api';
+import { api, parseInfobipErrorDiagnostic, DiagnosticError } from '../services/api';
 
 export const DispatchRecords: React.FC = () => {
     const [records, setRecords] = useState<DispatchRecord[]>([]);
@@ -14,6 +14,13 @@ export const DispatchRecords: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'DELIVERED' | 'SENT' | 'FAILED'>('ALL');
     const timerRef = useRef<any>(null);
+
+    // Modal de Log de Falha
+    const [selectedRecordForLog, setSelectedRecordForLog] = useState<DispatchRecord | null>(null);
+    const [copiedLog, setCopiedLog] = useState(false);
+
+    // Hover Tooltip State
+    const [hoveredRecordId, setHoveredRecordId] = useState<string | null>(null);
 
     // Initial load & Polling
     useEffect(() => {
@@ -56,6 +63,12 @@ export const DispatchRecords: React.FC = () => {
         if (!window.confirm('Deseja limpar todos os registros locais de envios?')) return;
         localStorage.removeItem('express_live_dispatch_records');
         setRecords([]);
+    };
+
+    const handleCopyLog = (text: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedLog(true);
+        setTimeout(() => setCopiedLog(false), 2000);
     };
 
     // Filtered records
@@ -201,9 +214,9 @@ export const DispatchRecords: React.FC = () => {
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Mensagens registradas</span>
                 </div>
 
-                {/* Entregues */}
+                {/* Delivered */}
                 <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
-                    <span style={{ fontSize: '11px', color: '#16A34A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
                         Entregues
                     </span>
                     <strong style={{ fontSize: '20px', fontWeight: 600, color: '#16A34A', display: 'block', margin: '4px 0 2px' }}>
@@ -212,9 +225,9 @@ export const DispatchRecords: React.FC = () => {
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Confirmados pela Meta</span>
                 </div>
 
-                {/* Enviados / Em Rota */}
+                {/* Sent / In Route */}
                 <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
-                    <span style={{ fontSize: '11px', color: '#2563EB', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
                         Em Rota
                     </span>
                     <strong style={{ fontSize: '20px', fontWeight: 600, color: '#2563EB', display: 'block', margin: '4px 0 2px' }}>
@@ -223,27 +236,27 @@ export const DispatchRecords: React.FC = () => {
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Aguardando confirmação</span>
                 </div>
 
-                {/* Falhas */}
+                {/* Failed */}
                 <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
-                    <span style={{ fontSize: '11px', color: '#DC2626', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
                         Falhas / Rejeitados
                     </span>
                     <strong style={{ fontSize: '20px', fontWeight: 600, color: '#DC2626', display: 'block', margin: '4px 0 2px' }}>
                         {failedCount}
                     </strong>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Erros de número ou limite</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Erros de número ou template</span>
                 </div>
 
-                {/* Taxa de Entrega */}
+                {/* Delivery Rate */}
                 <div style={{ background: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '14px 16px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
                         Taxa de Entrega
                     </span>
-                    <strong style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-main)', display: 'block', margin: '4px 0 6px' }}>
+                    <strong style={{ fontSize: '20px', fontWeight: 600, color: successRate >= 80 ? '#16A34A' : '#DC2626', display: 'block', margin: '4px 0 2px' }}>
                         {successRate}%
                     </strong>
-                    <div style={{ width: '100%', height: '4px', background: '#E5E7EB', borderRadius: '2px', overflow: 'hidden' }}>
-                        <div style={{ width: `${successRate}%`, height: '100%', background: '#16A34A', borderRadius: '2px' }} />
+                    <div style={{ height: '4px', background: '#F3F4F6', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
+                        <div style={{ height: '100%', width: `${successRate}%`, background: successRate >= 80 ? '#16A34A' : '#DC2626' }} />
                     </div>
                 </div>
 
@@ -261,42 +274,31 @@ export const DispatchRecords: React.FC = () => {
                 flexWrap: 'wrap',
                 gap: '12px'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '240px' }}>
-                    <Search size={15} color="var(--text-dim)" />
+                <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+                    <Search size={14} color="var(--text-dim)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
                     <input 
                         type="text"
                         placeholder="Buscar destinatário, remetente ou template..."
+                        className="form-input"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{
-                            height: '34px',
-                            border: '1px solid #D1D5DB',
-                            borderRadius: '6px',
-                            background: '#FFFFFF',
-                            padding: '0 12px',
-                            fontSize: '13px',
-                            width: '100%',
-                            maxWidth: '440px',
-                            color: 'var(--text-main)'
-                        }}
+                        style={{ height: '34px', paddingLeft: '32px', fontSize: '12.5px', borderRadius: '6px', width: '100%' }}
                     />
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Filter size={14} color="var(--text-muted)" />
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Status:</span>
-                    <select
+                    <Filter size={13} color="var(--text-dim)" />
+                    <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontWeight: 500 }}>Status:</span>
+                    <select 
+                        className="form-select"
                         value={statusFilter}
                         onChange={(e: any) => setStatusFilter(e.target.value)}
                         style={{
                             height: '34px',
-                            border: '1px solid #D1D5DB',
+                            fontSize: '12.5px',
                             borderRadius: '6px',
-                            background: '#FFFFFF',
                             padding: '0 10px',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            color: 'var(--text-main)'
+                            minWidth: '120px'
                         }}
                     >
                         <option value="ALL">Todos ({records.length})</option>
@@ -329,7 +331,7 @@ export const DispatchRecords: React.FC = () => {
                     background: '#FFFFFF',
                     border: '1px solid var(--border-subtle)',
                     borderRadius: '8px',
-                    overflow: 'hidden'
+                    overflow: 'visible'
                 }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
                         <thead>
@@ -346,6 +348,8 @@ export const DispatchRecords: React.FC = () => {
                             {filteredRecords.map((r, i) => {
                                 const timeStr = new Date(r.timestamp).toLocaleTimeString('pt-BR');
                                 const dateStr = new Date(r.timestamp).toLocaleDateString('pt-BR');
+                                const diagnostic = r.status === 'FAILED' ? parseInfobipErrorDiagnostic(r.rawPayload, r.errorReason) : null;
+                                const isHovered = hoveredRecordId === r.id;
 
                                 return (
                                     <tr key={r.id || i} style={{ borderBottom: '1px solid #F3F4F6', transition: 'background 0.15s' }}>
@@ -373,8 +377,8 @@ export const DispatchRecords: React.FC = () => {
                                             {r.templateName || '—'}
                                         </td>
 
-                                        {/* Status Badge */}
-                                        <td style={{ padding: '10px 14px' }}>
+                                        {/* Status Badge com Hover Tooltip & Popup de Log */}
+                                        <td style={{ padding: '10px 14px', position: 'relative' }}>
                                             {r.status === 'DELIVERED' ? (
                                                 <span style={{
                                                     background: '#ECFDF5',
@@ -408,25 +412,107 @@ export const DispatchRecords: React.FC = () => {
                                                     ENVIADO
                                                 </span>
                                             ) : (
-                                                <span 
-                                                    title={r.errorReason || 'Erro retornado pela API da Infobip/Meta'}
-                                                    style={{
-                                                        background: '#FEF2F2',
-                                                        color: '#B91C1C',
-                                                        border: '1px solid #FECACA',
-                                                        padding: '2px 8px',
-                                                        borderRadius: '4px',
-                                                        fontSize: '11px',
-                                                        fontWeight: 600,
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '4px',
-                                                        cursor: 'help'
-                                                    }}
+                                                /* BADGE DE FALHA INTERATIVO */
+                                                <div 
+                                                    style={{ position: 'relative', display: 'inline-block' }}
+                                                    onMouseEnter={() => setHoveredRecordId(r.id)}
+                                                    onMouseLeave={() => setHoveredRecordId(null)}
                                                 >
-                                                    <AlertTriangle size={11} />
-                                                    FALHA
-                                                </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedRecordForLog(r)}
+                                                        style={{
+                                                            background: '#FEF2F2',
+                                                            color: '#B91C1C',
+                                                            border: '1px solid #FECACA',
+                                                            padding: '3px 8px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 600,
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '5px',
+                                                            cursor: 'pointer',
+                                                            boxShadow: '0 1px 2px rgba(220, 38, 38, 0.08)',
+                                                            transition: 'all 0.15s ease'
+                                                        }}
+                                                        title="Clique para ver o log completo da falha"
+                                                    >
+                                                        <AlertTriangle size={11} color="#DC2626" />
+                                                        <span>FALHA</span>
+                                                        <Info size={11} color="#EF4444" style={{ marginLeft: '1px', opacity: 0.8 }} />
+                                                    </button>
+
+                                                    {/* Resumo do motivo logo abaixo do badge */}
+                                                    {diagnostic && (
+                                                        <div 
+                                                            onClick={() => setSelectedRecordForLog(r)}
+                                                            style={{
+                                                                fontSize: '10.5px',
+                                                                color: '#DC2626',
+                                                                marginTop: '2px',
+                                                                maxWidth: '160px',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                whiteSpace: 'nowrap',
+                                                                cursor: 'pointer',
+                                                                fontWeight: 500
+                                                            }}
+                                                            title={diagnostic.description}
+                                                        >
+                                                            {diagnostic.title !== 'Erro na Transmissão' ? diagnostic.title : diagnostic.description}
+                                                        </div>
+                                                    )}
+
+                                                    {/* HOVER TOOLTIP FLUTUANTE */}
+                                                    {isHovered && diagnostic && (
+                                                        <div style={{
+                                                            position: 'absolute',
+                                                            bottom: '100%',
+                                                            left: '0',
+                                                            marginBottom: '8px',
+                                                            background: '#1e293b',
+                                                            color: '#f8fafc',
+                                                            padding: '10px 14px',
+                                                            borderRadius: '8px',
+                                                            fontSize: '12px',
+                                                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
+                                                            zIndex: 9999,
+                                                            minWidth: '260px',
+                                                            maxWidth: '340px',
+                                                            pointerEvents: 'none',
+                                                            border: '1px solid #334155',
+                                                            lineHeight: '1.4'
+                                                        }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                                                <AlertTriangle size={13} color="#f87171" />
+                                                                <strong style={{ color: '#fca5a5', fontSize: '12.5px' }}>
+                                                                    {diagnostic.title}
+                                                                </strong>
+                                                            </div>
+                                                            <div style={{ color: '#e2e8f0', fontSize: '11.5px', marginBottom: '6px' }}>
+                                                                {diagnostic.description}
+                                                            </div>
+                                                            {diagnostic.code && (
+                                                                <div style={{ 
+                                                                    fontFamily: 'monospace', 
+                                                                    fontSize: '10.5px', 
+                                                                    color: '#94a3b8', 
+                                                                    background: '#0f172a', 
+                                                                    padding: '2px 6px', 
+                                                                    borderRadius: '4px',
+                                                                    display: 'inline-block',
+                                                                    marginBottom: '6px'
+                                                                }}>
+                                                                    Código: {diagnostic.code}
+                                                                </div>
+                                                            )}
+                                                            <div style={{ fontSize: '10.5px', color: '#38bdf8', borderTop: '1px solid #334155', paddingTop: '4px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                <span>💡 Clique no botão para abrir o relatório completo</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                         </td>
 
@@ -441,6 +527,248 @@ export const DispatchRecords: React.FC = () => {
                     </table>
                 </div>
             )}
+
+            {/* ======================================================== */}
+            {/* MODAL POPUP: DIAGNÓSTICO DO DISPARO & LOG DA FALHA      */}
+            {/* ======================================================== */}
+            {selectedRecordForLog && (() => {
+                const r = selectedRecordForLog;
+                const diag = parseInfobipErrorDiagnostic(r.rawPayload, r.errorReason);
+                const rawJsonString = typeof r.rawPayload === 'string' 
+                    ? r.rawPayload 
+                    : JSON.stringify(r.rawPayload || { error: r.errorReason || 'Erro no envio' }, null, 2);
+
+                return (
+                    <div style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(15, 23, 42, 0.5)',
+                        backdropFilter: 'blur(3px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1300,
+                        padding: '16px'
+                    }}>
+                        <div className="glass-panel" style={{
+                            width: '100%',
+                            maxWidth: '680px',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
+                            background: '#ffffff',
+                            borderRadius: '10px',
+                            border: '1px solid var(--border-subtle)',
+                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                            padding: '24px',
+                            position: 'relative'
+                        }}>
+                            {/* Close Button */}
+                            <button
+                                onClick={() => setSelectedRecordForLog(null)}
+                                style={{
+                                    position: 'absolute',
+                                    top: '18px',
+                                    right: '18px',
+                                    background: '#f1f5f9',
+                                    border: 'none',
+                                    color: 'var(--text-muted)',
+                                    width: '30px',
+                                    height: '30px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <X size={16} />
+                            </button>
+
+                            {/* Header */}
+                            <div style={{ marginBottom: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                    <span style={{
+                                        background: '#FEF2F2',
+                                        color: '#B91C1C',
+                                        border: '1px solid #FECACA',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '11px',
+                                        fontWeight: 700,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}>
+                                        <AlertTriangle size={11} /> FALHA NO DISPARO
+                                    </span>
+                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                        {new Date(r.timestamp).toLocaleString('pt-BR')}
+                                    </span>
+                                </div>
+                                <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)', margin: 0, letterSpacing: '-0.01em' }}>
+                                    Diagnóstico & Detalhes da Falha
+                                </h3>
+                                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                                    Informações detalhadas retornadas pelo servidor da Infobip/Meta para este destinatário.
+                                </p>
+                            </div>
+
+                            {/* CARTÃO DE DIAGNÓSTICO EM DESTAQUE */}
+                            <div style={{
+                                background: '#FEF2F2',
+                                border: '1.5px solid #F87171',
+                                borderRadius: '8px',
+                                padding: '14px 16px',
+                                marginBottom: '16px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                    <div style={{
+                                        background: '#FEE2E2',
+                                        color: '#DC2626',
+                                        width: '28px',
+                                        height: '28px',
+                                        borderRadius: '6px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0,
+                                        marginTop: '2px'
+                                    }}>
+                                        <AlertTriangle size={16} />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                            <strong style={{ fontSize: '14px', color: '#991B1B' }}>
+                                                {diag.title}
+                                            </strong>
+                                            {diag.code && (
+                                                <span style={{
+                                                    fontFamily: 'monospace',
+                                                    fontSize: '11px',
+                                                    background: '#ffffff',
+                                                    border: '1px solid #FECACA',
+                                                    color: '#B91C1C',
+                                                    padding: '1px 6px',
+                                                    borderRadius: '4px',
+                                                    fontWeight: 600
+                                                }}>
+                                                    {diag.code}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p style={{ fontSize: '13px', color: '#7F1D1D', margin: '4px 0 0 0', lineHeight: '1.4' }}>
+                                            {diag.description}
+                                        </p>
+
+                                        {/* Sugestão de resolução */}
+                                        {diag.suggestion && (
+                                            <div style={{
+                                                marginTop: '8px',
+                                                paddingTop: '8px',
+                                                borderTop: '1px dashed #FCA5A5',
+                                                fontSize: '12px',
+                                                color: '#991B1B',
+                                                display: 'flex',
+                                                alignItems: 'flex-start',
+                                                gap: '6px'
+                                            }}>
+                                                <span style={{ fontWeight: 600 }}>💡 Como resolver:</span>
+                                                <span>{diag.suggestion}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* TABELA DE DADOS DO DISPARO */}
+                            <div style={{
+                                background: '#F8FAFC',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: '8px',
+                                padding: '12px 14px',
+                                marginBottom: '16px',
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '10px',
+                                fontSize: '12.5px'
+                            }}>
+                                <div>
+                                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Destinatário:</span>
+                                    <strong style={{ fontFamily: 'monospace', color: 'var(--text-main)', fontSize: '13.5px' }}>{r.recipient}</strong>
+                                </div>
+                                <div>
+                                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Remetente (WABA):</span>
+                                    <strong style={{ fontFamily: 'monospace', color: 'var(--text-main)', fontSize: '13px' }}>{r.senderNumber || '—'}</strong>
+                                </div>
+                                <div>
+                                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Template Escolhido:</span>
+                                    <strong style={{ color: 'var(--text-main)' }}>{r.templateName || '—'}</strong>
+                                </div>
+                                <div>
+                                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>ID da Mensagem / Tx:</span>
+                                    <span style={{ fontFamily: 'monospace', color: 'var(--text-dim)', fontSize: '11.5px' }}>{r.messageId || r.transmissionId || '—'}</span>
+                                </div>
+                            </div>
+
+                            {/* RESPOSTA TÉCNICA BRUTA (JSON) */}
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                    <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <FileText size={12} /> Resposta Bruta da API Infobip (JSON):
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCopyLog(rawJsonString)}
+                                        style={{
+                                            background: '#f1f5f9',
+                                            border: '1px solid #cbd5e1',
+                                            color: 'var(--text-main)',
+                                            padding: '3px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        {copiedLog ? <Check size={11} color="#16a34a" /> : <Copy size={11} />}
+                                        {copiedLog ? 'Copiado!' : 'Copiar JSON'}
+                                    </button>
+                                </div>
+
+                                <pre style={{
+                                    background: '#0f172a',
+                                    color: '#f8fafc',
+                                    padding: '12px',
+                                    borderRadius: '6px',
+                                    fontSize: '11.5px',
+                                    fontFamily: 'monospace',
+                                    maxHeight: '180px',
+                                    overflowY: 'auto',
+                                    margin: 0,
+                                    border: '1px solid #334155',
+                                    lineHeight: '1.4'
+                                }}>
+                                    {rawJsonString}
+                                </pre>
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '18px' }}>
+                                <button
+                                    className="btn-primary"
+                                    onClick={() => setSelectedRecordForLog(null)}
+                                    style={{ height: '34px', padding: '0 16px', fontSize: '13px', borderRadius: '6px' }}
+                                >
+                                    Fechar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
         </div>
     );

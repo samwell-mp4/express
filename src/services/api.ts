@@ -7,6 +7,116 @@ export const LUIS_BASE = INFOBIP_BASE;
 
 export const TRIAGE_WEBHOOK_URL = 'https://plug-sales-dispatch-app-n8n-2.hx8235.easypanel.host/webhook/a2d2ee02-2bdf-4f5c-a1b6-a0cd43b128ed';
 
+export interface DiagnosticError {
+    title: string;
+    description: string;
+    code?: string;
+    rawText: string;
+    suggestion?: string;
+}
+
+export function parseInfobipErrorDiagnostic(payload: any, fallbackMessage = 'Erro no envio'): DiagnosticError {
+    if (!payload) {
+        return {
+            title: 'Falha no Envio',
+            description: fallbackMessage,
+            rawText: fallbackMessage
+        };
+    }
+
+    let raw = payload;
+    if (typeof payload === 'string') {
+        try {
+            raw = JSON.parse(payload);
+        } catch {
+            raw = { error: payload };
+        }
+    }
+
+    let code = '';
+    let description = '';
+    let suggestion = '';
+
+    // 1. Mensagem Infobip (Array messages)
+    const firstMsg = raw.messages?.[0];
+    if (firstMsg?.status) {
+        code = firstMsg.status.name || firstMsg.status.groupName || '';
+        description = firstMsg.status.description || '';
+    } else if (firstMsg?.error) {
+        code = firstMsg.error.name || '';
+        description = firstMsg.error.description || (typeof firstMsg.error === 'string' ? firstMsg.error : '');
+    }
+
+    // 2. RequestError da Infobip (ServiceException)
+    if (!description && raw.requestError?.serviceException) {
+        const sexc = raw.requestError.serviceException;
+        code = sexc.messageId || 'SERVICE_EXCEPTION';
+        description = sexc.text || '';
+    }
+
+    // 3. Objeto error na raiz
+    if (!description && raw.error) {
+        if (typeof raw.error === 'string') {
+            description = raw.error;
+        } else if (typeof raw.error === 'object') {
+            code = raw.error.name || raw.error.code || '';
+            description = raw.error.description || raw.error.message || '';
+        }
+    }
+
+    // 4. Outros campos padrão
+    if (!description && raw.description) description = raw.description;
+    if (!description && raw.message) description = raw.message;
+    if (!description && raw.errorMessage) description = raw.errorMessage;
+
+    // Se ainda não encontrou e tem statusCode
+    if (!description && raw.statusCode) {
+        code = `HTTP_${raw.statusCode}`;
+        description = `Servidor da Infobip retornou erro HTTP ${raw.statusCode}`;
+    }
+
+    // Se nada encontrado
+    if (!description) {
+        description = fallbackMessage;
+    }
+
+    // Dicas e sugestões automáticas baseadas nos erros comuns da Meta/Infobip
+    const combinedLower = (code + ' ' + description).toLowerCase();
+
+    let title = 'Erro na Transmissão';
+
+    if (combinedLower.includes('not_enough_credits') || combinedLower.includes('saldo') || combinedLower.includes('credit')) {
+        title = 'Saldo Insuficiente';
+        suggestion = 'A conta Infobip está sem saldo de recarga para envio de mensagens WhatsApp. Recarregue a conta na Infobip.';
+    } else if (combinedLower.includes('unknown_template') || combinedLower.includes('template not found') || combinedLower.includes('template')) {
+        title = 'Template Inválido ou Não Aprovado';
+        suggestion = 'O nome do template ou o idioma não conferem com o modelo aprovado na Meta/Infobip para este remetente.';
+    } else if (combinedLower.includes('destination_not_registered') || combinedLower.includes('not registered') || combinedLower.includes('user not found')) {
+        title = 'Número Sem WhatsApp';
+        suggestion = 'O número de destino não possui uma conta ativa no WhatsApp ou bloqueou o recebimento de mensagens.';
+    } else if (combinedLower.includes('header media url is required') || combinedLower.includes('media url')) {
+        title = 'URL da Imagem Obrigatória';
+        suggestion = 'O template aprovado exige uma imagem válida no cabeçalho. Preencha o campo "URL da Imagem Original" na transmissão.';
+    } else if (combinedLower.includes('placeholder') || combinedLower.includes('variable') || combinedLower.includes('parameter')) {
+        title = 'Variáveis Incompatíveis';
+        suggestion = 'A quantidade de variáveis fornecidas não corresponde exatamente ao que o template aprovado exige (ex: esperado 4, enviado 2).';
+    } else if (combinedLower.includes('unauthorized') || combinedLower.includes('401') || combinedLower.includes('forbidden') || combinedLower.includes('403')) {
+        title = 'Falha de Autenticação da API';
+        suggestion = 'A chave de API (API Key) da Infobip ou URL de endpoint não tem permissão para disparar por esta WABA.';
+    } else if (combinedLower.includes('sender') || combinedLower.includes('from')) {
+        title = 'Remetente Não Autorizado';
+        suggestion = 'O número da WABA (remetente) não está devidamente associado à conta ou BM na Infobip.';
+    }
+
+    return {
+        title,
+        description,
+        code: code || undefined,
+        rawText: typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2),
+        suggestion: suggestion || undefined
+    };
+}
+
 export const api = {
     // Autenticação (Login Admin)
     async login(email: string, password: string): Promise<{ success: boolean; token?: string; user?: any; error?: string }> {
@@ -193,6 +303,11 @@ export const api = {
                 else if (isSuccess) recordStatus = 'SENT';
                 else if (r.log_type === 'ERROR') recordStatus = 'FAILED';
 
+                const diagnostic = !isSuccess ? parseInfobipErrorDiagnostic(parsedPayload) : null;
+                const finalErrorReason = diagnostic 
+                    ? (diagnostic.code ? `[${diagnostic.code}] ${diagnostic.description}` : diagnostic.description) 
+                    : undefined;
+
                 return {
                     id: String(r.id || r.transmission_id || Math.random()),
                     transmissionId: r.transmission_id,
@@ -202,7 +317,7 @@ export const api = {
                     templateName: r.message || '',
                     status: recordStatus,
                     messageId: r.transmission_id,
-                    errorReason: !isSuccess ? (parsedPayload?.error?.description || parsedPayload?.requestError?.serviceException?.text || 'Erro no envio') : undefined,
+                    errorReason: finalErrorReason,
                     rawPayload: parsedPayload
                 };
             });
