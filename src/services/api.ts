@@ -121,14 +121,50 @@ export function parseInfobipErrorDiagnostic(payload: any, fallbackMessage = 'Err
         description = fallbackMessage;
     }
 
-    // Dicas e sugestões automáticas baseadas nos erros comuns da Meta/Infobip
+    // Dicas e sugestões automáticas baseadas nos erros oficiais da Infobip / Meta (documentação oficial)
     const combinedLower = (code + ' ' + description).toLowerCase();
 
     let title = 'Erro na Transmissão';
 
-    if (combinedLower.includes('not_enough_credits') || combinedLower.includes('saldo') || combinedLower.includes('credit')) {
-        title = 'Saldo Insuficiente';
-        suggestion = 'A conta Infobip está sem saldo de recarga para envio de mensagens WhatsApp. Recarregue a conta na Infobip.';
+    if (combinedLower.includes('7016') || combinedLower.includes('ec_spam_rate') || combinedLower.includes('spam rate')) {
+        title = 'Limite de Spam Excedido (Meta)';
+        suggestion = 'Restrição de qualidade do remetente imposta pela Meta (EC_SPAM_RATE 7016). Reduza o ritmo de envio, pause a campanha ou rotacione para outra WABA.';
+    } else if (combinedLower.includes('7008') || combinedLower.includes('invalid_template_args') || combinedLower.includes('match template parameters')) {
+        title = 'Parâmetros do Template Incompatíveis (Meta)';
+        suggestion = 'A quantidade ou formato das variáveis {{1}}, {{2}}... não confere com o modelo aprovado na Meta (EC_INVALID_TEMPLATE_ARGS 7008).';
+    } else if (combinedLower.includes('7032') || combinedLower.includes('frequency_capping') || combinedLower.includes('frequency capping')) {
+        title = 'Limite de Frequência do Destinatário (Meta)';
+        suggestion = 'O destinatário já recebeu a cota máxima de mensagens promocionais nas últimas 24 horas permitida pela Meta (EC_FREQUENCY_CAPPING 7032).';
+    } else if (combinedLower.includes('7048') || combinedLower.includes('7046') || combinedLower.includes('daily_promo_quota') || combinedLower.includes('destination_message_quota')) {
+        title = 'Cota Promocional do Destinatário Atingida';
+        suggestion = 'O usuário atingiu o limite de mensagens de marketing recebidas hoje (EC_DESTINATION_DAILY_PROMO_QUOTA_REACHED).';
+    } else if (combinedLower.includes('not_enough_credits') || combinedLower.includes('rejected_not_enough_credits') || combinedLower.includes('saldo') || combinedLower.includes('credit')) {
+        title = 'Saldo Insuficiente na Infobip';
+        suggestion = 'A conta Infobip está sem saldo para envio (REJECTED_NOT_ENOUGH_CREDITS 12). Recarregue sua conta na Infobip.';
+    } else if (combinedLower.includes('unknown_subscriber') || combinedLower.includes('unidentified_subscriber') || combinedLower.includes('ec_unknown_subscriber')) {
+        title = 'Número Inexistente na Operadora';
+        suggestion = 'O número do destinatário não existe ou não está ativo na rede da operadora (EC_UNKNOWN_SUBSCRIBER 1).';
+    } else if (combinedLower.includes('absent_subscriber') || combinedLower.includes('ec_absent_subscriber')) {
+        title = 'Aparelho Desligado / Sem Sinal';
+        suggestion = 'O celular do destinatário estava desligado ou fora de área de cobertura da operadora (EC_ABSENT_SUBSCRIBER 6/27).';
+    } else if (combinedLower.includes('call_barred') || combinedLower.includes('ec_call_barred')) {
+        title = 'Linha Bloqueada pela Operadora';
+        suggestion = 'A operadora suspendeu o serviço do destinatário por bloqueio ou pendência de faturamento (EC_CALL_BARRED 13).';
+    } else if (combinedLower.includes('rejected_dnd') || combinedLower.includes('dnd')) {
+        title = 'Destinatário com Não Perturbe (DND)';
+        suggestion = 'O destinatário cadastrou o número no serviço Não Perturbe (DND), bloqueando mensagens em massa (REJECTED_DND 10).';
+    } else if (combinedLower.includes('flooding') || combinedLower.includes('rejected_flooding_filter')) {
+        title = 'Filtro Anti-Flooding Acionado';
+        suggestion = 'Envios muito rápidos para o mesmo destinatário foram bloqueados pelo filtro anti-flooding da Infobip (REJECTED_FLOODING_FILTER 20).';
+    } else if (combinedLower.includes('blocklisted') || combinedLower.includes('rejected_destination_blocklisted') || combinedLower.includes('rejected_sender')) {
+        title = 'Número ou Remetente em Blacklist';
+        suggestion = 'O número ou remetente foi adicionado à lista de bloqueio (blacklist) na plataforma Infobip.';
+    } else if (combinedLower.includes('rejected_operator') || combinedLower.includes('undeliverable_rejected_operator')) {
+        title = 'Rejeitado pela Operadora';
+        suggestion = 'A operadora de telefonia rejeitou a entrega da mensagem por restrições de rede ou filtros da operadora (UNDELIVERABLE_REJECTED_OPERATOR 4).';
+    } else if (combinedLower.includes('expired_expired') || combinedLower.includes('expired')) {
+        title = 'Mensagem Expirada (Timeout de 48h)';
+        suggestion = 'A mensagem expirou o período de validade de 48h sem conseguir confirmação de entrega no handset (EXPIRED_EXPIRED 15).';
     } else if (combinedLower.includes('unknown_template') || combinedLower.includes('template not found') || combinedLower.includes('template')) {
         title = 'Template Inválido ou Não Aprovado';
         suggestion = 'O nome do template ou o idioma não conferem com o modelo aprovado na Meta/Infobip para este remetente.';
@@ -140,7 +176,7 @@ export function parseInfobipErrorDiagnostic(payload: any, fallbackMessage = 'Err
         suggestion = 'O template aprovado exige uma imagem válida no cabeçalho. Preencha o campo "URL da Imagem Original" na transmissão.';
     } else if (combinedLower.includes('placeholder') || combinedLower.includes('variable') || combinedLower.includes('parameter')) {
         title = 'Variáveis Incompatíveis';
-        suggestion = 'A quantidade de variáveis fornecidas não corresponde exatamente ao que o template aprovado exige (ex: esperado 4, enviado 2).';
+        suggestion = 'A quantidade de variáveis fornecidas não corresponde exatamente ao que o template aprovado exige.';
     } else if (combinedLower.includes('unauthorized') || combinedLower.includes('401') || combinedLower.includes('forbidden') || combinedLower.includes('403')) {
         title = 'Falha de Autenticação da API';
         suggestion = 'A chave de API (API Key) da Infobip ou URL de endpoint não tem permissão para disparar por esta WABA.';
@@ -392,22 +428,27 @@ export const api = {
                     ? realErrorObj.description
                     : (r.error_name && !r.error_name.toLowerCase().includes('no error') ? r.error_name : '');
 
-                // 1. Detecção estrita de ENTREGA CONFIRMADA NO HANDSET
+                // Verificação estrita: DELIVERED_TO_OPERATOR é entrega na operadora (deve ser PENDENTE/AGUARDANDO HANDSET)
+                const isOperatorOnly = statusUpper === 'DELIVERED_TO_OPERATOR' || 
+                                       deliveryUpper === 'DELIVERED_TO_OPERATOR' ||
+                                       (deliveryUpper.includes('OPERATOR') && !deliveryUpper.includes('HANDSET'));
+
+                // 1. Detecção estrita de ENTREGA CONFIRMADA NO HANDSET (apenas DELIVERED_TO_HANDSET)
                 const isDelivered = (
-                    groupUpper === 'DELIVERED' || 
                     statusUpper === 'DELIVERED_TO_HANDSET' || 
                     deliveryUpper === 'DELIVERED_TO_HANDSET' || 
-                    deliveryUpper === 'DELIVERED' ||
-                    r.status === 'DELIVERED' ||
-                    r.log_type === 'DELIVERED'
+                    (
+                        (groupUpper === 'DELIVERED' || deliveryUpper === 'DELIVERED' || r.status === 'DELIVERED' || r.log_type === 'DELIVERED') &&
+                        !isOperatorOnly
+                    )
                 ) && !deliveryUpper.includes('NOT') && 
                      !deliveryUpper.includes('UNDELIVERABLE') && 
                      !statusUpper.includes('NOT') && 
                      !statusUpper.includes('UNDELIVERABLE') &&
                      !realErrorId;
 
-                // 2. Detecção estrita de FALHA / NÃO ENTREGUE (apenas se NÃO for Delivered)
-                const isFailed = !isDelivered && (
+                // 2. Detecção estrita de FALHA / NÃO ENTREGUE (apenas se NÃO for Handset Delivered e NÃO for Operator)
+                const isFailed = !isDelivered && !isOperatorOnly && (
                     r.status === 'FAILED' || 
                     r.log_type === 'ERROR' || 
                     groupUpper === 'UNDELIVERABLE' || 
@@ -437,7 +478,7 @@ export const api = {
                     recordStatus = 'DELIVERED';
                 } else if (isFailed) {
                     recordStatus = 'FAILED';
-                } else if (isSuccess || r.status === 'SENT' || deliveryUpper.includes('PENDING') || deliveryUpper.includes('ENROUTE') || deliveryUpper.includes('WAITING') || groupUpper === 'PENDING') {
+                } else if (isSuccess || r.status === 'SENT' || isOperatorOnly || deliveryUpper.includes('PENDING') || deliveryUpper.includes('ENROUTE') || deliveryUpper.includes('WAITING') || groupUpper === 'PENDING') {
                     recordStatus = 'SENT';
                 }
 
@@ -453,7 +494,7 @@ export const api = {
                     finalErrorReason = realErrorId ? `${realErrorDesc || 'Erro no envio'} (code ${realErrorId}) · Reason: ${deliveryStatus}` : `Reason: ${deliveryStatus}`;
                 }
 
-                // Data de entrega: apenas para mensagens realmente entregues
+                // Data de entrega: apenas para mensagens realmente entregues no aparelho
                 let validDoneAt: string | undefined = undefined;
                 if (recordStatus === 'DELIVERED') {
                     validDoneAt = r.done_at || r.doneAt || r.timestamp;
@@ -464,9 +505,11 @@ export const api = {
 
                 const cleanedDeliveryReason = recordStatus === 'DELIVERED' 
                     ? (deliveryUpper === 'DELIVERED' || deliveryUpper === 'DELIVERED_TO_HANDSET' ? deliveryStatus : 'DELIVERED_TO_HANDSET')
-                    : (recordStatus === 'FAILED' 
-                        ? (deliveryStatus || 'UNDELIVERABLE_NOT_DELIVERED') 
-                        : (deliveryUpper.includes('PENDING') || deliveryUpper.includes('ENROUTE') || deliveryUpper.includes('WAITING') ? deliveryStatus : 'PENDING_WAITING_DELIVERY'));
+                    : (isOperatorOnly
+                        ? 'DELIVERED_TO_OPERATOR'
+                        : (recordStatus === 'FAILED' 
+                            ? (deliveryStatus || 'UNDELIVERABLE_NOT_DELIVERED') 
+                            : (deliveryUpper.includes('PENDING') || deliveryUpper.includes('ENROUTE') || deliveryUpper.includes('WAITING') ? deliveryStatus : 'PENDING_WAITING_DELIVERY')));
 
                 return {
                     id: String(r.id || r.transmission_id || Math.random()),

@@ -261,6 +261,7 @@ export const DispatchRecords: React.FC = () => {
 
             const isDelivered = r.status === 'DELIVERED';
             const isFailed = r.status === 'FAILED';
+            const isOperatorOnly = !isDelivered && !isFailed && (r.deliveryReason === 'DELIVERED_TO_OPERATOR' || String(r.deliveryReason).includes('OPERATOR'));
             const operator = r.operator || api.detectOperator(r.recipient);
 
             return {
@@ -278,12 +279,12 @@ export const DispatchRecords: React.FC = () => {
                 'Country Name': 'Brazil',
                 'Network Name': operator,
                 'Purchase Price': r.price !== undefined ? r.price : 0,
-                'Status': isDelivered ? 'Delivered' : (isFailed ? 'Failed' : 'Sent'),
-                'Reason': isDelivered ? 'DELIVERED_TO_HANDSET' : (isFailed ? (r.errorReason || 'REJECTED') : 'SENT_TO_NETWORK'),
+                'Status': isDelivered ? 'Delivered' : (isFailed ? 'Failed' : (isOperatorOnly ? 'Pending (Operator)' : 'Sent')),
+                'Reason': isDelivered ? 'DELIVERED_TO_HANDSET' : (isOperatorOnly ? 'DELIVERED_TO_OPERATOR' : (isFailed ? (r.errorReason || 'REJECTED') : 'SENT_TO_NETWORK')),
                 'Action': '',
-                'Error Group': isDelivered ? 'No Errors' : (isFailed ? 'HANDSET_ERRORS' : 'No Errors'),
-                'Error Name': isDelivered ? 'No Error (code 0)' : (isFailed ? (r.errorReason || 'Undeliverable') : 'No Error (code 0)'),
-                'Done At': doneDate ? formatDate(doneDate.toISOString()) : '',
+                'Error Group': isDelivered || isOperatorOnly ? 'No Errors' : (isFailed ? 'HANDSET_ERRORS' : 'No Errors'),
+                'Error Name': isDelivered || isOperatorOnly ? 'No Error (code 0)' : (isFailed ? (r.errorReason || 'Undeliverable') : 'No Error (code 0)'),
+                'Done At': isDelivered && doneDate ? formatDate(doneDate.toISOString()) : '',
                 'Text': `MEDIA_TEMPLATE - ${r.templateName || campaign.templateName || 'template'}`,
                 'Messages Count': 1,
                 'Service Name': 'WhatsApp Business'
@@ -968,6 +969,7 @@ export const DispatchRecords: React.FC = () => {
                                             {activeCampaign.records.map((r, idx) => {
                                                 const isDelivered = r.status === 'DELIVERED';
                                                 const isFailed = r.status === 'FAILED';
+                                                const isOperatorOnly = !isDelivered && !isFailed && (r.deliveryReason === 'DELIVERED_TO_OPERATOR' || String(r.deliveryReason).includes('OPERATOR'));
                                                 const operator = r.operator || api.detectOperator(r.recipient);
 
                                                 return (
@@ -1013,6 +1015,21 @@ export const DispatchRecords: React.FC = () => {
                                                                 >
                                                                     <AlertTriangle size={12} /> Falha (Ver)
                                                                 </span>
+                                                            ) : isOperatorOnly ? (
+                                                                <span style={{
+                                                                    background: '#fef3c7',
+                                                                    color: '#92400e',
+                                                                    border: '1px solid #fde68a',
+                                                                    padding: '2px 8px',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600,
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px'
+                                                                }} title="Entregue à operadora telefônica, aguardando confirmação do aparelho">
+                                                                    <Clock size={12} /> Operadora OK (Pendente)
+                                                                </span>
                                                             ) : (
                                                                 <span style={{
                                                                     background: '#e0f2fe',
@@ -1037,9 +1054,10 @@ export const DispatchRecords: React.FC = () => {
                                                             <div>Env: {r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '—'}</div>
                                                             {isDelivered && r.doneAt && <div style={{ color: '#16a34a' }}>Ent: {new Date(r.doneAt).toLocaleTimeString()}</div>}
                                                             {isFailed && <div style={{ color: '#dc2626', fontWeight: 500 }}>Não entregue</div>}
+                                                            {isOperatorOnly && <div style={{ color: '#d97706', fontWeight: 500 }}>Aguardando aparelho</div>}
                                                         </td>
-                                                        <td style={{ padding: '8px 12px', fontSize: '11.5px', color: isDelivered ? '#166534' : (isFailed ? '#dc2626' : '#64748b') }}>
-                                                            {r.deliveryReason || (isDelivered ? 'DELIVERED_TO_HANDSET' : (isFailed ? (r.errorReason || 'UNDELIVERABLE_NOT_DELIVERED') : 'SENT_TO_NETWORK'))}
+                                                        <td style={{ padding: '8px 12px', fontSize: '11.5px', color: isDelivered ? '#166534' : (isFailed ? '#dc2626' : (isOperatorOnly ? '#b45309' : '#64748b')) }}>
+                                                            {r.deliveryReason || (isDelivered ? 'DELIVERED_TO_HANDSET' : (isFailed ? (r.errorReason || 'UNDELIVERABLE_NOT_DELIVERED') : (isOperatorOnly ? 'DELIVERED_TO_OPERATOR' : 'SENT_TO_NETWORK')))}
                                                         </td>
                                                     </tr>
                                                 );

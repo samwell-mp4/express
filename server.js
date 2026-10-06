@@ -726,11 +726,11 @@ async function runDispatchWorker() {
       let initialStatus = 'SENT';
       if (logType === 'ERROR' || statusGroup === 'REJECTED' || statusGroup === 'UNDELIVERABLE') {
         initialStatus = 'FAILED';
-      } else if (statusGroup === 'DELIVERED') {
+      } else if (statusName === 'DELIVERED_TO_HANDSET' || firstMsg?.status?.id === 5) {
         initialStatus = 'DELIVERED';
       }
 
-      let deliveryStatus = statusName || statusGroup || 'SENT_TO_NETWORK';
+      let deliveryStatus = statusName || statusGroup || 'PENDING_ENROUTE';
       if (errorId === 7008 || String(errorDesc).includes('7008') || String(errorDesc).includes('match template parameters')) {
         deliveryStatus = 'FALHA_PARAMETROS_7008 (Erro de parâmetros Meta)';
         initialStatus = 'FAILED';
@@ -949,14 +949,14 @@ async function syncDeliveryReportsFromInfobip() {
           const mId = rep.messageId;
           const statusGroup = rep.status?.groupName;
           const statusName = rep.status?.name;
+          const statusId = rep.status?.id !== undefined ? Number(rep.status.id) : null;
           const doneAt = rep.doneAt || rep.sentAt;
           const price = rep.price?.pricePerMessage;
 
-          // ATENÇÃO CRÍTICA:
-          // Para entregas com sucesso, a Infobip retorna:
-          // status: { id: 5, name: 'DELIVERED_TO_HANDSET', groupId: 3, groupName: 'DELIVERED' }
-          // error: { id: 0, name: 'NO_ERROR', description: 'No Error', groupId: 0, groupName: 'OK' }
-          // NUNCA tratar status.id (5) como código de erro, e error.id === 0 é NO_ERROR!
+          // ATENÇÃO CRÍTICA (Documentação Oficial Infobip):
+          // status.id === 5 (DELIVERED_TO_HANDSET) -> Entregue com sucesso no aparelho do cliente.
+          // status.id === 2 (DELIVERED_TO_OPERATOR) -> Entregue à operadora, mas AINDA PENDENTE no aparelho!
+          // rep.error.id === 0 é NO_ERROR (sucesso). NUNCA tratar status.id como código de erro!
           const realErrorId = (rep.error?.id !== undefined && rep.error?.id !== null && Number(rep.error.id) > 0)
             ? Number(rep.error.id)
             : null;
@@ -967,13 +967,17 @@ async function syncDeliveryReportsFromInfobip() {
             ? rep.error.groupName
             : null;
 
-          const isDeliv = (
-            statusGroup === 'DELIVERED' || 
-            statusName === 'DELIVERED_TO_HANDSET' ||
-            (statusName && statusName.includes('DELIVERED') && !statusName.includes('NOT') && !statusName.includes('UNDELIVERABLE'))
+          // REGRA DE OURO: Apenas DELIVERED_TO_HANDSET conta como ENTREGUE
+          const isHandsetDelivered = (
+            statusName === 'DELIVERED_TO_HANDSET' || statusId === 5
           ) && !realErrorId;
 
-          const isFail = !isDeliv && (
+          // DELIVERED_TO_OPERATOR é tratado como PENDENTE (enviado à operadora, aguarda aparelho)
+          const isOperatorDelivered = (
+            statusName === 'DELIVERED_TO_OPERATOR' || statusId === 2
+          );
+
+          const isFail = !isHandsetDelivered && !isOperatorDelivered && (
             statusGroup === 'UNDELIVERABLE' || 
             statusGroup === 'REJECTED' || 
             statusGroup === 'FAILED' || 
@@ -1015,12 +1019,12 @@ async function syncDeliveryReportsFromInfobip() {
               changed = true;
             }
 
-            if (isDeliv) {
-              if (match.status !== 'DELIVERED' || match.delivery_status !== (statusName || 'DELIVERED_TO_HANDSET')) {
+            if (isHandsetDelivered) {
+              if (match.status !== 'DELIVERED' || match.delivery_status !== 'DELIVERED_TO_HANDSET') {
                 match.status = 'DELIVERED';
                 match.log_type = 'SUCCESS';
-                match.delivery_status = statusName || 'DELIVERED_TO_HANDSET';
-                match.deliveryReason = statusName || 'DELIVERED_TO_HANDSET';
+                match.delivery_status = 'DELIVERED_TO_HANDSET';
+                match.deliveryReason = 'DELIVERED_TO_HANDSET';
                 match.done_at = doneAt || match.done_at || new Date().toISOString();
                 match.error_group = 'No Errors';
                 match.error_name = 'No Error (code 0)';
@@ -1038,15 +1042,16 @@ async function syncDeliveryReportsFromInfobip() {
                 changed = true;
               }
             } else {
-              // Status em trânsito (PENDING_WAITING_DELIVERY, PENDING_ENROUTE)
-              if (match.delivery_status !== statusName) {
-                match.delivery_status = statusName || 'PENDING_WAITING_DELIVERY';
-                match.deliveryReason = statusName || 'PENDING_WAITING_DELIVERY';
+              // Status em trânsito / operadora (DELIVERED_TO_OPERATOR, PENDING_WAITING_DELIVERY, PENDING_ENROUTE)
+              const pendStatus = isOperatorDelivered ? 'DELIVERED_TO_OPERATOR' : (statusName || 'PENDING_WAITING_DELIVERY');
+              if (match.delivery_status !== pendStatus || match.status !== 'SENT') {
+                match.status = 'SENT';
+                match.log_type = 'SUCCESS';
+                match.delivery_status = pendStatus;
+                match.deliveryReason = pendStatus;
+                match.done_at = null;
+                match.error_group = 'No Errors';
                 match.error_name = 'No Error (code 0)';
-                if (match.status === 'FAILED') {
-                  match.status = 'SENT';
-                  match.log_type = 'SUCCESS';
-                }
                 changed = true;
               }
             }
@@ -1090,6 +1095,7 @@ async function syncDeliveryReportsFromInfobip() {
 
           const statusGroup = rep.status?.groupName;
           const statusName = rep.status?.name;
+          const statusId = rep.status?.id !== undefined ? Number(rep.status.id) : null;
           const doneAt = rep.doneAt || rep.sentAt;
 
           const realErrorId = (rep.error?.id !== undefined && rep.error?.id !== null && Number(rep.error.id) > 0)
@@ -1099,13 +1105,15 @@ async function syncDeliveryReportsFromInfobip() {
             ? rep.error.description
             : null;
 
-          const isDeliv = (
-            statusGroup === 'DELIVERED' || 
-            statusName === 'DELIVERED_TO_HANDSET' ||
-            (statusName && statusName.includes('DELIVERED') && !statusName.includes('NOT') && !statusName.includes('UNDELIVERABLE'))
+          const isHandsetDelivered = (
+            statusName === 'DELIVERED_TO_HANDSET' || statusId === 5
           ) && !realErrorId;
 
-          const isFail = !isDeliv && (
+          const isOperatorDelivered = (
+            statusName === 'DELIVERED_TO_OPERATOR' || statusId === 2
+          );
+
+          const isFail = !isHandsetDelivered && !isOperatorDelivered && (
             statusGroup === 'UNDELIVERABLE' || 
             statusGroup === 'REJECTED' || 
             statusGroup === 'FAILED' || 
@@ -1126,10 +1134,10 @@ async function syncDeliveryReportsFromInfobip() {
             ))
           );
 
-          const logType = isDeliv ? 'DELIVERED' : (isFail ? 'ERROR' : 'SENT');
-          const doneAtVal = isDeliv ? (rep.doneAt ? new Date(rep.doneAt) : (rep.sentAt ? new Date(rep.sentAt) : new Date())) : null;
-          const errorFormatted = isDeliv ? 'No Error (code 0)' : (realErrorDesc ? (realErrorId ? `${realErrorDesc} (code ${realErrorId})` : realErrorDesc) : (statusName || 'UNDELIVERABLE_NOT_DELIVERED'));
-          const delivStatus = statusName || statusGroup || (isDeliv ? 'DELIVERED_TO_HANDSET' : 'SENT_TO_NETWORK');
+          const logType = isHandsetDelivered ? 'DELIVERED' : (isFail ? 'ERROR' : 'SENT');
+          const doneAtVal = isHandsetDelivered ? (rep.doneAt ? new Date(rep.doneAt) : (rep.sentAt ? new Date(rep.sentAt) : new Date())) : null;
+          const errorFormatted = (isHandsetDelivered || isOperatorDelivered) ? 'No Error (code 0)' : (realErrorDesc ? (realErrorId ? `${realErrorDesc} (code ${realErrorId})` : realErrorDesc) : (statusName || (isFail ? 'UNDELIVERABLE_NOT_DELIVERED' : 'No Error (code 0)')));
+          const delivStatus = isHandsetDelivered ? 'DELIVERED_TO_HANDSET' : (isOperatorDelivered ? 'DELIVERED_TO_OPERATOR' : (statusName || statusGroup || (isFail ? 'UNDELIVERABLE_NOT_DELIVERED' : 'SENT_TO_NETWORK')));
 
           await pgPool.query(
             `UPDATE dispatch_records 
