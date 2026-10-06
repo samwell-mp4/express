@@ -1931,6 +1931,22 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Limpar Logs de Envio (Redis e Postgres)
+  if ((pathname === '/api/dispatch/logs' || pathname === '/api/dispatch/logs/clear') && (req.method === 'DELETE' || req.method === 'POST')) {
+    try {
+      if (isRedisConnected) {
+        await redisClient.del('dispatch_logs');
+        await redisClient.del('dispatch_batches');
+      }
+      if (isPostgresConnected) {
+        await pgPool.query('DELETE FROM dispatch_records').catch(() => {});
+      }
+      return sendJson({ success: true, message: 'Logs de envio limpos com sucesso' });
+    } catch (err) {
+      return sendError(err.message, 500);
+    }
+  }
+
   // Sincronizar Relatórios de Entrega (DLR) em tempo real diretamente da Infobip
   if ((pathname === '/api/dispatch/sync-reports' || pathname === '/api/dispatch/sync-reports/') && (req.method === 'GET' || req.method === 'POST')) {
     try {

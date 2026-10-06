@@ -3,7 +3,8 @@ import {
     Activity, CheckCircle2, Clock, AlertTriangle, RefreshCw, 
     Search, Filter, Smartphone, Trash2, ArrowUpRight, Send, Check, 
     Radio, ShieldCheck, Download, ExternalLink, Zap, Copy, X, Info, 
-    FileText, Layers, ChevronLeft, Calendar, FileSpreadsheet, Eye, Sparkles,
+    FileText, Layers, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+    Calendar, FileSpreadsheet, Eye, Sparkles,
     CheckCheck, BarChart3, ArrowLeft, Pause, Play
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -53,6 +54,11 @@ export const DispatchRecords: React.FC = () => {
     // Hover Tooltip State
     const [hoveredRecordId, setHoveredRecordId] = useState<string | null>(null);
     const [pausedCampaignIds, setPausedCampaignIds] = useState<Set<string>>(new Set());
+
+    // Estado de Limpeza e Paginação
+    const [isClearingLogs, setIsClearingLogs] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(50);
 
     const pollCountRef = useRef(0);
 
@@ -156,11 +162,25 @@ export const DispatchRecords: React.FC = () => {
         }
     };
 
-    const handleClearLogs = () => {
-        if (!window.confirm('Deseja limpar todos os registros locais de envios?')) return;
-        localStorage.removeItem('express_live_dispatch_records');
-        setRecords([]);
-        setSelectedCampaignId(null);
+    const handleClearLogs = async () => {
+        if (!window.confirm('Deseja realmente limpar todos os registros e logs de envios (do servidor e da tela)? Esta ação apagará permanentemente o histórico no Redis e banco de dados.')) return;
+        setIsClearingLogs(true);
+        try {
+            await api.clearDispatchLogs();
+            localStorage.removeItem('express_live_dispatch_records');
+            setRecords([]);
+            setSelectedCampaignId(null);
+            setCurrentPage(1);
+        } catch (err: any) {
+            console.error('Falha ao limpar logs no servidor:', err);
+            localStorage.removeItem('express_live_dispatch_records');
+            setRecords([]);
+            setSelectedCampaignId(null);
+            setCurrentPage(1);
+            alert(`Aviso ao limpar logs: ${err.message || 'Erro na comunicação com o servidor'}`);
+        } finally {
+            setIsClearingLogs(false);
+        }
     };
 
     const handleCopyLog = (text: string) => {
@@ -305,6 +325,25 @@ export const DispatchRecords: React.FC = () => {
             (r.messageId && r.messageId.toLowerCase().includes(q));
         return matchesStatus && matchesSearch;
     });
+
+    // Resetar para página 1 sempre que os filtros mudarem
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, statusFilter]);
+
+    // Cálculo de Paginação para o Log em Tempo Real
+    const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
+
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [totalPages, currentPage]);
+
+    const paginatedRecords = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredRecords.slice(start, start + pageSize);
+    }, [filteredRecords, currentPage, pageSize]);
 
     // Metrics Calculations
     const totalCount = records.length;
@@ -495,7 +534,9 @@ export const DispatchRecords: React.FC = () => {
 
                     {records.length > 0 && (
                         <button
+                            type="button"
                             onClick={handleClearLogs}
+                            disabled={isClearingLogs}
                             style={{
                                 height: '34px',
                                 background: '#FEF2F2',
@@ -503,17 +544,18 @@ export const DispatchRecords: React.FC = () => {
                                 color: '#DC2626',
                                 padding: '0 10px',
                                 borderRadius: '6px',
-                                cursor: 'pointer',
+                                cursor: isClearingLogs ? 'not-allowed' : 'pointer',
                                 fontSize: '12.5px',
                                 fontWeight: 500,
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '5px'
+                                gap: '5px',
+                                opacity: isClearingLogs ? 0.6 : 1
                             }}
-                            title="Limpar registros de envios"
+                            title="Limpar todos os registros e logs de envios permanentemente do servidor e da tela"
                         >
-                            <Trash2 size={13} />
-                            Limpar
+                            <Trash2 size={13} className={isClearingLogs ? 'animate-spin' : ''} />
+                            {isClearingLogs ? 'Limpando...' : 'Limpar'}
                         </button>
                     )}
                 </div>
@@ -1520,7 +1562,7 @@ export const DispatchRecords: React.FC = () => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredRecords.map((r) => {
+                                        paginatedRecords.map((r) => {
                                             const isDelivered = r.status === 'DELIVERED';
                                             const isFailed = r.status === 'FAILED';
                                             const diag = isFailed ? parseInfobipErrorDiagnostic(r.rawPayload) : null;
@@ -1687,6 +1729,191 @@ export const DispatchRecords: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* Barra de Paginação Moderna e Responsiva */}
+                        {filteredRecords.length > 0 && (
+                            <div style={{
+                                padding: '12px 18px',
+                                background: '#F8FAFC',
+                                borderTop: '1px solid var(--border-subtle)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: '12px',
+                                fontSize: '12.5px',
+                                color: 'var(--text-muted)'
+                            }}>
+                                {/* Lado Esquerdo: Resumo de itens e seletor de quantidade */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                                    <span>
+                                        Exibindo <strong style={{ color: 'var(--text-main)' }}>{Math.min((currentPage - 1) * pageSize + 1, filteredRecords.length)}</strong> a <strong style={{ color: 'var(--text-main)' }}>{Math.min(currentPage * pageSize, filteredRecords.length)}</strong> de <strong style={{ color: 'var(--text-main)' }}>{filteredRecords.length}</strong> registros
+                                    </span>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: '12px' }}>Exibir:</span>
+                                        <select
+                                            value={pageSize}
+                                            onChange={(e) => {
+                                                setPageSize(Number(e.target.value));
+                                                setCurrentPage(1);
+                                            }}
+                                            style={{
+                                                height: '28px',
+                                                fontSize: '12px',
+                                                borderRadius: '4px',
+                                                border: '1px solid #CBD5E1',
+                                                background: '#FFFFFF',
+                                                padding: '0 6px',
+                                                fontWeight: 600,
+                                                color: 'var(--text-main)',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <option value={25}>25 por pág</option>
+                                            <option value={50}>50 por pág</option>
+                                            <option value={100}>100 por pág</option>
+                                            <option value={250}>250 por pág</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Lado Direito: Navegação de Páginas */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <button
+                                        type="button"
+                                        disabled={currentPage === 1}
+                                        onClick={() => setCurrentPage(1)}
+                                        style={{
+                                            height: '30px',
+                                            padding: '0 8px',
+                                            borderRadius: '5px',
+                                            border: '1px solid #E2E8F0',
+                                            background: currentPage === 1 ? '#F1F5F9' : '#FFFFFF',
+                                            color: currentPage === 1 ? '#94A3B8' : '#334155',
+                                            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                                            fontSize: '12px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '2px',
+                                            fontWeight: 500
+                                        }}
+                                        title="Primeira página"
+                                    >
+                                        <ChevronsLeft size={14} />
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={currentPage === 1}
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        style={{
+                                            height: '30px',
+                                            padding: '0 10px',
+                                            borderRadius: '5px',
+                                            border: '1px solid #E2E8F0',
+                                            background: currentPage === 1 ? '#F1F5F9' : '#FFFFFF',
+                                            color: currentPage === 1 ? '#94A3B8' : '#334155',
+                                            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                                            fontSize: '12px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontWeight: 500
+                                        }}
+                                        title="Página anterior"
+                                    >
+                                        <ChevronLeft size={14} /> Anterior
+                                    </button>
+
+                                    {/* Números das Páginas */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', margin: '0 4px' }}>
+                                        {(() => {
+                                            const pageButtons = [];
+                                            const maxVisiblePages = 5;
+                                            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                                            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                                            if (endPage - startPage + 1 < maxVisiblePages) {
+                                                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                                            }
+
+                                            for (let i = startPage; i <= endPage; i++) {
+                                                const isCurrent = i === currentPage;
+                                                pageButtons.push(
+                                                    <button
+                                                        key={i}
+                                                        type="button"
+                                                        onClick={() => setCurrentPage(i)}
+                                                        style={{
+                                                            height: '30px',
+                                                            minWidth: '30px',
+                                                            padding: '0 6px',
+                                                            borderRadius: '5px',
+                                                            border: isCurrent ? '1px solid #2563EB' : '1px solid #E2E8F0',
+                                                            background: isCurrent ? '#2563EB' : '#FFFFFF',
+                                                            color: isCurrent ? '#FFFFFF' : '#334155',
+                                                            fontSize: '12px',
+                                                            fontWeight: isCurrent ? 700 : 500,
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.15s ease'
+                                                        }}
+                                                    >
+                                                        {i}
+                                                    </button>
+                                                );
+                                            }
+                                            return pageButtons;
+                                        })()}
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        disabled={currentPage === totalPages}
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                        style={{
+                                            height: '30px',
+                                            padding: '0 10px',
+                                            borderRadius: '5px',
+                                            border: '1px solid #E2E8F0',
+                                            background: currentPage === totalPages ? '#F1F5F9' : '#FFFFFF',
+                                            color: currentPage === totalPages ? '#94A3B8' : '#334155',
+                                            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                                            fontSize: '12px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontWeight: 500
+                                        }}
+                                        title="Próxima página"
+                                    >
+                                        Próxima <ChevronRight size={14} />
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={currentPage === totalPages}
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        style={{
+                                            height: '30px',
+                                            padding: '0 8px',
+                                            borderRadius: '5px',
+                                            border: '1px solid #E2E8F0',
+                                            background: currentPage === totalPages ? '#F1F5F9' : '#FFFFFF',
+                                            color: currentPage === totalPages ? '#94A3B8' : '#334155',
+                                            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                                            fontSize: '12px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '2px',
+                                            fontWeight: 500
+                                        }}
+                                        title="Última página"
+                                    >
+                                        <ChevronsRight size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

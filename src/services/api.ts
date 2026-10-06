@@ -467,6 +467,21 @@ export const api = {
         }
     },
 
+    // 8.0 Limpar Logs de Envio (Redis e Banco)
+    async clearDispatchLogs(): Promise<{ success: boolean; message?: string }> {
+        try {
+            const res = await fetch('/api/dispatch/logs', { method: 'DELETE' });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || 'Falha ao limpar logs');
+            }
+            return await res.json();
+        } catch (err: any) {
+            console.error('Erro ao limpar logs de envio:', err);
+            throw err;
+        }
+    },
+
     // 8.1 Sincronizar Relatórios de Entrega (DLR) com a Infobip
     async syncDeliveryReports(): Promise<{ success: boolean; synced: number; updated: number; sample?: any[] }> {
         try {
