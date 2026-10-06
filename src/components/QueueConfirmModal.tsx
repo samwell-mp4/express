@@ -47,11 +47,70 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
     const activePartitions = partitionedSenders.filter(s => s.allocatedContacts && s.allocatedContacts.length > 0);
     const totalAllocated = activePartitions.reduce((acc, s) => acc + (s.allocatedContacts?.length || 0), 0);
 
-    // Detectar se algum remetente ativo exige cabeçalho de imagem
-    const requiresImage = activePartitions.some(s => s.headerType === 'IMAGE');
-    const isImageMissing = requiresImage && !currentMediaUrl.trim() && !activePartitions.some(s => s.mediaUrl);
+    // Função de auditoria e inspeção rigorosa do template de cada remetente (Prevenção Erro 7008 Meta)
+    const getSenderTemplateDetails = (s: SenderConfig) => {
+        const clean = s.senderNumber.replace(/\D/g, '');
+        const tObj = s.templates?.find(t => t.name === s.templateName);
+        
+        // 1. Formato de cabeçalho exigido pelo template aprovado
+        let headerFormat: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE' = 'NONE';
+        if (tObj?.structure?.header?.format) {
+            const fmt = String(tObj.structure.header.format).toUpperCase();
+            if (fmt === 'IMAGE' || fmt === 'VIDEO' || fmt === 'DOCUMENT') {
+                headerFormat = fmt as any;
+            } else if (fmt === 'TEXT') {
+                headerFormat = 'TEXT';
+            }
+        } else if (s.headerType && s.headerType !== 'NONE') {
+            headerFormat = s.headerType;
+        }
 
-    // Detectar se alguma variável está completamente sem preenchimento
+        // 2. Contagem de variáveis aprovadas no corpo do template
+        let varCount = localMappings.length;
+        let bodyPlaceholders: string[] = [];
+        if (tObj?.structure?.body?.text) {
+            const matches = tObj.structure.body.text.match(/\{\{\d+\}\}/g) || [];
+            varCount = matches.length;
+            bodyPlaceholders = matches;
+        } else {
+            bodyPlaceholders = localMappings.map(m => `{{${m.id}}}`);
+        }
+
+        const effectiveMedia = s.mediaUrl || currentMediaUrl || '';
+        const isMediaRequired = headerFormat === 'IMAGE' || headerFormat === 'VIDEO' || headerFormat === 'DOCUMENT';
+        const hasMedia = !isMediaRequired || Boolean(effectiveMedia.trim());
+
+        return {
+            senderNumber: clean,
+            label: s.label,
+            templateName: s.templateName,
+            templateObj: tObj,
+            headerFormat,
+            isMediaRequired,
+            hasMedia,
+            effectiveMedia,
+            varCount,
+            bodyPlaceholders
+        };
+    };
+
+    // Auditoria de todas as WABAs ativas
+    const senderAnalyses = activePartitions.map(getSenderTemplateDetails);
+
+    // Detecção de divergências ou mídia ausente
+    const sendersMissingMedia = senderAnalyses.filter(a => a.isMediaRequired && !a.hasMedia);
+    const requiresAnyMedia = senderAnalyses.some(a => a.isMediaRequired);
+    const isImageMissing = sendersMissingMedia.length > 0;
+
+    // Divergência de contagem de variáveis entre remetentes
+    const uniqueVarCounts = Array.from(new Set(senderAnalyses.map(a => a.varCount)));
+    const hasVarDivergence = uniqueVarCounts.length > 1;
+
+    // Divergência de tipo de cabeçalho entre remetentes
+    const uniqueHeaderFormats = Array.from(new Set(senderAnalyses.map(a => a.headerFormat)));
+    const hasHeaderDivergence = uniqueHeaderFormats.length > 1;
+
+    // Detectar se alguma variável mapeada está sem preenchimento
     const unconfiguredVariables = localMappings.filter(m => {
         if (m.type === 'fixed') return !m.fixedValue || !m.fixedValue.trim();
         if (m.type === 'column') return !m.columnName;
@@ -87,7 +146,7 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
         return fallback;
     };
 
-    // Build all queue messages
+    // Build all queue messages com auto-correção estrita por WABA
     const buildMessages = (batchCampaignId?: string): InfobipQueueMessage[] => {
         const messages: InfobipQueueMessage[] = [];
         const effectiveBatchId = batchCampaignId || `cmp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -95,10 +154,14 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
         activePartitions.forEach(s => {
             const senderNum = s.senderNumber.replace(/\D/g, '');
             const contactsList = s.allocatedContacts || [];
-            const effectiveMediaUrl = s.mediaUrl || currentMediaUrl || '';
+            const analysis = getSenderTemplateDetails(s);
+            const expectedVarsCount = analysis.varCount;
+            const requiredHeader = analysis.headerFormat;
+            const effectiveMediaUrl = analysis.effectiveMedia;
 
             contactsList.forEach(c => {
-                const placeholders = localMappings.map((m, idx) => {
+                // Coleta de valores mapeados
+                const rawValues = localMappings.map((m, idx) => {
                     let val = '';
                     const safeFallback = m.fixedValue?.trim() || (idx === 0 ? (c.nome || 'Cliente') : `Valor ${idx + 1}`);
 
@@ -108,8 +171,6 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                         val = m.fixedValue?.trim() || safeFallback;
                     }
 
-                    // Proteção contra erro 'must not be empty' da Infobip/Meta:
-                    // Se o valor estiver vazio, aplicar fallback seguro e NUNCA enviar string vazia
                     if (!val || !val.trim()) {
                         val = safeFallback;
                     }
@@ -117,13 +178,26 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                     return val.trim();
                 });
 
-                const templateData: any = {};
-                if (placeholders.length > 0) {
-                    templateData.body = { placeholders };
+                // AUTO-CORREÇÃO DE PARÂMETROS POR REMETENTE (Prevenção definitiva do Erro 7008):
+                // Corta ou completa os placeholders para bater EXATAMENTE com a quantidade que o template desta WABA exige!
+                let finalPlaceholders: string[] = [];
+                if (expectedVarsCount > 0) {
+                    finalPlaceholders = rawValues.slice(0, expectedVarsCount);
+                    while (finalPlaceholders.length < expectedVarsCount) {
+                        const nextId = finalPlaceholders.length + 1;
+                        finalPlaceholders.push(`Valor ${nextId}`);
+                    }
                 }
-                if (s.headerType !== 'NONE' && effectiveMediaUrl) {
+
+                const templateData: any = {};
+                if (finalPlaceholders.length > 0) {
+                    templateData.body = { placeholders: finalPlaceholders };
+                }
+
+                // Envia cabeçalho apenas se o template daquele remetente exigir e houver URL
+                if ((requiredHeader === 'IMAGE' || requiredHeader === 'VIDEO' || requiredHeader === 'DOCUMENT') && effectiveMediaUrl) {
                     templateData.header = {
-                        type: s.headerType,
+                        type: requiredHeader,
                         mediaUrl: effectiveMediaUrl
                     };
                 }
@@ -137,7 +211,7 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                     campaign_name: campaignName.trim(),
                     listName: listName || 'Lista_Principal',
                     mediaUrl: effectiveMediaUrl,
-                    headerType: s.headerType,
+                    headerType: requiredHeader,
                     content: {
                         templateName: s.templateName || 'template_padrao',
                         templateData: Object.keys(templateData).length > 0 ? templateData : undefined,
@@ -154,7 +228,8 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
         setErrorMsg('');
 
         if (isImageMissing) {
-            setErrorMsg('O template selecionado requer cabeçalho de Imagem. Por favor, insira a URL da Imagem Original abaixo antes de enviar.');
+            const missingNumbers = sendersMissingMedia.map(s => `${s.senderNumber} (${s.headerFormat})`).join(', ');
+            setErrorMsg(`O template selecionado requer mídia de cabeçalho. O(s) remetente(s) [${missingNumbers}] estão sem URL de mídia. Por favor, preencha a URL da Imagem/Mídia abaixo antes de enviar.`);
             return;
         }
 
@@ -393,10 +468,118 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
 
                             <div className="glass-card" style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
                                 <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cabeçalho</span>
-                                <strong style={{ fontSize: '14px', color: requiresImage ? '#0369a1' : 'var(--text-main)', display: 'block', marginTop: '2px', fontWeight: 600 }}>
-                                    {requiresImage ? '🖼️ Imagem' : 'Nenhum (Texto)'}
+                                <strong style={{ fontSize: '14px', color: requiresAnyMedia ? '#0369a1' : 'var(--text-main)', display: 'block', marginTop: '2px', fontWeight: 600 }}>
+                                    {requiresAnyMedia ? '🖼️ Mídia (Imagem/Vídeo)' : 'Nenhum (Texto)'}
                                 </strong>
                             </div>
+                        </div>
+
+                        {/* PAINEL DE CONFERÊNCIA DE PARÂMETROS ENTRE WABAS (Prevenção Erro 7008 Meta) */}
+                        <div style={{
+                            background: '#ffffff',
+                            border: `1.5px solid ${isImageMissing ? '#ef4444' : hasVarDivergence ? '#f59e0b' : '#10b981'}`,
+                            borderRadius: '8px',
+                            padding: '14px',
+                            marginBottom: '14px',
+                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {isImageMissing ? (
+                                        <AlertTriangle size={18} color="#ef4444" />
+                                    ) : hasVarDivergence ? (
+                                        <AlertTriangle size={18} color="#f59e0b" />
+                                    ) : (
+                                        <CheckCircle2 size={18} color="#10b981" />
+                                    )}
+                                    <strong style={{ fontSize: '13px', color: 'var(--text-main)' }}>
+                                        Conferência de Parâmetros entre WABAs (Prevenção Erro 7008 Meta)
+                                    </strong>
+                                </div>
+
+                                <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    padding: '3px 8px',
+                                    borderRadius: '12px',
+                                    background: isImageMissing ? '#fef2f2' : hasVarDivergence ? '#fffbeb' : '#ecfdf5',
+                                    color: isImageMissing ? '#dc2626' : hasVarDivergence ? '#d97706' : '#059669',
+                                    border: `1px solid ${isImageMissing ? '#fca5a5' : hasVarDivergence ? '#fcd34d' : '#a7f3d0'}`
+                                }}>
+                                    {isImageMissing ? '❌ Ação: Imagem Obrigatória' : hasVarDivergence ? '⚡ Auto-Adaptação Ativa' : '✓ 100% Compatível'}
+                                </span>
+                            </div>
+
+                            {/* Cards comparativos para cada WABA ativa */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px', marginBottom: '8px' }}>
+                                {senderAnalyses.map((a, i) => (
+                                    <div key={i} style={{
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '6px',
+                                        padding: '10px 12px',
+                                        fontSize: '12px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '5px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span style={{ fontWeight: 700, color: 'var(--text-main)', fontFamily: 'monospace' }}>
+                                                +{a.senderNumber} ({a.label})
+                                            </span>
+                                            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                                                Template: <strong>{a.templateName}</strong>
+                                            </span>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '4px' }}>
+                                            <span style={{ color: 'var(--text-muted)' }}>Variáveis no Corpo:</span>
+                                            <span style={{ 
+                                                fontWeight: 700, 
+                                                color: '#0284c7', 
+                                                background: '#e0f2fe', 
+                                                padding: '1px 6px', 
+                                                borderRadius: '4px',
+                                                fontFamily: 'monospace'
+                                            }}>
+                                                {a.varCount} {a.varCount === 1 ? 'variável' : 'variáveis'} ({a.bodyPlaceholders.join(', ') || 'Nenhuma'})
+                                            </span>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span style={{ color: 'var(--text-muted)' }}>Cabeçalho:</span>
+                                            <span style={{ 
+                                                fontWeight: 600, 
+                                                color: a.headerFormat === 'IMAGE' ? '#7c3aed' : a.headerFormat === 'VIDEO' ? '#d97706' : 'var(--text-main)'
+                                            }}>
+                                                {a.headerFormat === 'IMAGE' ? '🖼️ Imagem (IMAGE)' : a.headerFormat === 'VIDEO' ? '🎥 Vídeo (VIDEO)' : 'Nenhum'}
+                                            </span>
+                                        </div>
+
+                                        {a.isMediaRequired && (
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <span style={{ color: 'var(--text-muted)' }}>Status da Mídia:</span>
+                                                <span style={{ 
+                                                    fontWeight: 700, 
+                                                    color: a.hasMedia ? '#059669' : '#dc2626'
+                                                }}>
+                                                    {a.hasMedia ? '✓ Mídia Configurada' : '❌ Falta Imagem!'}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            {hasVarDivergence ? (
+                                <p style={{ fontSize: '11.5px', color: '#b45309', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+                                    💡 <strong>Auto-Correção Ativa:</strong> As WABAs possuem quantidades diferentes de variáveis no template. O sistema ajustará dinamicamente os parâmetros de cada envio (ex: cortando para 2 variáveis na WABA que espera 2), eliminando o risco do erro 7008 da Meta.
+                                </p>
+                            ) : (
+                                <p style={{ fontSize: '11.5px', color: '#059669', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+                                    ✓ Todas as WABAs ativas estão com o mesmo número de parâmetros ({uniqueVarCounts[0] || 0} variáveis).
+                                </p>
+                            )}
                         </div>
 
                         {/* BLOCO DE VALIDAÇÃO DE VARIÁVEIS PENDENTES */}
@@ -446,8 +629,8 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                             </div>
                         )}
 
-                        {/* BLOCO DE VALIDAÇÃO DE IMAGEM ORIGINAL SE OBRIGATÓRIA */}
-                        {requiresImage && (
+                        {/* BLOCO DE VALIDAÇÃO DE IMAGEM / MÍDIA SE OBRIGATÓRIA */}
+                        {requiresAnyMedia && (
                             <div style={{
                                 background: isImageMissing ? '#fffbeb' : '#f0f9ff',
                                 border: isImageMissing ? '1.5px solid #f59e0b' : '1px solid #bae6fd',

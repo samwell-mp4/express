@@ -669,15 +669,24 @@ async function runDispatchWorker() {
       const campaignId = job.campaignId || job.campaign_id || null;
       const campaignName = job.campaignName || job.campaign_name || 'Campanha_Padrao';
       const listName = job.listName || 'Lista_Contatos';
-      const messageId = payload?.messages?.[0]?.messageId || `tx_${Date.now()}`;
-      const statusGroup = payload?.messages?.[0]?.status?.groupName;
-      const statusName = payload?.messages?.[0]?.status?.name;
+      const firstMsg = payload?.messages?.[0];
+      const messageId = firstMsg?.messageId || `tx_${Date.now()}`;
+      const statusGroup = firstMsg?.status?.groupName;
+      const statusName = firstMsg?.status?.name;
+      const errorId = firstMsg?.status?.id || firstMsg?.error?.id;
+      const errorDesc = firstMsg?.status?.description || firstMsg?.error?.description || '';
 
       let initialStatus = 'SENT';
       if (logType === 'ERROR' || statusGroup === 'REJECTED' || statusGroup === 'UNDELIVERABLE') {
         initialStatus = 'FAILED';
       } else if (statusGroup === 'DELIVERED') {
         initialStatus = 'DELIVERED';
+      }
+
+      let deliveryStatus = statusName || statusGroup || 'SENT_TO_NETWORK';
+      if (errorId === 7008 || String(errorDesc).includes('7008') || String(errorDesc).includes('match template parameters')) {
+        deliveryStatus = 'FALHA_PARAMETROS_7008 (Erro de parâmetros Meta)';
+        initialStatus = 'FAILED';
       }
 
       const logRecord = {
@@ -692,7 +701,7 @@ async function runDispatchWorker() {
         message: templateName,
         log_type: logType,
         status: initialStatus,
-        delivery_status: statusName || statusGroup || 'SENT_TO_NETWORK',
+        delivery_status: deliveryStatus,
         done_at: null,
         media_url: job.content?.templateData?.header?.mediaUrl || job.mediaUrl || '',
         header_type: job.content?.templateData?.header?.type || job.headerType || 'NONE',

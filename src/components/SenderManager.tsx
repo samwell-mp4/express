@@ -42,6 +42,7 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
     const [addSenderTab, setAddSenderTab] = useState<'saved' | 'create_new' | 'paste'>('saved');
     const [showManualPasteModal, setShowManualPasteModal] = useState(false);
     const [manualPasteText, setManualPasteText] = useState('');
+    const [showParameterInspector, setShowParameterInspector] = useState(false);
 
     // Form inside "Criar Nova WABA" modal
     const [newWabaLabel, setNewWabaLabel] = useState('');
@@ -93,6 +94,49 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
         setTimeout(() => setBannerMessage(null), 4000);
     };
 
+    // Helper de auditoria detalhada de parâmetros do template por remetente (Prevenção Erro 7008 Meta)
+    const getSenderTemplateDetails = (s: SenderConfig) => {
+        const clean = (s.senderNumber || '').replace(/\D/g, '');
+        const tObj = s.templates?.find(t => t.name === s.templateName);
+
+        let headerFormat: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE' = 'NONE';
+        if (tObj?.structure?.header?.format) {
+            const fmt = String(tObj.structure.header.format).toUpperCase();
+            if (fmt === 'IMAGE' || fmt === 'VIDEO' || fmt === 'DOCUMENT') {
+                headerFormat = fmt as any;
+            } else if (fmt === 'TEXT') {
+                headerFormat = 'TEXT';
+            }
+        } else if (s.headerType && s.headerType !== 'NONE') {
+            headerFormat = s.headerType;
+        }
+
+        let bodyPlaceholders: string[] = [];
+        const bodyText = tObj?.structure?.body?.text || '';
+        if (bodyText) {
+            bodyPlaceholders = bodyText.match(/\{\{\d+\}\}/g) || [];
+        }
+
+        const effectiveMedia = s.mediaUrl || mediaUrl || '';
+        const isMediaRequired = headerFormat === 'IMAGE' || headerFormat === 'VIDEO' || headerFormat === 'DOCUMENT';
+        const hasMedia = !isMediaRequired || Boolean(effectiveMedia.trim());
+
+        return {
+            senderId: s.id,
+            senderNumber: clean,
+            label: s.label,
+            templateName: s.templateName,
+            templateObj: tObj,
+            headerFormat,
+            isMediaRequired,
+            hasMedia,
+            effectiveMedia,
+            varCount: bodyPlaceholders.length,
+            bodyPlaceholders,
+            bodyText
+        };
+    };
+
     // Load templates for senders that already have numbers
     useEffect(() => {
         senders.forEach(s => {
@@ -116,11 +160,14 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                     const selectedName = currentValid ? s.templateName : (templates[0]?.name || s.templateName || '');
                     
                     const selectedTemplateObj = templates.find(t => t.name === selectedName);
-                    let detectedHeaderType = s.headerType;
+                    let detectedHeaderType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE' = 'NONE';
                     if (selectedTemplateObj?.structure?.header?.format) {
-                        const fmt = selectedTemplateObj.structure.header.format;
+                        const fmt = String(selectedTemplateObj.structure.header.format).toUpperCase();
                         if (fmt === 'IMAGE') detectedHeaderType = 'IMAGE';
                         else if (fmt === 'VIDEO') detectedHeaderType = 'VIDEO';
+                        else if (fmt === 'TEXT') detectedHeaderType = 'TEXT';
+                    } else if (s.headerType && s.headerType !== 'NONE') {
+                        detectedHeaderType = s.headerType;
                     }
 
                     return {
@@ -867,6 +914,184 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
 
             </div>
 
+            {/* PAINEL DE CONFERÊNCIA DE PARÂMETROS E TEMPLATES ENTRE WABAS (PREVENÇÃO ERRO 7008 META) */}
+            {(() => {
+                const sendersWithTemplates = senders.filter(s => s.senderNumber && s.templateName);
+                if (sendersWithTemplates.length === 0) return null;
+
+                const analyses = sendersWithTemplates.map(getSenderTemplateDetails);
+                const uniqueVars = Array.from(new Set(analyses.map(a => a.varCount)));
+                const hasVarDivergence = uniqueVars.length > 1;
+                const sendersMissingMedia = analyses.filter(a => a.isMediaRequired && !a.hasMedia);
+                const hasMediaIssue = sendersMissingMedia.length > 0;
+
+                return (
+                    <div style={{
+                        background: hasMediaIssue ? '#fffbeb' : hasVarDivergence ? '#eff6ff' : '#f0fdf4',
+                        border: hasMediaIssue ? '1.5px solid #f59e0b' : hasVarDivergence ? '1.5px solid #60a5fa' : '1.5px solid #86efac',
+                        borderRadius: '10px',
+                        padding: '14px 16px',
+                        marginBottom: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <ShieldCheck size={18} color={hasMediaIssue ? '#d97706' : hasVarDivergence ? '#2563eb' : '#16a34a'} />
+                                <div>
+                                    <strong style={{ fontSize: '13.5px', color: hasMediaIssue ? '#92400e' : hasVarDivergence ? '#1e40af' : '#166534' }}>
+                                        Conferência de Parâmetros e Templates entre WABAs (Prevenção Erro 7008 Meta)
+                                    </strong>
+                                    <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                                        Auditoria automática de variáveis do corpo e formato de cabeçalho para garantir entrega sem falhas.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <button
+                                    className="btn-secondary"
+                                    onClick={() => setShowParameterInspector(!showParameterInspector)}
+                                    style={{ height: '28px', padding: '0 10px', fontSize: '11.5px', gap: '4px', borderRadius: '5px' }}
+                                >
+                                    <Eye size={12} />
+                                    {showParameterInspector ? 'Ocultar Detalhes dos Templates' : 'Visualizar Texto e Parâmetros'}
+                                </button>
+
+                                {hasVarDivergence ? (
+                                    <span style={{ fontSize: '11px', background: '#dbeafe', color: '#1d4ed8', padding: '3px 8px', borderRadius: '5px', fontWeight: 700 }}>
+                                        ⚡ Auto-Adaptação Ativa
+                                    </span>
+                                ) : (
+                                    <span style={{ fontSize: '11px', background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '5px', fontWeight: 700 }}>
+                                        ✓ 100% Compatível
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* CARDS COMPARATIVOS DE CADA WABA */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
+                            {analyses.map(a => (
+                                <div key={a.senderId} style={{
+                                    background: '#ffffff',
+                                    border: '1px solid var(--border-subtle)',
+                                    borderRadius: '7px',
+                                    padding: '10px 12px',
+                                    fontSize: '12px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '6px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--text-main)' }}>
+                                            +{a.senderNumber} ({a.label})
+                                        </span>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600 }}>
+                                            {a.templateName}
+                                        </span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '4px' }}>
+                                        <span style={{ color: 'var(--text-muted)' }}>Variáveis de Corpo:</span>
+                                        <span style={{
+                                            fontWeight: 700,
+                                            color: '#0284c7',
+                                            background: '#e0f2fe',
+                                            padding: '1px 6px',
+                                            borderRadius: '4px',
+                                            fontFamily: 'monospace'
+                                        }}>
+                                            {a.varCount} {a.varCount === 1 ? 'parâmetro' : 'parâmetros'} {a.bodyPlaceholders.length > 0 ? `(${a.bodyPlaceholders.join(', ')})` : ''}
+                                        </span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span style={{ color: 'var(--text-muted)' }}>Cabeçalho:</span>
+                                        <span style={{
+                                            fontWeight: 600,
+                                            color: a.headerFormat === 'IMAGE' ? '#7c3aed' : a.headerFormat === 'VIDEO' ? '#d97706' : 'var(--text-main)'
+                                        }}>
+                                            {a.headerFormat === 'IMAGE' ? '🖼️ Imagem (IMAGE)' : a.headerFormat === 'VIDEO' ? '🎥 Vídeo (VIDEO)' : 'Nenhum'}
+                                        </span>
+                                    </div>
+
+                                    {a.isMediaRequired && (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span style={{ color: 'var(--text-muted)' }}>Status da Imagem:</span>
+                                            <span style={{
+                                                fontWeight: 700,
+                                                color: a.hasMedia ? '#16a34a' : '#dc2626'
+                                            }}>
+                                                {a.hasMedia ? '✓ URL Informada' : '❌ Falta URL!'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* MENSAGEM EXPLICATIVA / STATUS */}
+                        {hasVarDivergence ? (
+                            <div style={{ fontSize: '12px', color: '#1e40af', background: 'rgba(255,255,255,0.7)', padding: '8px 12px', borderRadius: '6px', borderLeft: '3px solid #2563eb' }}>
+                                💡 <strong>Proteção Multi-WABA Ativa:</strong> As WABAs estão configuradas com templates com números diferentes de variáveis. O despachador auto-alinhará os parâmetros de cada contato especificamente para o template de cada WABA (ex: cortando para 2 variáveis na WABA que espera 2), eliminando o risco do <strong>Erro 7008 da Meta</strong>.
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: '12px', color: '#15803d', background: 'rgba(255,255,255,0.7)', padding: '8px 12px', borderRadius: '6px', borderLeft: '3px solid #16a34a' }}>
+                                ✓ Todas as WABAs ativas utilizam templates compatíveis com exatamente {uniqueVars[0] || 0} variáveis.
+                            </div>
+                        )}
+
+                        {/* INSPEÇÃO DETALHADA EXPANSÍVEL DO TEXTO DO TEMPLATE */}
+                        {showParameterInspector && (
+                            <div style={{
+                                background: '#ffffff',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: '8px',
+                                padding: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px'
+                            }}>
+                                <strong style={{ fontSize: '12.5px', color: 'var(--text-main)' }}>
+                                    Prévia do Texto Oficial Aprovado na Meta por Remetente:
+                                </strong>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '10px' }}>
+                                    {analyses.map(a => (
+                                        <div key={a.senderId} style={{
+                                            background: '#f8fafc',
+                                            border: '1px solid #e2e8f0',
+                                            borderRadius: '6px',
+                                            padding: '10px',
+                                            fontSize: '12px'
+                                        }}>
+                                            <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
+                                                +{a.senderNumber} — <em>{a.templateName}</em>
+                                            </div>
+                                            <p style={{
+                                                margin: 0,
+                                                whiteSpace: 'pre-wrap',
+                                                color: '#334155',
+                                                lineHeight: 1.45,
+                                                background: '#ffffff',
+                                                border: '1px solid #e2e8f0',
+                                                borderRadius: '4px',
+                                                padding: '8px',
+                                                fontFamily: 'system-ui, sans-serif'
+                                            }}>
+                                                {a.bodyText || '(Texto do corpo indisponível na listagem da Meta)'}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
+
             {/* SENDERS VIEW: CARDS OR LIST */}
             {viewMode === 'card' ? (
                 /* CARD VIEW */
@@ -987,11 +1212,15 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                         onChange={(e) => {
                                             const chosen = e.target.value;
                                             const tObj = s.templates.find(t => t.name === chosen);
-                                            let hType = s.headerType;
+                                            let hType: 'NONE' | 'IMAGE' | 'VIDEO' | 'TEXT' = 'NONE';
                                             if (tObj?.structure?.header?.format) {
-                                                const fmt = tObj.structure.header.format;
+                                                const fmt = String(tObj.structure.header.format).toUpperCase();
                                                 if (fmt === 'IMAGE') hType = 'IMAGE';
                                                 else if (fmt === 'VIDEO') hType = 'VIDEO';
+                                                else if (fmt === 'TEXT') hType = 'TEXT';
+                                                else hType = 'NONE';
+                                            } else if (s.headerType && s.headerType !== 'NONE') {
+                                                hType = s.headerType;
                                             }
                                             updateSender(s.id, { 
                                                 templateName: chosen,
@@ -1032,6 +1261,47 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                         </span>
                                     </div>
                                 )}
+
+                                {/* Preview de parâmetros do template selecionado */}
+                                {s.templateName && (() => {
+                                    const details = getSenderTemplateDetails(s);
+                                    return (
+                                        <div style={{
+                                            marginTop: '6px',
+                                            background: '#f8fafc',
+                                            border: '1px solid var(--border-subtle)',
+                                            borderRadius: '6px',
+                                            padding: '6px 8px',
+                                            fontSize: '11px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '4px'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <span style={{ color: 'var(--text-muted)' }}>Variáveis do Corpo:</span>
+                                                <span style={{ 
+                                                    fontWeight: 700, 
+                                                    color: details.varCount > 0 ? '#0284c7' : 'var(--text-muted)',
+                                                    background: details.varCount > 0 ? '#e0f2fe' : '#f1f5f9',
+                                                    padding: '1px 5px',
+                                                    borderRadius: '4px',
+                                                    fontFamily: 'monospace'
+                                                }}>
+                                                    {details.varCount} {details.varCount === 1 ? 'parâmetro' : 'parâmetros'} {details.bodyPlaceholders.length > 0 ? `(${details.bodyPlaceholders.join(', ')})` : ''}
+                                                </span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <span style={{ color: 'var(--text-muted)' }}>Cabeçalho Meta:</span>
+                                                <span style={{ 
+                                                    fontWeight: 600,
+                                                    color: details.headerFormat === 'IMAGE' ? '#7c3aed' : details.headerFormat === 'VIDEO' ? '#d97706' : 'var(--text-main)'
+                                                }}>
+                                                    {details.headerFormat === 'IMAGE' ? '🖼️ Imagem (IMAGE)' : details.headerFormat === 'VIDEO' ? '🎥 Vídeo (VIDEO)' : 'Nenhum (Texto)'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             {/* Cota e Cabeçalho */}
@@ -1073,15 +1343,27 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                 </div>
                             </div>
 
-                            {/* URL da Imagem Original se Cabeçalho for Imagem */}
-                            {s.headerType === 'IMAGE' && (
-                                <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', padding: '8px 10px' }}>
-                                    <label style={{ fontSize: '11px', color: '#0369a1', fontWeight: 600, display: 'block', marginBottom: '3px' }}>
-                                        URL da Imagem Original:
-                                    </label>
+                            {/* URL da Mídia Original se Cabeçalho for Imagem ou Vídeo */}
+                            {(s.headerType === 'IMAGE' || s.headerType === 'VIDEO') && (
+                                <div style={{ 
+                                    background: (s.mediaUrl || mediaUrl) ? '#f0f9ff' : '#fffbeb', 
+                                    border: (s.mediaUrl || mediaUrl) ? '1px solid #bae6fd' : '1.5px solid #f59e0b', 
+                                    borderRadius: '6px', 
+                                    padding: '8px 10px' 
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                                        <label style={{ fontSize: '11px', color: (s.mediaUrl || mediaUrl) ? '#0369a1' : '#92400e', fontWeight: 600 }}>
+                                            URL da Mídia ({s.headerType === 'IMAGE' ? 'Imagem' : 'Vídeo'}):
+                                        </label>
+                                        {!(s.mediaUrl || mediaUrl) && (
+                                            <span style={{ fontSize: '10px', background: '#fef3c7', color: '#b45309', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
+                                                Obrigatório
+                                            </span>
+                                        )}
+                                    </div>
                                     <input 
                                         type="url"
-                                        placeholder="https://exemplo.com/imagem.jpg"
+                                        placeholder={`https://exemplo.com/${s.headerType === 'IMAGE' ? 'imagem.jpg' : 'video.mp4'}`}
                                         className="form-input"
                                         value={s.mediaUrl || mediaUrl || ''}
                                         onChange={(e) => {
@@ -1095,7 +1377,7 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                     />
                                     {(s.mediaUrl || mediaUrl) && (
                                         <span style={{ fontSize: '10.5px', color: '#16a34a', display: 'inline-block', marginTop: '2px', fontWeight: 500 }}>
-                                            ✓ Imagem vinculada ao envio
+                                            ✓ Mídia vinculada ao envio
                                         </span>
                                     )}
                                 </div>
