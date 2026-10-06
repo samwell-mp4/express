@@ -28,6 +28,17 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 const INFOBIP_BASE_URL = process.env.INFOBIP_BASE_URL || '9kn66r.api-us.infobip.com';
 const INFOBIP_API_KEY = process.env.INFOBIP_API_KEY || 'a20edbf816d727811c324791316af20b-56e251b9-66f6-4f75-b461-e9006d123473';
 
+// Sanitização de host da Infobip para prevenção estrita de SSRF (Server-Side Request Forgery)
+function sanitizeInfobipHost(host) {
+  if (!host || typeof host !== 'string') return INFOBIP_BASE_URL;
+  const clean = host.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
+  // Permitir somente subdomínios oficiais da Infobip (*.infobip.com) ou o host configurado via ENV
+  if (/^[a-zA-Z0-9-]+\.(api|api-us|api-eu)\.infobip\.com$/.test(clean) || clean === INFOBIP_BASE_URL) {
+    return clean;
+  }
+  return INFOBIP_BASE_URL;
+}
+
 // Redis Credenciais (Host: fast_plug_redis / Password: Samuca82465! / Port: 6379)
 const REDIS_HOST = process.env.REDIS_HOST || 'fast_plug_redis';
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
@@ -1204,10 +1215,12 @@ const server = http.createServer(async (req, res) => {
   const pathname = urlObj.pathname;
   const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
 
-  // Security Headers
+  // Security Headers (Defesa profunda contra XSS, Clickjacking, MIME Sniffing e Information Disclosure)
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
 
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -2502,7 +2515,7 @@ const server = http.createServer(async (req, res) => {
       const cleanWabaId = String(businessAccountId).trim();
       const cleanCountry = String(countryCode).replace(/\D/g, '');
       const cleanPhone = String(phoneNumber).replace(/\D/g, '');
-      const cleanHost = (baseUrl || INFOBIP_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const cleanHost = sanitizeInfobipHost(baseUrl);
       const activeKey = apiKey || INFOBIP_API_KEY;
 
       const payload = {
@@ -2567,7 +2580,7 @@ const server = http.createServer(async (req, res) => {
 
       const cleanSender = String(sender).replace(/\D/g, '');
       const cleanCode = String(code).trim();
-      const cleanHost = (baseUrl || INFOBIP_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const cleanHost = sanitizeInfobipHost(baseUrl);
       const activeKey = apiKey || INFOBIP_API_KEY;
 
       const payload = { code: cleanCode };
@@ -2612,7 +2625,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const cleanSender = String(sender).replace(/\D/g, '');
-      const cleanHost = (baseUrl || INFOBIP_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const cleanHost = sanitizeInfobipHost(baseUrl);
       const activeKey = apiKey || INFOBIP_API_KEY;
 
       const payload = {
@@ -2646,7 +2659,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/whatsapp/senders' && req.method === 'GET') {
     try {
       const activeKey = urlObj.searchParams.get('apiKey') || INFOBIP_API_KEY;
-      const cleanHost = (urlObj.searchParams.get('baseUrl') || INFOBIP_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const cleanHost = sanitizeInfobipHost(urlObj.searchParams.get('baseUrl'));
       const sendersRes = await getJson(cleanHost, '/whatsapp/1/senders', activeKey);
       return sendJson(sendersRes || { senders: [] });
     } catch (err) {
@@ -2657,7 +2670,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/whatsapp/known-wabas' && req.method === 'GET') {
     try {
       const activeKey = urlObj.searchParams.get('apiKey') || INFOBIP_API_KEY;
-      const cleanHost = (urlObj.searchParams.get('baseUrl') || INFOBIP_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const cleanHost = sanitizeInfobipHost(urlObj.searchParams.get('baseUrl'));
       const known = new Set(['875786408937731']);
       try {
         const templatesRes = await getJson(cleanHost, '/whatsapp/1/templates?page=0&size=100', activeKey);
@@ -2673,46 +2686,77 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Proxy Seguro Infobip (Substitui Authorization pelo token do servidor)
+  // Proxy Seguro Infobip (Restrito estritamente a leitura de templates de remetentes cadastrados)
   if (pathname.startsWith('/infobip-proxy/')) {
-    const targetPath = pathname.replace('/infobip-proxy', '') + urlObj.search;
+    // 1. Bloquear qualquer método HTTP que não seja GET (defesa anti-Burp Suite / Pentest)
+    if (req.method !== 'GET') {
+      return sendError('Método não permitido no proxy', 405);
+    }
+
+    // 2. Permitir APENAS a rota de busca de templates: /infobip-proxy/whatsapp/2/senders/:digits/templates
+    const match = pathname.match(/^\/infobip-proxy\/whatsapp\/2\/senders\/([0-9]{8,20})\/templates$/);
+    if (!match) {
+      return sendError('Acesso negado: rota de proxy não autorizada ou formato de remetente inválido', 403);
+    }
+
+    const senderDigits = match[1];
+    const targetPath = `/whatsapp/2/senders/${senderDigits}/templates` + (urlObj.search || '');
+
     const proxyHeaders = {
-      ...req.headers,
-      host: INFOBIP_BASE_URL,
-      authorization: `App ${INFOBIP_API_KEY}`
+      'host': INFOBIP_BASE_URL,
+      'authorization': `App ${INFOBIP_API_KEY}`,
+      'accept': 'application/json',
+      'user-agent': 'FastPlug-SecureProxy/1.0'
     };
 
     const proxyReq = https.request({
       hostname: INFOBIP_BASE_URL,
       path: targetPath,
-      method: req.method,
+      method: 'GET',
       headers: proxyHeaders
     }, (proxyRes) => {
-      res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+      res.writeHead(proxyRes.statusCode || 200, {
+        'content-type': proxyRes.headers['content-type'] || 'application/json',
+        'cache-control': 'no-cache'
+      });
       proxyRes.pipe(res);
     });
 
     proxyReq.on('error', (err) => {
       sendError(`Proxy error: ${err.message}`, 502);
     });
-    req.pipe(proxyReq);
+    proxyReq.end();
     return;
   }
 
   // -------------------------------------------------------------
-  // 8. SERVIR ARQUIVOS ESTÁTICOS DO DIRETÓRIO ./dist
+  // 8. SERVIR ARQUIVOS ESTÁTICOS DO DIRETÓRIO ./dist (Anti-Path Traversal)
   // -------------------------------------------------------------
-  let filePath = path.join(DIST_DIR, pathname);
+  const normalizedDist = path.resolve(DIST_DIR);
+  // Normalizar e sanitizar caminho para prevenir Directory Traversal (LFI / Path Traversal)
+  const safeRelativePath = path.normalize(pathname).replace(/^(\.\.[\/\\])+/, '');
+  let resolvedFilePath = path.resolve(normalizedDist, '.' + safeRelativePath);
+
+  // Verificação de segurança estrita: o arquivo resolvido DEVE estar dentro de dist/
+  if (!resolvedFilePath.startsWith(normalizedDist)) {
+    return sendError('Acesso proibido (Path Traversal detectado)', 403);
+  }
+
+  // Se for rota raiz ou sem extensão de arquivo (SPA client-side routing), verificar arquivo ou fallback para index.html
   if (pathname === '/' || !path.extname(pathname)) {
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    if (fs.existsSync(resolvedFilePath) && fs.statSync(resolvedFilePath).isFile()) {
       // Arquivo existe diretamente
     } else {
-      filePath = path.join(DIST_DIR, 'index.html');
+      resolvedFilePath = path.join(normalizedDist, 'index.html');
     }
   }
 
-  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-    const ext = path.extname(filePath).toLowerCase();
+  if (fs.existsSync(resolvedFilePath) && fs.statSync(resolvedFilePath).isFile()) {
+    // Validação secundária para garantir que não vazou do diretório dist
+    if (!resolvedFilePath.startsWith(normalizedDist)) {
+      return sendError('Acesso proibido', 403);
+    }
+    const ext = path.extname(resolvedFilePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
     if (ext !== '.html') {
@@ -2720,10 +2764,10 @@ const server = http.createServer(async (req, res) => {
     } else {
       res.setHeader('Cache-Control', 'no-cache');
     }
-    const stream = fs.createReadStream(filePath);
+    const stream = fs.createReadStream(resolvedFilePath);
     stream.pipe(res);
   } else {
-    const indexPath = path.join(DIST_DIR, 'index.html');
+    const indexPath = path.join(normalizedDist, 'index.html');
     if (fs.existsSync(indexPath)) {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       fs.createReadStream(indexPath).pipe(res);

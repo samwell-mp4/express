@@ -260,8 +260,8 @@ function googleSheetsProxyPlugin(): Plugin {
             return;
           }
 
-          const LUIZ_HOST = '9kn66r.api-us.infobip.com';
-          const LUIZ_KEY = 'a20edbf816d727811c324791316af20b-56e251b9-66f6-4f75-b461-e9006d123473';
+          const LUIZ_HOST = process.env.INFOBIP_BASE_URL || '9kn66r.api-us.infobip.com';
+          const LUIZ_KEY = process.env.INFOBIP_API_KEY || '';
           const LUIS_HOST = LUIZ_HOST;
           const LUIS_KEY = LUIZ_KEY;
 
@@ -586,13 +586,9 @@ export default defineConfig({
         secure: false
       },
       '/infobip-proxy': {
-        target: 'https://9kn66r.api-us.infobip.com',
+        target: 'http://localhost:3000',
         changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/infobip-proxy/, ''),
-        headers: {
-          'Authorization': 'App a20edbf816d727811c324791316af20b-56e251b9-66f6-4f75-b461-e9006d123473'
-        }
+        secure: false
       }
     }
   }

@@ -1,7 +1,7 @@
 import https from 'https';
 
-const key = 'a20edbf816d727811c324791316af20b-56e251b9-66f6-4f75-b461-e9006d123473';
-const host = '9kn66r.api-us.infobip.com';
+const key = process.env.INFOBIP_API_KEY || '';
+const host = process.env.INFOBIP_BASE_URL || '9kn66r.api-us.infobip.com';
 
 function getJson(p) {
   return new Promise((resolve) => {

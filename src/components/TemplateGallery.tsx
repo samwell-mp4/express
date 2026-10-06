@@ -757,7 +757,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                             className="input-field"
                             style={{ height: '40px', fontSize: '0.82rem', fontWeight: 600 }}
                         >
-                            <option value="ALL">Conta: BM do Luiz (9kn66r - Oficial)</option>
+                            <option value="ALL">Conta Meta Principal (Oficial)</option>
                         </select>
                     </div>
 

@@ -4,3 +4,11 @@ dist
 .gitignore
 *.log
 .DS_Store
+test_*.mjs
+find_spec.mjs
+check_*.mjs
+scratch_*.mjs
+*.bat
+.env
+.env.*
+SECURITY_ROLE.*

@@ -66,7 +66,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
                         <span style={{ color: 'var(--text-muted)' }}>Conta Meta:</span>
                         <strong style={{ color: '#fff' }}>BM do Luiz</strong>
                         <span style={{ opacity: 0.4 }}>|</span>
-                        <code style={{ fontSize: '0.72rem', color: 'var(--primary-color)' }}>9kn66r.api-us</code>
+                        <code style={{ fontSize: '0.72rem', color: 'var(--primary-color)' }}>Meta API Online</code>
                     </div>
 
                     {/* Live Redis Status Pill */}

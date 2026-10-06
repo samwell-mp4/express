@@ -14,9 +14,9 @@ import {
 } from '../types';
 import { mediaStorage } from './mediaStorage';
 
-// Credenciais de API mantidas estritamente no Server-Side (SECURITY-FIRST)
-export const INFOBIP_BASE = '9kn66r.api-us.infobip.com';
-export const LUIS_BASE = INFOBIP_BASE;
+// Credenciais e endpoints de API mantidos estritamente no Server-Side (SECURITY-FIRST)
+export const INFOBIP_BASE = '';
+export const LUIS_BASE = '';
 
 export const TRIAGE_WEBHOOK_URL = 'https://plug-sales-dispatch-app-n8n-2.hx8235.easypanel.host/webhook/a2d2ee02-2bdf-4f5c-a1b6-a0cd43b128ed';
 
