@@ -749,42 +749,69 @@ export const DispatchRecords: React.FC = () => {
                                     Resumo das estimativas
                                 </h3>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
+                                    {/* Enviadas */}
                                     <div>
-                                        <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                            Enviadas <Info size={12} color="#94a3b8" />
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            Enviadas <Info size={11} color="#94a3b8" />
                                         </div>
                                         <strong style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-main)' }}>
                                             {activeCampaign.total}
                                         </strong>
                                     </div>
 
+                                    {/* Entregues (Handset) */}
                                     <div>
-                                        <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                            Pendentes <Info size={12} color="#94a3b8" />
-                                        </div>
-                                        <strong style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-main)' }}>
-                                            {activeCampaign.pending}
-                                        </strong>
-                                    </div>
-
-                                    <div>
-                                        <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                            Entregues <Info size={12} color="#94a3b8" />
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            Entregues <Info size={11} color="#94a3b8" />
                                         </div>
                                         <strong style={{ fontSize: '24px', fontWeight: 600, color: '#16a34a' }}>
                                             {activeCampaign.delivered}
                                         </strong>
                                     </div>
+
+                                    {/* Não Entregues (Falhas / Spam / Rejeições) */}
+                                    <div>
+                                        <div style={{ fontSize: '12px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px', fontWeight: 500 }}>
+                                            Não Entregues <Info size={11} color="#ef4444" />
+                                        </div>
+                                        <strong style={{ fontSize: '24px', fontWeight: 600, color: '#dc2626' }}>
+                                            {activeCampaign.failed}
+                                        </strong>
+                                    </div>
+
+                                    {/* Pendentes (Em rota) */}
+                                    <div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            Pendentes <Info size={11} color="#94a3b8" />
+                                        </div>
+                                        <strong style={{ fontSize: '24px', fontWeight: 600, color: '#2563eb' }}>
+                                            {activeCampaign.pending}
+                                        </strong>
+                                    </div>
                                 </div>
 
-                                <div style={{ paddingTop: '14px' }}>
-                                    <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                        Taxa de entrega <Info size={12} color="#94a3b8" />
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                                    <div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            Taxa de entrega (Handset) <Info size={11} color="#94a3b8" />
+                                        </div>
+                                        <strong style={{ fontSize: '24px', fontWeight: 600, color: activeCampaign.deliveryRate >= 70 ? '#16a34a' : '#ea580c' }}>
+                                            {activeCampaign.deliveryRate}%
+                                        </strong>
                                     </div>
-                                    <strong style={{ fontSize: '24px', fontWeight: 600, color: activeCampaign.deliveryRate >= 70 ? '#16a34a' : '#ea580c' }}>
-                                        {activeCampaign.deliveryRate}%
-                                    </strong>
+
+                                    {/* Barra de comparação Entregues vs Não Entregues */}
+                                    <div style={{ minWidth: '190px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
+                                            <span style={{ color: '#16a34a', fontWeight: 600 }}>{activeCampaign.delivered} entregues</span>
+                                            <span style={{ color: '#dc2626', fontWeight: 600 }}>{activeCampaign.failed} não entregues</span>
+                                        </div>
+                                        <div style={{ height: '6px', background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
+                                            <div style={{ height: '100%', width: `${activeCampaign.total > 0 ? (activeCampaign.delivered / activeCampaign.total) * 100 : 0}%`, background: '#16a34a' }} />
+                                            <div style={{ height: '100%', width: `${activeCampaign.total > 0 ? (activeCampaign.failed / activeCampaign.total) * 100 : 0}%`, background: '#dc2626' }} />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1008,10 +1035,11 @@ export const DispatchRecords: React.FC = () => {
                                                         </td>
                                                         <td style={{ padding: '8px 12px', fontSize: '11.5px', color: '#64748b' }}>
                                                             <div>Env: {r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '—'}</div>
-                                                            {r.doneAt && <div style={{ color: '#16a34a' }}>Ent: {new Date(r.doneAt).toLocaleTimeString()}</div>}
+                                                            {isDelivered && r.doneAt && <div style={{ color: '#16a34a' }}>Ent: {new Date(r.doneAt).toLocaleTimeString()}</div>}
+                                                            {isFailed && <div style={{ color: '#dc2626', fontWeight: 500 }}>Não entregue</div>}
                                                         </td>
                                                         <td style={{ padding: '8px 12px', fontSize: '11.5px', color: isDelivered ? '#166534' : (isFailed ? '#dc2626' : '#64748b') }}>
-                                                            {r.deliveryReason || (isDelivered ? 'DELIVERED_TO_HANDSET' : (isFailed ? r.errorReason : 'SENT_TO_NETWORK'))}
+                                                            {r.deliveryReason || (isDelivered ? 'DELIVERED_TO_HANDSET' : (isFailed ? (r.errorReason || 'UNDELIVERABLE_NOT_DELIVERED') : 'SENT_TO_NETWORK'))}
                                                         </td>
                                                     </tr>
                                                 );

@@ -932,11 +932,24 @@ async function syncDeliveryReportsFromInfobip() {
           const errorId = rep.error?.id || rep.status?.id;
           const price = rep.price?.pricePerMessage;
 
-          const isDeliv = statusGroup === 'DELIVERED' || statusName === 'DELIVERED_TO_HANDSET';
           const isFail = statusGroup === 'UNDELIVERABLE' || 
                          statusGroup === 'REJECTED' || 
                          statusGroup === 'FAILED' || 
-                         (statusName && (statusName.includes('REJECTED') || statusName.includes('UNDELIVERABLE') || statusName.includes('FAILED')));
+                         (statusName && (
+                           statusName.includes('REJECTED') || 
+                           statusName.includes('UNDELIVERABLE') || 
+                           statusName.includes('NOT_DELIVERED') || 
+                           statusName.includes('SPAM') || 
+                           statusName.includes('FAILED')
+                         )) ||
+                         (errorDesc && errorDesc.toLowerCase().includes('spam')) ||
+                         (errorId && String(errorId) !== '0');
+
+          const isDeliv = !isFail && (
+            statusGroup === 'DELIVERED' || 
+            statusName === 'DELIVERED_TO_HANDSET' ||
+            (statusName && statusName.includes('DELIVERED') && !statusName.includes('NOT') && !statusName.includes('UNDELIVERABLE'))
+          );
 
           // VINCULAÇÃO ESTRITA: apenas pelo ID único da transmissão
           const match = parsedLogs.find(l => (l.transmission_id === mId || l.messageId === mId));
@@ -959,11 +972,11 @@ async function syncDeliveryReportsFromInfobip() {
               if (match.status !== 'FAILED' || match.delivery_status !== (statusName || statusGroup)) {
                 match.status = 'FAILED';
                 match.log_type = 'ERROR';
-                match.delivery_status = statusName || statusGroup || 'UNDELIVERABLE_REJECTED_OPERATOR';
-                match.deliveryReason = statusName || statusGroup || 'UNDELIVERABLE_REJECTED_OPERATOR';
-                match.done_at = doneAt || new Date().toISOString();
+                match.delivery_status = statusName || statusGroup || 'UNDELIVERABLE_NOT_DELIVERED';
+                match.deliveryReason = statusName || statusGroup || 'UNDELIVERABLE_NOT_DELIVERED';
+                match.done_at = null;
                 match.error_group = errorGroup || 'HANDSET_ERRORS';
-                match.error_name = errorDesc ? (errorId ? `${errorDesc} (code ${errorId})` : errorDesc) : 'Erro de entrega';
+                match.error_name = errorDesc ? (errorId ? `${errorDesc} (code ${errorId})` : errorDesc) : (statusName || 'UNDELIVERABLE_NOT_DELIVERED');
                 changed = true;
               }
             } else {
@@ -1009,17 +1022,30 @@ async function syncDeliveryReportsFromInfobip() {
 
           const statusGroup = rep.status?.groupName;
           const statusName = rep.status?.name;
-          const isDeliv = statusGroup === 'DELIVERED' || statusName === 'DELIVERED_TO_HANDSET';
           const isFail = statusGroup === 'UNDELIVERABLE' || 
                          statusGroup === 'REJECTED' || 
                          statusGroup === 'FAILED' || 
-                         (statusName && (statusName.includes('REJECTED') || statusName.includes('UNDELIVERABLE') || statusName.includes('FAILED')));
+                         (statusName && (
+                           statusName.includes('REJECTED') || 
+                           statusName.includes('UNDELIVERABLE') || 
+                           statusName.includes('NOT_DELIVERED') || 
+                           statusName.includes('SPAM') || 
+                           statusName.includes('FAILED')
+                         )) ||
+                         (rep.error?.description && rep.error.description.toLowerCase().includes('spam')) ||
+                         (rep.error?.id && String(rep.error.id) !== '0');
+
+          const isDeliv = !isFail && (
+            statusGroup === 'DELIVERED' || 
+            statusName === 'DELIVERED_TO_HANDSET' ||
+            (statusName && statusName.includes('DELIVERED') && !statusName.includes('NOT') && !statusName.includes('UNDELIVERABLE'))
+          );
 
           const logType = isDeliv ? 'DELIVERED' : (isFail ? 'ERROR' : 'SENT');
-          const doneAtVal = rep.doneAt ? new Date(rep.doneAt) : (rep.sentAt ? new Date(rep.sentAt) : new Date());
+          const doneAtVal = isDeliv ? (rep.doneAt ? new Date(rep.doneAt) : (rep.sentAt ? new Date(rep.sentAt) : new Date())) : null;
           const errDesc = rep.error?.description || rep.status?.description;
           const errId = rep.error?.id || rep.status?.id;
-          const errorFormatted = isDeliv ? 'No Error (code 0)' : (errDesc ? (errId ? `${errorDesc} (code ${errId})` : errorDesc) : 'No Error (code 0)');
+          const errorFormatted = isDeliv ? 'No Error (code 0)' : (errDesc ? (errId ? `${errorDesc} (code ${errId})` : errorDesc) : (statusName || 'UNDELIVERABLE_NOT_DELIVERED'));
           const delivStatus = statusName || statusGroup || (isDeliv ? 'DELIVERED_TO_HANDSET' : 'SENT_TO_NETWORK');
 
           await pgPool.query(
