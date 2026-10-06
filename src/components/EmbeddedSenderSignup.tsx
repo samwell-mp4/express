@@ -71,8 +71,10 @@ export const EmbeddedSenderSignup: React.FC<EmbeddedSenderSignupProps> = ({
         setExistingWabas(saved);
         if (saved.length > 0 && !businessAccountId) {
             // Tentar extrair businessAccountId se disponível
-            const foundId = saved.find(w => (w as any).businessAccountId)?.['businessAccountId'] || '';
-            if (foundId) setBusinessAccountId(String(foundId));
+            const found = saved.find(w => Boolean(w.businessAccountId));
+            if (found && found.businessAccountId) {
+                setBusinessAccountId(String(found.businessAccountId));
+            }
         }
     }, []);
 

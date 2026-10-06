@@ -23,6 +23,7 @@ export interface SavedWaba {
     number: string;
     defaultLimit: number;
     accountName: string; // "BM do Luiz"
+    businessAccountId?: string | number;
     apiKey?: string;
     baseUrl?: string;
     templateName?: string;
