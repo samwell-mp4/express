@@ -752,56 +752,44 @@ async function syncDeliveryReportsFromInfobip() {
       console.warn('[SyncDLR] Erro ao consultar /messages-api/1/reports:', e.message);
     }
 
-    // 2. Coletar IDs de transmissão pendentes (e números) para consulta direta
-    const pendingIds = new Set();
-    const pendingDestinations = new Set();
+    // 2. Coletar IDs de transmissão (messageId único de cada envio)
+    const trackedIds = new Set();
 
     if (isRedisConnected) {
       try {
-        const rawLogs = await redisClient.lRange('dispatch_logs', 0, 999);
+        const rawLogs = await redisClient.lRange('dispatch_logs', 0, 499);
         for (const str of rawLogs) {
           try {
             const l = JSON.parse(str);
-            const st = String(l.status || '').toUpperCase();
-            const delSt = String(l.delivery_status || '').toUpperCase();
-            const isFinished = st === 'DELIVERED' || st === 'FAILED' || 
-                               delSt.includes('DELIVERED') || delSt.includes('REJECTED') || delSt.includes('UNDELIVERABLE');
-            if (!isFinished) {
-              if (l.transmission_id && !l.transmission_id.startsWith('tx_')) {
-                pendingIds.add(l.transmission_id);
-              }
-              if (l.recipient) {
-                pendingDestinations.add(l.recipient.replace(/\D/g, ''));
-              }
+            const mId = l.transmission_id || l.messageId;
+            if (mId && !mId.startsWith('tx_')) {
+              trackedIds.add(mId);
             }
           } catch {}
         }
       } catch {}
     }
 
-    if (isPostgresConnected && pendingIds.size < 50) {
+    if (isPostgresConnected) {
       try {
-        const pgPending = await pgPool.query(`
-          SELECT transmission_id, recipient 
+        const pgTracked = await pgPool.query(`
+          SELECT transmission_id 
           FROM dispatch_records 
-          WHERE (log_type != 'DELIVERED' AND log_type != 'ERROR')
-            AND (delivery_status IS NULL OR (delivery_status NOT LIKE '%DELIVERED%' AND delivery_status NOT LIKE '%REJECTED%' AND delivery_status NOT LIKE '%UNDELIVERABLE%'))
-          ORDER BY id DESC LIMIT 100
+          WHERE transmission_id IS NOT NULL 
+            AND transmission_id NOT LIKE 'tx_%'
+          ORDER BY id DESC LIMIT 500
         `);
-        for (const row of pgPending.rows) {
-          if (row.transmission_id && !row.transmission_id.startsWith('tx_')) {
-            pendingIds.add(row.transmission_id);
-          }
-          if (row.recipient) {
-            pendingDestinations.add(row.recipient.replace(/\D/g, ''));
+        for (const row of pgTracked.rows) {
+          if (row.transmission_id) {
+            trackedIds.add(row.transmission_id);
           }
         }
       } catch {}
     }
 
-    // 3. Consultar /messages-api/1/logs pelos IDs pendentes
-    if (pendingIds.size > 0) {
-      const idArray = Array.from(pendingIds);
+    // 3. Consultar /messages-api/1/logs em lotes usando estritamente os IDs únicos
+    if (trackedIds.size > 0) {
+      const idArray = Array.from(trackedIds);
       for (let i = 0; i < idArray.length; i += 50) {
         const chunk = idArray.slice(i, i + 50);
         const q = chunk.map(id => `messageId=${encodeURIComponent(id)}`).join('&');
@@ -816,30 +804,18 @@ async function syncDeliveryReportsFromInfobip() {
       }
     }
 
-    // 4. Também consultar os últimos logs de WhatsApp (últimas 24h)
-    try {
-      const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-      const lRecent = await getJson(baseUrl, `/messages-api/1/logs?channel=WHATSAPP&limit=200&sentSince=${encodeURIComponent(since)}`, apiKey);
-      if (lRecent?.results && Array.isArray(lRecent.results)) {
-        reports.push(...lRecent.results);
-      }
-    } catch (e) {
-      console.warn('[SyncDLR] Erro ao consultar logs recentes:', e.message);
-    }
-
-    // 5. Dedup por messageId
+    // 4. Dedup de relatórios exclusivamente pelo messageId
     const seenMap = new Map();
     for (const r of reports) {
-      const key = r.messageId || `${r.destination}_${r.sentAt}`;
-      if (!seenMap.has(key)) {
-        seenMap.set(key, r);
+      if (r.messageId) {
+        seenMap.set(r.messageId, r);
       }
     }
     const uniqueReports = Array.from(seenMap.values());
 
     let updatedCount = 0;
 
-    // 6. Atualização no Redis
+    // 5. Atualização no Redis: ESTRITAMENTE POR transmission_id / messageId
     if (isRedisConnected && uniqueReports.length > 0) {
       try {
         const rawLogs = await redisClient.lRange('dispatch_logs', 0, 999);
@@ -849,8 +825,6 @@ async function syncDeliveryReportsFromInfobip() {
 
         for (const rep of uniqueReports) {
           const mId = rep.messageId;
-          const dest = rep.destination || rep.to || rep.contact?.phoneNumber;
-          const destClean = dest ? String(dest).replace(/\D/g, '') : '';
           const statusGroup = rep.status?.groupName;
           const statusName = rep.status?.name;
           const doneAt = rep.doneAt || rep.sentAt;
@@ -865,42 +839,48 @@ async function syncDeliveryReportsFromInfobip() {
                          statusGroup === 'FAILED' || 
                          (statusName && (statusName.includes('REJECTED') || statusName.includes('UNDELIVERABLE') || statusName.includes('FAILED')));
 
-          const match = parsedLogs.find(l =>
-            (mId && (l.transmission_id === mId || l.messageId === mId)) ||
-            (destClean && l.recipient && (l.recipient === dest || l.recipient.replace(/\D/g, '') === destClean))
-          );
+          // VINCULAÇÃO ESTRITA: apenas pelo ID único da transmissão
+          const match = parsedLogs.find(l => (l.transmission_id === mId || l.messageId === mId));
 
           if (match) {
             let changed = false;
 
-            if (isDeliv && match.status !== 'DELIVERED') {
-              match.status = 'DELIVERED';
-              match.log_type = 'SUCCESS';
-              match.delivery_status = statusName || 'DELIVERED_TO_HANDSET';
-              match.deliveryReason = statusName || 'DELIVERED_TO_HANDSET';
-              match.done_at = doneAt || match.done_at || new Date().toISOString();
-              match.error_group = 'No Errors';
-              match.error_name = 'No Error (code 0)';
-              changed = true;
-            } else if (isFail && match.status !== 'FAILED') {
-              match.status = 'FAILED';
-              match.log_type = 'ERROR';
-              match.delivery_status = statusName || statusGroup || 'UNDELIVERABLE_REJECTED_OPERATOR';
-              match.deliveryReason = statusName || statusGroup || 'UNDELIVERABLE_REJECTED_OPERATOR';
-              match.done_at = doneAt || match.done_at || new Date().toISOString();
-              match.error_group = errorGroup || 'HANDSET_ERRORS';
-              match.error_name = errorDesc ? (errorId ? `${errorDesc} (code ${errorId})` : errorDesc) : 'Erro de entrega';
-              changed = true;
-            } else if (statusName && statusName !== match.delivery_status) {
-              match.delivery_status = statusName;
-              match.deliveryReason = statusName;
-              changed = true;
+            if (isDeliv) {
+              if (match.status !== 'DELIVERED' || match.delivery_status !== (statusName || 'DELIVERED_TO_HANDSET')) {
+                match.status = 'DELIVERED';
+                match.log_type = 'SUCCESS';
+                match.delivery_status = statusName || 'DELIVERED_TO_HANDSET';
+                match.deliveryReason = statusName || 'DELIVERED_TO_HANDSET';
+                match.done_at = doneAt || new Date().toISOString();
+                match.error_group = 'No Errors';
+                match.error_name = 'No Error (code 0)';
+                changed = true;
+              }
+            } else if (isFail) {
+              if (match.status !== 'FAILED' || match.delivery_status !== (statusName || statusGroup)) {
+                match.status = 'FAILED';
+                match.log_type = 'ERROR';
+                match.delivery_status = statusName || statusGroup || 'UNDELIVERABLE_REJECTED_OPERATOR';
+                match.deliveryReason = statusName || statusGroup || 'UNDELIVERABLE_REJECTED_OPERATOR';
+                match.done_at = doneAt || new Date().toISOString();
+                match.error_group = errorGroup || 'HANDSET_ERRORS';
+                match.error_name = errorDesc ? (errorId ? `${errorDesc} (code ${errorId})` : errorDesc) : 'Erro de entrega';
+                changed = true;
+              }
+            } else {
+              // Status em trânsito (PENDING_WAITING_DELIVERY, PENDING_ENROUTE)
+              if (match.delivery_status !== statusName) {
+                match.delivery_status = statusName || 'PENDING_WAITING_DELIVERY';
+                match.deliveryReason = statusName || 'PENDING_WAITING_DELIVERY';
+                match.error_name = 'No Error (code 0)';
+                if (match.status === 'FAILED') {
+                  match.status = 'SENT';
+                  match.log_type = 'SUCCESS';
+                }
+                changed = true;
+              }
             }
 
-            if (mId && (!match.transmission_id || match.transmission_id.startsWith('tx_'))) {
-              match.transmission_id = mId;
-              changed = true;
-            }
             if (price !== undefined && match.price !== price) {
               match.price = price;
               changed = true;
@@ -921,13 +901,13 @@ async function syncDeliveryReportsFromInfobip() {
       }
     }
 
-    // 7. Atualização no PostgreSQL
+    // 6. Atualização no PostgreSQL: ESTRITAMENTE POR transmission_id
     if (isPostgresConnected && uniqueReports.length > 0) {
       try {
         for (const rep of uniqueReports) {
           const mId = rep.messageId;
-          const dest = rep.destination || rep.to || rep.contact?.phoneNumber;
-          const destClean = dest ? String(dest).replace(/\D/g, '') : null;
+          if (!mId) continue;
+
           const statusGroup = rep.status?.groupName;
           const statusName = rep.status?.name;
           const isDeliv = statusGroup === 'DELIVERED' || statusName === 'DELIVERED_TO_HANDSET';
@@ -936,34 +916,28 @@ async function syncDeliveryReportsFromInfobip() {
                          statusGroup === 'FAILED' || 
                          (statusName && (statusName.includes('REJECTED') || statusName.includes('UNDELIVERABLE') || statusName.includes('FAILED')));
 
-          if (isDeliv || isFail || statusName) {
-            const logType = isDeliv ? 'DELIVERED' : (isFail ? 'ERROR' : 'SENT');
-            const doneAtVal = rep.doneAt ? new Date(rep.doneAt) : (rep.sentAt ? new Date(rep.sentAt) : new Date());
-            const errDesc = rep.error?.description || rep.status?.description;
-            const errId = rep.error?.id || rep.status?.id;
-            const errorFormatted = isDeliv ? 'No Error (code 0)' : (errDesc ? (errId ? `${errDesc} (code ${errId})` : errDesc) : null);
-            const delivStatus = statusName || statusGroup || (isDeliv ? 'DELIVERED_TO_HANDSET' : 'SENT_TO_NETWORK');
+          const logType = isDeliv ? 'DELIVERED' : (isFail ? 'ERROR' : 'SENT');
+          const doneAtVal = rep.doneAt ? new Date(rep.doneAt) : (rep.sentAt ? new Date(rep.sentAt) : new Date());
+          const errDesc = rep.error?.description || rep.status?.description;
+          const errId = rep.error?.id || rep.status?.id;
+          const errorFormatted = isDeliv ? 'No Error (code 0)' : (errDesc ? (errId ? `${errorDesc} (code ${errId})` : errorDesc) : 'No Error (code 0)');
+          const delivStatus = statusName || statusGroup || (isDeliv ? 'DELIVERED_TO_HANDSET' : 'SENT_TO_NETWORK');
 
-            await pgPool.query(
-              `UPDATE dispatch_records 
-               SET log_type = $1, 
-                   delivery_status = $2,
-                   done_at = $3,
-                   error_name = COALESCE($4, error_name)
-               WHERE (transmission_id = $5 AND transmission_id IS NOT NULL) 
-                  OR (recipient = $6)
-                  OR (recipient = $7)`,
-              [
-                logType, 
-                delivStatus, 
-                doneAtVal, 
-                errorFormatted,
-                mId,
-                dest,
-                destClean
-              ]
-            ).catch(() => {});
-          }
+          await pgPool.query(
+            `UPDATE dispatch_records 
+             SET log_type = $1, 
+                 delivery_status = $2,
+                 done_at = $3,
+                 error_name = $4
+             WHERE transmission_id = $5 AND transmission_id IS NOT NULL`,
+            [
+              logType, 
+              delivStatus, 
+              doneAtVal, 
+              errorFormatted,
+              mId
+            ]
+          ).catch(() => {});
         }
       } catch (err) {
         console.warn('[SyncDLR] Erro ao sincronizar PostgreSQL:', err.message);
