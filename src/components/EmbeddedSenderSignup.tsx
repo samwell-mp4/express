@@ -64,18 +64,20 @@ export const EmbeddedSenderSignup: React.FC<EmbeddedSenderSignupProps> = ({
     const [activeSenders, setActiveSenders] = useState<InfobipActiveSender[]>([]);
     const [isLoadingSenders, setIsLoadingSenders] = useState(false);
     const [existingWabas, setExistingWabas] = useState<SavedWaba[]>([]);
+    const [knownWabaIds, setKnownWabaIds] = useState<string[]>(['875786408937731']);
 
-    // Carregar WABAs salvas para auto-sugestão de WABA ID
+    // Carregar WABAs salvas e conhecidas para auto-sugestão de WABA ID
     useEffect(() => {
         const saved = wabaStorage.getSavedWabas();
         setExistingWabas(saved);
-        if (saved.length > 0 && !businessAccountId) {
-            // Tentar extrair businessAccountId se disponível
-            const found = saved.find(w => Boolean(w.businessAccountId));
-            if (found && found.businessAccountId) {
-                setBusinessAccountId(String(found.businessAccountId));
+        api.getKnownWabas().then(wabas => {
+            if (wabas && wabas.length > 0) {
+                setKnownWabaIds(wabas);
+                if (!businessAccountId) {
+                    setBusinessAccountId(wabas[0]);
+                }
             }
-        }
+        });
     }, []);
 
     // Timer regressivo para reenvio de OTP
@@ -517,6 +519,70 @@ export const EmbeddedSenderSignup: React.FC<EmbeddedSenderSignupProps> = ({
                                 </p>
                             </div>
 
+                            {/* Alerta Educativo WABA ID vs BM ID */}
+                            <div style={{
+                                background: '#eff6ff',
+                                border: '1px solid #bfdbfe',
+                                borderRadius: '8px',
+                                padding: '14px 16px',
+                                marginBottom: '20px',
+                                fontSize: '13px',
+                                color: '#1e40af',
+                                display: 'flex',
+                                gap: '12px',
+                                alignItems: 'flex-start'
+                            }}>
+                                <Info size={20} style={{ flexShrink: 0, marginTop: '2px', color: '#2563eb' }} />
+                                <div style={{ flex: 1 }}>
+                                    <strong style={{ fontSize: '13.5px', color: '#1e3a8a' }}>Atenção sobre o WABA ID (Erro 404):</strong>
+                                    <p style={{ margin: '4px 0 8px 0', lineHeight: 1.5 }}>
+                                        A API da Infobip exige o <strong>ID da Conta do WhatsApp (WABA ID)</strong> associada a ela. Se você digitar o ID do Gerenciador de Negócios (BM) do Meta (como <code>2589586361492683</code>) ou uma WABA não cadastrada nesta Infobip, a API retornará <strong>404 Not Found</strong>.
+                                    </p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#1e40af' }}>WABA vinculada à conta:</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setBusinessAccountId('875786408937731')}
+                                            style={{
+                                                background: businessAccountId === '875786408937731' ? '#2563eb' : '#dbeafe',
+                                                border: '1px solid #93c5fd',
+                                                color: businessAccountId === '875786408937731' ? '#fff' : '#1d4ed8',
+                                                padding: '3px 10px',
+                                                borderRadius: '4px',
+                                                fontSize: '12px',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                        >
+                                            {businessAccountId === '875786408937731' && <Check size={12} />}
+                                            875786408937731 (BM do Luiz)
+                                        </button>
+
+                                        <a
+                                            href="https://portal.infobip.com/channels/numbers/whatsapp"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{
+                                                marginLeft: 'auto',
+                                                fontSize: '12px',
+                                                fontWeight: 600,
+                                                color: '#2563eb',
+                                                textDecoration: 'underline',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                        >
+                                            Portal Infobip (Embedded Signup Meta)
+                                            <ExternalLink size={13} />
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
                             <form onSubmit={handleRequestRegistration} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                                     {/* WABA ID */}
@@ -529,7 +595,7 @@ export const EmbeddedSenderSignup: React.FC<EmbeddedSenderSignupProps> = ({
                                                 type="text"
                                                 value={businessAccountId}
                                                 onChange={(e) => setBusinessAccountId(e.target.value)}
-                                                placeholder="Ex: 104829104829102"
+                                                placeholder="Ex: 875786408937731"
                                                 required
                                                 style={{
                                                     width: '100%',
@@ -543,7 +609,7 @@ export const EmbeddedSenderSignup: React.FC<EmbeddedSenderSignupProps> = ({
                                             />
                                         </div>
                                         <span style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px', display: 'block' }}>
-                                            Encontrado no Meta Business Suite em "Configurações do Negócio &gt; Contas do WhatsApp".
+                                            Pegue no Meta Business Suite em "Configurações do Negócio &gt; Contas do WhatsApp" (e não na aba Informações da Empresa).
                                         </span>
                                     </div>
 

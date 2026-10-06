@@ -705,5 +705,17 @@ export const api = {
         } catch {
             return { senders: [] };
         }
+    },
+
+    // 16. Obter WABA IDs conhecidos na conta Infobip
+    async getKnownWabas(): Promise<string[]> {
+        try {
+            const res = await fetch('/api/whatsapp/known-wabas');
+            if (!res.ok) return ['875786408937731'];
+            const data = await res.json();
+            return data.wabas || ['875786408937731'];
+        } catch {
+            return ['875786408937731'];
+        }
     }
 };

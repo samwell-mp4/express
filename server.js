@@ -2245,13 +2245,23 @@ const server = http.createServer(async (req, res) => {
       const infobipRes = await postJson(cleanHost, endpoint, activeKey, payload);
 
       if (infobipRes && (infobipRes.statusCode >= 400 || infobipRes.requestError)) {
-        const errMsg = infobipRes.requestError?.serviceException?.text ||
-                       infobipRes.requestError?.clientCorrelator ||
-                       infobipRes.message ||
-                       infobipRes.description ||
-                       JSON.stringify(infobipRes);
+        let errMsg = infobipRes.requestError?.serviceException?.text ||
+                     infobipRes.requestError?.clientCorrelator ||
+                     infobipRes.message ||
+                     infobipRes.description;
+
+        if (!errMsg || errMsg === 'Something went wrong. Please contact support.') {
+          if (infobipRes.statusCode === 404) {
+            errMsg = `WABA ID ${cleanWabaId} não encontrado na Infobip (404). O ID digitado não existe ou não está vinculado à sua conta Infobip. Certifique-se de que informou o ID da Conta do WhatsApp (WABA ID) e não o ID da Business Manager (BM) do Meta.`;
+          } else if (infobipRes.statusCode === 500 || infobipRes.requestError?.serviceException?.messageId === 'GENERAL_ERROR') {
+            errMsg = `A API de Bulk Sender da Infobip retornou erro 500 para a WABA ${cleanWabaId}. O recurso 'whatsapp-bulk-sender-registration' é classificado como Early Access pela Infobip e requer que o suporte/gerente de conta da Infobip habilite a permissão 'whatsapp:manage', ou utilize o Portal Oficial da Infobip.`;
+          } else {
+            errMsg = JSON.stringify(infobipRes);
+          }
+        }
+
         console.warn('[EmbeddedSignup] Erro retornado pela Infobip:', infobipRes);
-        return sendError(`Infobip: ${errMsg}`, infobipRes.statusCode || 400);
+        return sendError(`Infobip: ${errMsg}`, 400);
       }
 
       console.log('[EmbeddedSignup] Sucesso no envio do registro:', infobipRes);
@@ -2366,6 +2376,25 @@ const server = http.createServer(async (req, res) => {
       const cleanHost = (urlObj.searchParams.get('baseUrl') || INFOBIP_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, '');
       const sendersRes = await getJson(cleanHost, '/whatsapp/1/senders', activeKey);
       return sendJson(sendersRes || { senders: [] });
+    } catch (err) {
+      return sendError(err.message, 500);
+    }
+  }
+
+  if (pathname === '/api/whatsapp/known-wabas' && req.method === 'GET') {
+    try {
+      const activeKey = urlObj.searchParams.get('apiKey') || INFOBIP_API_KEY;
+      const cleanHost = (urlObj.searchParams.get('baseUrl') || INFOBIP_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const known = new Set(['875786408937731']);
+      try {
+        const templatesRes = await getJson(cleanHost, '/whatsapp/1/templates?page=0&size=100', activeKey);
+        if (templatesRes && Array.isArray(templatesRes.results)) {
+          for (const t of templatesRes.results) {
+            if (t.businessAccountId) known.add(String(t.businessAccountId));
+          }
+        }
+      } catch {}
+      return sendJson({ success: true, wabas: Array.from(known) });
     } catch (err) {
       return sendError(err.message, 500);
     }
