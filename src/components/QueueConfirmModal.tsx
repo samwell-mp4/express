@@ -76,6 +76,24 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
             bodyPlaceholders = localMappings.map(m => `{{${m.id}}}`);
         }
 
+        // 3. Botões aprovados no template (ex: QUICK_REPLY "Não Reconheço" ou URL dinâmica)
+        const templateButtons = tObj?.structure?.buttons || [];
+        const dynamicButtons: any[] = [];
+        templateButtons.forEach((b: any) => {
+            const bType = String(b.type || '').toUpperCase();
+            if (bType === 'QUICK_REPLY') {
+                dynamicButtons.push({
+                    type: 'QUICK_REPLY',
+                    parameter: b.text || b.payload || 'Não Reconheço'
+                });
+            } else if (bType === 'URL' && b.url && (b.url.includes('{{') || b.url.includes('{1}'))) {
+                dynamicButtons.push({
+                    type: 'URL',
+                    parameter: b.parameter || ''
+                });
+            }
+        });
+
         const effectiveMedia = s.mediaUrl || currentMediaUrl || '';
         const isMediaRequired = headerFormat === 'IMAGE' || headerFormat === 'VIDEO' || headerFormat === 'DOCUMENT';
         const hasMedia = !isMediaRequired || Boolean(effectiveMedia.trim());
@@ -90,7 +108,9 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
             hasMedia,
             effectiveMedia,
             varCount,
-            bodyPlaceholders
+            bodyPlaceholders,
+            buttons: dynamicButtons,
+            rawButtons: templateButtons
         };
     };
 
@@ -200,6 +220,11 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                         type: requiredHeader,
                         mediaUrl: effectiveMediaUrl
                     };
+                }
+
+                // Envia botões dinâmicos / payload se o template exigir (ex: QUICK_REPLY "Não Reconheço")
+                if (analysis.buttons && analysis.buttons.length > 0) {
+                    templateData.buttons = analysis.buttons;
                 }
 
                 messages.push({
@@ -564,6 +589,22 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                                                     color: a.hasMedia ? '#059669' : '#dc2626'
                                                 }}>
                                                     {a.hasMedia ? '✓ Mídia Configurada' : '❌ Falta Imagem!'}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {a.rawButtons && a.rawButtons.length > 0 && (
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '4px' }}>
+                                                <span style={{ color: 'var(--text-muted)' }}>Botões / Payload:</span>
+                                                <span style={{ 
+                                                    fontWeight: 600, 
+                                                    color: '#0f766e', 
+                                                    background: '#ccfbf1', 
+                                                    padding: '1px 6px', 
+                                                    borderRadius: '4px',
+                                                    fontSize: '11px'
+                                                }}>
+                                                    {a.rawButtons.map((b: any) => `${b.text || b.type}`).join(', ')}
                                                 </span>
                                             </div>
                                         )}

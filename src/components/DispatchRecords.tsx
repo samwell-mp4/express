@@ -4,7 +4,7 @@ import {
     Search, Filter, Smartphone, Trash2, ArrowUpRight, Send, Check, 
     Radio, ShieldCheck, Download, ExternalLink, Zap, Copy, X, Info, 
     FileText, Layers, ChevronLeft, Calendar, FileSpreadsheet, Eye, Sparkles,
-    CheckCheck, BarChart3, ArrowLeft
+    CheckCheck, BarChart3, ArrowLeft, Pause, Play
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { DispatchRecord } from '../types';
@@ -52,8 +52,34 @@ export const DispatchRecords: React.FC = () => {
 
     // Hover Tooltip State
     const [hoveredRecordId, setHoveredRecordId] = useState<string | null>(null);
+    const [pausedCampaignIds, setPausedCampaignIds] = useState<Set<string>>(new Set());
 
     const pollCountRef = useRef(0);
+
+    const handleTogglePauseCampaign = async (campaignId: string, campaignName?: string) => {
+        const isPaused = pausedCampaignIds.has(campaignId) || (campaignName ? pausedCampaignIds.has(campaignName) : false);
+        try {
+            if (isPaused) {
+                await api.resumeCampaign(campaignId, campaignName);
+                setPausedCampaignIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(campaignId);
+                    if (campaignName) next.delete(campaignName);
+                    return next;
+                });
+            } else {
+                await api.pauseCampaign(campaignId, campaignName);
+                setPausedCampaignIds(prev => {
+                    const next = new Set(prev);
+                    next.add(campaignId);
+                    if (campaignName) next.add(campaignName);
+                    return next;
+                });
+            }
+        } catch (err: any) {
+            alert(`Erro ao alterar status de pausa da campanha: ${err.message}`);
+        }
+    };
 
     // Initial load & Polling
     useEffect(() => {
@@ -75,6 +101,11 @@ export const DispatchRecords: React.FC = () => {
             if (triggerDlrImmediate || (pollCountRef.current % 2 === 0)) {
                 await api.syncDeliveryReports().catch(() => {});
             }
+
+            try {
+                const pausedList = await api.getPausedCampaigns();
+                setPausedCampaignIds(new Set(pausedList));
+            } catch {}
 
             // 1. Logs oficiais do servidor (Postgres + Redis com relatórios da Infobip)
             const serverLogs = await api.getDispatchLogs();
@@ -456,9 +487,10 @@ export const DispatchRecords: React.FC = () => {
                     <button
                         className="btn-secondary"
                         onClick={() => setAutoRefresh(!autoRefresh)}
-                        style={{ height: '34px', fontSize: '12.5px', padding: '0 10px', borderRadius: '6px' }}
+                        style={{ height: '34px', fontSize: '12px', padding: '0 10px', borderRadius: '6px' }}
+                        title="Pausa ou retoma a atualização automática dos registros na tela a cada 3 segundos"
                     >
-                        {autoRefresh ? 'Pausar' : 'Retomar'}
+                        {autoRefresh ? 'Pausar Atualização (3s)' : 'Retomar Atualização'}
                     </button>
 
                     {records.length > 0 && (
@@ -536,14 +568,68 @@ export const DispatchRecords: React.FC = () => {
                                     <Smartphone size={14} /> WhatsApp
                                 </span>
                                 <span>•</span>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#059669', fontWeight: 600 }}>
-                                    <CheckCircle2 size={14} /> {activeCampaign.pending === 0 ? 'Terminado' : 'Em Andamento'}
-                                </span>
+                                {(pausedCampaignIds.has(activeCampaign.id) || pausedCampaignIds.has(activeCampaign.name)) ? (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#b45309', background: '#fef3c7', padding: '2px 8px', borderRadius: '4px', fontWeight: 700, fontSize: '12px' }}>
+                                        <Pause size={13} /> PAUSADA
+                                    </span>
+                                ) : (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#059669', fontWeight: 600 }}>
+                                        <CheckCircle2 size={14} /> {activeCampaign.pending === 0 ? 'Terminado' : 'Em Andamento'}
+                                    </span>
+                                )}
                             </div>
                         </div>
 
                         {/* Botões de Ação Topo Direito (Imagem 2) */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            {/* PAUSAR / RETOMAR CAMPANHA INDIVIDUAL */}
+                            {(pausedCampaignIds.has(activeCampaign.id) || pausedCampaignIds.has(activeCampaign.name)) ? (
+                                <button
+                                    type="button"
+                                    className="btn-primary"
+                                    onClick={() => handleTogglePauseCampaign(activeCampaign.id, activeCampaign.name)}
+                                    style={{
+                                        height: '36px',
+                                        padding: '0 14px',
+                                        fontSize: '12.5px',
+                                        fontWeight: 600,
+                                        borderRadius: '6px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        background: '#16a34a',
+                                        borderColor: '#16a34a'
+                                    }}
+                                    title="Retomar o disparo dos contatos desta campanha"
+                                >
+                                    <Play size={14} />
+                                    RETOMAR CAMPANHA
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    onClick={() => handleTogglePauseCampaign(activeCampaign.id, activeCampaign.name)}
+                                    style={{
+                                        height: '36px',
+                                        padding: '0 14px',
+                                        fontSize: '12.5px',
+                                        fontWeight: 600,
+                                        borderRadius: '6px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        color: '#b45309',
+                                        background: '#fef3c7',
+                                        border: '1px solid #fde68a'
+                                    }}
+                                    title="Pausar o envio dos contatos desta campanha individual"
+                                >
+                                    <Pause size={14} />
+                                    PAUSAR CAMPANHA
+                                </button>
+                            )}
+
                             {/* OBTER RELATÓRIO (Gera o XLS/CSV da Imagem 3) */}
                             <button
                                 type="button"
@@ -1069,21 +1155,45 @@ export const DispatchRecords: React.FC = () => {
                                     <div>
                                         {/* Status Header */}
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                            <span style={{
-                                                fontSize: '11.5px',
-                                                fontWeight: 600,
-                                                color: '#15803d',
-                                                background: '#dcfce7',
-                                                border: '1px solid #86efac',
-                                                padding: '2px 8px',
-                                                borderRadius: '4px',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '4px'
-                                            }}>
-                                                <CheckCircle2 size={12} />
-                                                {camp.pending === 0 ? 'Terminado' : 'Em Envio'}
-                                            </span>
+                                            {(() => {
+                                                const isCardPaused = pausedCampaignIds.has(camp.id) || pausedCampaignIds.has(camp.name);
+                                                if (isCardPaused) {
+                                                    return (
+                                                        <span style={{
+                                                            fontSize: '11.5px',
+                                                            fontWeight: 700,
+                                                            color: '#b45309',
+                                                            background: '#fef3c7',
+                                                            border: '1px solid #fde68a',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}>
+                                                            <Pause size={12} />
+                                                            Pausada
+                                                        </span>
+                                                    );
+                                                }
+                                                return (
+                                                    <span style={{
+                                                        fontSize: '11.5px',
+                                                        fontWeight: 600,
+                                                        color: '#15803d',
+                                                        background: '#dcfce7',
+                                                        border: '1px solid #86efac',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '4px',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px'
+                                                    }}>
+                                                        <CheckCircle2 size={12} />
+                                                        {camp.pending === 0 ? 'Terminado' : 'Em Envio'}
+                                                    </span>
+                                                );
+                                            })()}
                                             <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
                                                 {camp.createdAt ? new Date(camp.createdAt).toLocaleDateString() : 'Hoje'}
                                             </span>
@@ -1209,6 +1319,55 @@ export const DispatchRecords: React.FC = () => {
                                         >
                                             <Download size={13} /> XLS
                                         </button>
+
+                                        {(() => {
+                                            const isCardPaused = pausedCampaignIds.has(camp.id) || pausedCampaignIds.has(camp.name);
+                                            return isCardPaused ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleTogglePauseCampaign(camp.id, camp.name)}
+                                                    style={{
+                                                        height: '34px',
+                                                        fontSize: '12px',
+                                                        padding: '0 10px',
+                                                        borderRadius: '6px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        background: '#16a34a',
+                                                        color: '#ffffff',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        fontWeight: 600
+                                                    }}
+                                                    title="Retomar envios desta campanha"
+                                                >
+                                                    <Play size={13} /> Retomar
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleTogglePauseCampaign(camp.id, camp.name)}
+                                                    style={{
+                                                        height: '34px',
+                                                        fontSize: '12px',
+                                                        padding: '0 10px',
+                                                        borderRadius: '6px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        background: '#fef3c7',
+                                                        color: '#b45309',
+                                                        border: '1px solid #fde68a',
+                                                        cursor: 'pointer',
+                                                        fontWeight: 500
+                                                    }}
+                                                    title="Pausar envios desta campanha"
+                                                >
+                                                    <Pause size={13} /> Pausar
+                                                </button>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             ))}

@@ -117,6 +117,23 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
             bodyPlaceholders = bodyText.match(/\{\{\d+\}\}/g) || [];
         }
 
+        const templateButtons = tObj?.structure?.buttons || [];
+        const dynamicButtons: any[] = [];
+        templateButtons.forEach((b: any) => {
+            const bType = String(b.type || '').toUpperCase();
+            if (bType === 'QUICK_REPLY') {
+                dynamicButtons.push({
+                    type: 'QUICK_REPLY',
+                    parameter: b.text || b.payload || 'Não Reconheço'
+                });
+            } else if (bType === 'URL' && b.url && (b.url.includes('{{') || b.url.includes('{1}'))) {
+                dynamicButtons.push({
+                    type: 'URL',
+                    parameter: b.parameter || ''
+                });
+            }
+        });
+
         const effectiveMedia = s.mediaUrl || mediaUrl || '';
         const isMediaRequired = headerFormat === 'IMAGE' || headerFormat === 'VIDEO' || headerFormat === 'DOCUMENT';
         const hasMedia = !isMediaRequired || Boolean(effectiveMedia.trim());
@@ -133,7 +150,9 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
             effectiveMedia,
             varCount: bodyPlaceholders.length,
             bodyPlaceholders,
-            bodyText
+            bodyText,
+            buttons: dynamicButtons,
+            rawButtons: templateButtons
         };
     };
 
@@ -1026,6 +1045,22 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                                 color: a.hasMedia ? '#16a34a' : '#dc2626'
                                             }}>
                                                 {a.hasMedia ? '✓ URL Informada' : '❌ Falta URL!'}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {a.rawButtons && a.rawButtons.length > 0 && (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '4px' }}>
+                                            <span style={{ color: 'var(--text-muted)' }}>Botões / Payload:</span>
+                                            <span style={{
+                                                fontWeight: 600,
+                                                color: '#0f766e',
+                                                background: '#ccfbf1',
+                                                padding: '1px 6px',
+                                                borderRadius: '4px',
+                                                fontSize: '11px'
+                                            }}>
+                                                {a.rawButtons.map((b: any) => `${b.text || b.type}`).join(', ')}
                                             </span>
                                         </div>
                                     )}

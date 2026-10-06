@@ -310,10 +310,49 @@ export const api = {
         return await res.json();
     },
 
-    // 6. Stop Redis queue
+    // 6. Stop / Pause Redis queue
     async stopRedisQueue(): Promise<void> {
-        const res = await fetch('/api/dispatch/queue/stop', { method: 'POST' });
+        const res = await fetch('/api/dispatch/queue/pause', { method: 'POST' });
         if (!res.ok) throw new Error('Falha ao pausar fila Redis');
+    },
+
+    async pauseRedisQueue(): Promise<void> {
+        const res = await fetch('/api/dispatch/queue/pause', { method: 'POST' });
+        if (!res.ok) throw new Error('Falha ao pausar fila Redis');
+    },
+
+    async resumeRedisQueue(): Promise<void> {
+        const res = await fetch('/api/dispatch/queue/resume', { method: 'POST' });
+        if (!res.ok) throw new Error('Falha ao retomar fila Redis');
+    },
+
+    // 6b. Individual Campaign Pause / Resume
+    async pauseCampaign(campaignId: string, campaignName?: string): Promise<void> {
+        const res = await fetch(`/api/dispatch/campaign/${encodeURIComponent(campaignId)}/pause`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ campaignName })
+        });
+        if (!res.ok) throw new Error('Falha ao pausar campanha individual');
+    },
+
+    async resumeCampaign(campaignId: string, campaignName?: string): Promise<void> {
+        const res = await fetch(`/api/dispatch/campaign/${encodeURIComponent(campaignId)}/resume`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ campaignName })
+        });
+        if (!res.ok) throw new Error('Falha ao retomar campanha individual');
+    },
+
+    async getPausedCampaigns(): Promise<string[]> {
+        try {
+            const res = await fetch('/api/dispatch/campaigns/paused');
+            if (!res.ok) return [];
+            return await res.json();
+        } catch {
+            return [];
+        }
     },
 
     // 7. Clear Redis queue

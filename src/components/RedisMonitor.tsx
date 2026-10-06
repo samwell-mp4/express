@@ -36,14 +36,27 @@ export const RedisMonitor: React.FC<RedisMonitorProps> = ({ status, onRefresh })
     };
 
     const handleStopQueue = async () => {
-        if (!window.confirm("Deseja realmente sinalizar a pausa imediata do processamento da fila Redis?")) return;
+        if (!window.confirm("Deseja pausar o processamento da fila Redis? Os envios serão suspensos até você clicar em Retomar.")) return;
         setIsActionLoading(true);
         try {
-            await api.stopRedisQueue();
-            showToast("Sinal de parada enviado com sucesso. O worker finalizará a mensagem atual e entrará em pausa.");
+            await api.pauseRedisQueue();
+            showToast("Fila do Redis pausada com sucesso.");
             onRefresh();
         } catch (err: any) {
             alert(`Erro ao pausar fila: ${err.message}`);
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleResumeQueue = async () => {
+        setIsActionLoading(true);
+        try {
+            await api.resumeRedisQueue();
+            showToast("Fila do Redis retomada com sucesso. Processamento reativado.");
+            onRefresh();
+        } catch (err: any) {
+            alert(`Erro ao retomar fila: ${err.message}`);
         } finally {
             setIsActionLoading(false);
         }
@@ -95,15 +108,27 @@ export const RedisMonitor: React.FC<RedisMonitorProps> = ({ status, onRefresh })
                             Atualizar
                         </button>
 
-                        <button 
-                            className="btn-danger"
-                            onClick={handleStopQueue}
-                            disabled={isActionLoading || status.queueLength === 0}
-                            style={{ height: '34px', fontSize: '13px', padding: '0 12px', borderRadius: '6px' }}
-                        >
-                            <Pause size={13} />
-                            Pausar Fila
-                        </button>
+                        {status.isPaused ? (
+                            <button 
+                                className="btn-primary"
+                                onClick={handleResumeQueue}
+                                disabled={isActionLoading}
+                                style={{ background: '#16a34a', height: '34px', fontSize: '13px', padding: '0 12px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                            >
+                                <Play size={13} />
+                                Retomar Fila
+                            </button>
+                        ) : (
+                            <button 
+                                className="btn-danger"
+                                onClick={handleStopQueue}
+                                disabled={isActionLoading || (status.queueLength === 0 && !status.isRunning)}
+                                style={{ height: '34px', fontSize: '13px', padding: '0 12px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                            >
+                                <Pause size={13} />
+                                Pausar Fila
+                            </button>
+                        )}
 
                         <button 
                             className="btn-danger"
@@ -174,17 +199,17 @@ export const RedisMonitor: React.FC<RedisMonitorProps> = ({ status, onRefresh })
                     <div className="glass-card" style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                             <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Worker Status</span>
-                            <Zap size={15} color={status.isRunning ? 'var(--status-approved)' : '#94a3b8'} />
+                            <Zap size={15} color={status.isPaused ? '#d97706' : status.isRunning ? 'var(--status-approved)' : '#94a3b8'} />
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
                             <span style={{ 
                                 width: '8px', 
                                 height: '8px', 
                                 borderRadius: '50%', 
-                                background: status.isRunning ? 'var(--status-approved)' : '#94a3b8'
+                                background: status.isPaused ? '#f59e0b' : status.isRunning ? 'var(--status-approved)' : '#94a3b8'
                             }} />
-                            <span style={{ fontSize: '15px', fontWeight: 600, color: status.isRunning ? 'var(--status-approved)' : 'var(--text-muted)' }}>
-                                {status.isRunning ? 'EM DISPARO' : 'OCIOSO / AGUARDANDO'}
+                            <span style={{ fontSize: '15px', fontWeight: 600, color: status.isPaused ? '#d97706' : status.isRunning ? 'var(--status-approved)' : 'var(--text-muted)' }}>
+                                {status.isPaused ? '⏸️ PAUSADO' : status.isRunning ? 'EM DISPARO' : 'OCIOSO / AGUARDANDO'}
                             </span>
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>

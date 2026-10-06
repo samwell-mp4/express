@@ -582,6 +582,13 @@ let isWorkerRunning = false;
 
 async function startWorkerIfNeeded() {
   if (isWorkerRunning || !isRedisConnected) return;
+  try {
+    const isPaused = (await redisClient.get('dispatch_paused')) === 'true';
+    if (isPaused) {
+      console.log('[Worker] Fila está pausada. Não iniciando worker.');
+      return;
+    }
+  } catch {}
   runDispatchWorker().catch(err => {
     console.error('[Worker] Erro não tratado:', err);
     isWorkerRunning = false;
@@ -590,8 +597,17 @@ async function startWorkerIfNeeded() {
 
 async function runDispatchWorker() {
   if (isWorkerRunning) return;
-  isWorkerRunning = true;
+  if (isRedisConnected) {
+    try {
+      const isPaused = (await redisClient.get('dispatch_paused')) === 'true';
+      if (isPaused) {
+        console.log('[Worker] Fila pausada. Worker não será iniciado.');
+        return;
+      }
+    } catch {}
+  }
 
+  isWorkerRunning = true;
   console.log('[Worker] Iniciando loop de processamento da fila Redis...');
   try {
     if (isRedisConnected) {
@@ -604,10 +620,10 @@ async function runDispatchWorker() {
         continue;
       }
 
-      const stopFlag = await redisClient.get('dispatch_stop');
-      if (stopFlag === 'true') {
-        console.log('[Worker] Sinal de parada detectado. Pausando worker.');
-        await redisClient.set('dispatch_stop', 'false');
+      // Checa se a fila foi pausada globalmente
+      const isPaused = (await redisClient.get('dispatch_paused')) === 'true';
+      if (isPaused) {
+        console.log('[Worker] Fila pausada globalmente. Suspendendo worker.');
         break;
       }
 
@@ -624,12 +640,43 @@ async function runDispatchWorker() {
         continue;
       }
 
+      // Checa se a CAMPANHA individual deste job está pausada
+      const jobCampaignId = job.campaignId || job.campaign_id;
+      const jobCampaignName = job.campaignName || job.campaign_name;
+      let isCampaignPaused = false;
+      try {
+        if (jobCampaignId && await redisClient.sIsMember('paused_campaigns', String(jobCampaignId))) {
+          isCampaignPaused = true;
+        } else if (jobCampaignName && await redisClient.sIsMember('paused_campaigns', String(jobCampaignName))) {
+          isCampaignPaused = true;
+        }
+      } catch {}
+
+      if (isCampaignPaused) {
+        // Enfileira na fila reservada da campanha pausada para manter a integridade sem travar as outras
+        const pausedKey = `dispatch_queue_paused:${jobCampaignId || jobCampaignName}`;
+        await redisClient.rPush(pausedKey, itemStr);
+        continue;
+      }
+
       // Utiliza credencial server-side obrigatória
       const apiKey = INFOBIP_API_KEY;
       const baseUrl = INFOBIP_BASE_URL;
       const targetNumber = job.to;
       const senderNumber = job.from;
       const templateName = job.content?.templateName || 'template';
+
+      // Safeguard de botões para templates como final_0708 (evita erro 7008 Meta)
+      if (templateName.includes('final_0708') && job.content?.templateData) {
+        if (!job.content.templateData.buttons || job.content.templateData.buttons.length === 0) {
+          job.content.templateData.buttons = [
+            {
+              type: 'QUICK_REPLY',
+              parameter: 'Não Reconheço'
+            }
+          ];
+        }
+      }
 
       const startTime = new Date().toISOString();
       let logType = 'SUCCESS';
@@ -769,6 +816,8 @@ async function runDispatchWorker() {
 setInterval(async () => {
   if (isRedisConnected && !isWorkerRunning) {
     try {
+      const isPaused = (await redisClient.get('dispatch_paused')) === 'true';
+      if (isPaused) return; // Fila pausada pelo usuário, não reiniciar!
       const len = await redisClient.lLen('dispatch_queue');
       if (len > 0) {
         startWorkerIfNeeded();
@@ -1678,15 +1727,22 @@ const server = http.createServer(async (req, res) => {
 
       const queueLength = await redisClient.lLen('dispatch_queue');
       const isRunning = (await redisClient.get('dispatch_running')) === 'true';
+      const isPaused = (await redisClient.get('dispatch_paused')) === 'true';
       const processed = parseInt((await redisClient.get('dispatch_processed')) || '0', 10);
       const rateLimitStr = await redisClient.get('dispatch_rate_limit');
       const rateLimit = rateLimitStr ? parseFloat(rateLimitStr) : 1.0;
+      let pausedCampaigns = [];
+      try {
+        pausedCampaigns = await redisClient.sMembers('paused_campaigns') || [];
+      } catch {}
 
       return sendJson({
         queueLength,
-        isRunning,
+        isRunning: isRunning && !isPaused,
+        isPaused,
         processed,
         rateLimit,
+        pausedCampaigns,
         connected: true
       });
     } catch (err) {
@@ -1752,13 +1808,86 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Pausar Fila Redis
-  if (pathname === '/api/dispatch/queue/stop' && req.method === 'POST') {
+  // Pausar Fila Redis Global
+  if ((pathname === '/api/dispatch/queue/stop' || pathname === '/api/dispatch/queue/pause') && req.method === 'POST') {
     try {
       if (isRedisConnected) {
-        await redisClient.set('dispatch_stop', 'true');
+        await redisClient.set('dispatch_paused', 'true');
+        await redisClient.set('dispatch_running', 'false');
       }
-      return sendJson({ success: true, message: 'Comando de pausa enviado' });
+      return sendJson({ success: true, isPaused: true, message: 'Fila global pausada com sucesso' });
+    } catch (err) {
+      return sendError(err.message, 500);
+    }
+  }
+
+  // Retomar Fila Redis Global
+  if (pathname === '/api/dispatch/queue/resume' && req.method === 'POST') {
+    try {
+      if (isRedisConnected) {
+        await redisClient.set('dispatch_paused', 'false');
+        startWorkerIfNeeded();
+      }
+      return sendJson({ success: true, isPaused: false, message: 'Fila global retomada com sucesso' });
+    } catch (err) {
+      return sendError(err.message, 500);
+    }
+  }
+
+  // Pausar / Retomar Campanha Individual
+  if (pathname.startsWith('/api/dispatch/campaign/') && req.method === 'POST') {
+    try {
+      const parts = pathname.split('/');
+      // /api/dispatch/campaign/:id/pause or /api/dispatch/campaign/:id/resume
+      const campaignId = decodeURIComponent(parts[4] || '');
+      const action = parts[5]; // 'pause' ou 'resume'
+
+      if (!campaignId) return sendError('ID de campanha inválido', 400);
+
+      const body = await parseJsonBody(req).catch(() => ({}));
+      const campaignName = body?.campaignName;
+
+      if (action === 'pause') {
+        if (isRedisConnected) {
+          await redisClient.sAdd('paused_campaigns', campaignId);
+          if (campaignName) await redisClient.sAdd('paused_campaigns', campaignName);
+        }
+        return sendJson({ success: true, campaignId, paused: true, message: `Campanha "${campaignId}" pausada com sucesso` });
+      }
+
+      if (action === 'resume') {
+        if (isRedisConnected) {
+          await redisClient.sRem('paused_campaigns', campaignId);
+          if (campaignName) await redisClient.sRem('paused_campaigns', campaignName);
+
+          // Restaura mensagens da fila temporária de volta para dispatch_queue
+          const keys = [`dispatch_queue_paused:${campaignId}`];
+          if (campaignName) keys.push(`dispatch_queue_paused:${campaignName}`);
+
+          for (const key of keys) {
+            let item;
+            while ((item = await redisClient.lPop(key))) {
+              await redisClient.rPush('dispatch_queue', item);
+            }
+          }
+
+          startWorkerIfNeeded();
+        }
+        return sendJson({ success: true, campaignId, paused: false, message: `Campanha "${campaignId}" retomada com sucesso` });
+      }
+
+      return sendError('Ação desconhecida para campanha', 404);
+    } catch (err) {
+      return sendError(err.message, 500);
+    }
+  }
+
+  // Listar campanhas pausadas
+  if (pathname === '/api/dispatch/campaigns/paused' && req.method === 'GET') {
+    try {
+      if (!isRedisConnected) return sendJson([]);
+      const paused = await redisClient.sMembers('paused_campaigns');
+      return sendJson(paused || []);
     } catch (err) {
       return sendError(err.message, 500);
     }

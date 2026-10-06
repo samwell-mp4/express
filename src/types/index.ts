@@ -67,8 +67,10 @@ export interface PlaceholderMapping {
 export interface RedisQueueStatus {
     queueLength: number;
     isRunning: boolean;
+    isPaused?: boolean;
     processed: number;
     rateLimit?: number;
+    pausedCampaigns?: string[];
     warning?: string;
 }
 
