@@ -221,7 +221,7 @@ export const App: React.FC = () => {
                 return prev.map(s => ({
                     ...s,
                     templateName,
-                    headerType: analysis.headerType === 'IMAGE' ? 'IMAGE' : (analysis.headerType === 'VIDEO' ? 'VIDEO' : 'NONE'),
+                    headerType: analysis.headerType || 'NONE',
                     mediaUrl: s.mediaUrl || mediaUrl
                 }));
             }
@@ -238,14 +238,14 @@ export const App: React.FC = () => {
         setSenders(prev => prev.map(s => ({
             ...s,
             templateName: newTemplateName,
-            headerType: analysis.headerType === 'IMAGE' ? 'IMAGE' : (analysis.headerType === 'VIDEO' ? 'VIDEO' : 'NONE'),
+            headerType: analysis.headerType || 'NONE',
             mediaUrl: s.mediaUrl || mediaUrl
         })));
         const newMappings = templateHelper.generateMappingsForVariables(analysis.variablesCount, mappings, headers);
         setMappings(newMappings);
     };
 
-    const handleHeaderTypeChangeFromMapper = (hType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE') => {
+    const handleHeaderTypeChangeFromMapper = (hType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE') => {
         setSenders(prev => prev.map(s => ({ ...s, headerType: hType })));
     };
 
@@ -254,7 +254,7 @@ export const App: React.FC = () => {
         setSenders(prev => prev.map(s => ({ ...s, mediaUrl: url })));
     };
 
-    const handleSenderTemplateSelected = (chosenName: string, _hType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE') => {
+    const handleSenderTemplateSelected = (chosenName: string, _hType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE') => {
         const analysis = templateHelper.analyzeTemplate(chosenName, null, availableTemplates);
         const newMappings = templateHelper.generateMappingsForVariables(analysis.variablesCount, mappings, headers);
         setMappings(newMappings);

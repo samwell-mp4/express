@@ -19,8 +19,8 @@ interface VariableMapperProps {
     availableTemplates?: InfobipTemplateSummary[];
     mediaUrl: string;
     onMediaUrlChange: (url: string) => void;
-    headerType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE';
-    onHeaderTypeChange?: (headerType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE') => void;
+    headerType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE';
+    onHeaderTypeChange?: (headerType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE') => void;
 }
 
 export const VariableMapper: React.FC<VariableMapperProps> = ({

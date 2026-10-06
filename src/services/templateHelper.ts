@@ -5,7 +5,7 @@ export interface TemplateAnalysis {
     templateName: string;
     variablesCount: number;
     variableIndices: number[];
-    headerType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE';
+    headerType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE';
     bodyText: string;
     footerText?: string;
     buttons?: Array<{ type: string; text: string; url?: string }>;
@@ -73,9 +73,10 @@ export const templateHelper = {
         let language = t?.language || 'pt_BR';
         let status = t?.status || 'APPROVED';
 
-        let headerType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE' = 'NONE';
+        let headerType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE' = 'NONE';
         if (headerFormat === 'IMAGE') headerType = 'IMAGE';
         else if (headerFormat === 'VIDEO') headerType = 'VIDEO';
+        else if (headerFormat === 'DOCUMENT') headerType = 'DOCUMENT';
         else if (headerFormat === 'TEXT') headerType = 'TEXT';
 
         let variableIndices = this.extractVariableIndices(bodyText);

@@ -18,7 +18,7 @@ interface SenderManagerProps {
     setHeaders: React.Dispatch<React.SetStateAction<string[]>>;
     mediaUrl: string;
     onMediaUrlChange?: (url: string) => void;
-    onTemplateSelected?: (templateName: string, headerType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE') => void;
+    onTemplateSelected?: (templateName: string, headerType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE') => void;
     onAdvanceToReview: () => void;
 }
 
@@ -179,11 +179,12 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                     const selectedName = currentValid ? s.templateName : (templates[0]?.name || s.templateName || '');
                     
                     const selectedTemplateObj = templates.find(t => t.name === selectedName);
-                    let detectedHeaderType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE' = 'NONE';
+                    let detectedHeaderType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE' = 'NONE';
                     if (selectedTemplateObj?.structure?.header?.format) {
                         const fmt = String(selectedTemplateObj.structure.header.format).toUpperCase();
                         if (fmt === 'IMAGE') detectedHeaderType = 'IMAGE';
                         else if (fmt === 'VIDEO') detectedHeaderType = 'VIDEO';
+                        else if (fmt === 'DOCUMENT') detectedHeaderType = 'DOCUMENT';
                         else if (fmt === 'TEXT') detectedHeaderType = 'TEXT';
                     } else if (s.headerType && s.headerType !== 'NONE') {
                         detectedHeaderType = s.headerType;
@@ -1247,11 +1248,12 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
                                         onChange={(e) => {
                                             const chosen = e.target.value;
                                             const tObj = s.templates.find(t => t.name === chosen);
-                                            let hType: 'NONE' | 'IMAGE' | 'VIDEO' | 'TEXT' = 'NONE';
+                                            let hType: 'NONE' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' = 'NONE';
                                             if (tObj?.structure?.header?.format) {
                                                 const fmt = String(tObj.structure.header.format).toUpperCase();
                                                 if (fmt === 'IMAGE') hType = 'IMAGE';
                                                 else if (fmt === 'VIDEO') hType = 'VIDEO';
+                                                else if (fmt === 'DOCUMENT') hType = 'DOCUMENT';
                                                 else if (fmt === 'TEXT') hType = 'TEXT';
                                                 else hType = 'NONE';
                                             } else if (s.headerType && s.headerType !== 'NONE') {
