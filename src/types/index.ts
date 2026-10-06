@@ -29,7 +29,7 @@ export interface SavedWaba {
     templateName?: string;
     templateLanguage?: string;
     templates?: InfobipTemplateSummary[];
-    headerType?: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE';
+    headerType?: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE';
     mediaUrl?: string;
     createdAt: string;
 }
@@ -43,7 +43,7 @@ export interface SenderConfig {
     templateLanguage: string;
     templates: InfobipTemplateSummary[];
     isLoadingTemplates?: boolean;
-    headerType: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE';
+    headerType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE';
     mediaUrl: string;
     allocatedContacts?: ParsedContact[];
 }
@@ -94,7 +94,7 @@ export interface DispatchRecord {
     errorName?: string;
     operator?: string;
     mediaUrl?: string;
-    headerType?: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE';
+    headerType?: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE';
     price?: number;
 }
 
@@ -107,7 +107,7 @@ export interface InfobipQueueMessage {
     campaign_name?: string;
     listName?: string;
     mediaUrl?: string;
-    headerType?: 'IMAGE' | 'VIDEO' | 'TEXT' | 'NONE';
+    headerType?: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE';
     content: {
         templateName: string;
         templateData?: {
@@ -115,9 +115,13 @@ export interface InfobipQueueMessage {
                 placeholders: string[];
             };
             header?: {
-                type: 'IMAGE' | 'VIDEO' | 'TEXT';
+                type: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT';
                 mediaUrl?: string;
             };
+            buttons?: Array<{
+                type: string;
+                parameter?: string;
+            }>;
         };
         language: string;
     };
