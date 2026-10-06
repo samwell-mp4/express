@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Zap, Smartphone, Activity, Layers, UploadCloud, PlusCircle, FileSpreadsheet, Image as ImageIcon, Link as LinkIcon, User, LogOut } from 'lucide-react';
+import { Zap, Smartphone, Activity, Layers, UploadCloud, PlusCircle, FileSpreadsheet, Image as ImageIcon, Link as LinkIcon, User, LogOut, UserPlus } from 'lucide-react';
 import { RedisQueueStatus, AppTab } from '../types';
 
 interface SidebarProps {
@@ -215,6 +215,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             {wabaCount}
                         </span>
                     )}
+                </button>
+
+                {/* TAB: CADASTRAR REMETENTE (EMBEDDING) */}
+                <button
+                    className={`sidebar-nav-item ${activeTab === 'embedded-signup' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('embedded-signup')}
+                >
+                    <UserPlus size={16} />
+                    <span style={{ flex: 1 }}>Cadastrar Remetente</span>
+                    <span style={{
+                        background: '#ecfdf5',
+                        color: '#059669',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        border: '1px solid #a7f3d0'
+                    }}>
+                        Embedding
+                    </span>
                 </button>
 
                 {/* TAB: MULTI-REMETENTE */}

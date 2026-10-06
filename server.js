@@ -414,6 +414,47 @@ function postJson(host, reqPath, key, bodyData) {
   });
 }
 
+function putJson(host, reqPath, key, bodyData) {
+  return new Promise((resolve, reject) => {
+    const dataStr = typeof bodyData === 'string' ? bodyData : JSON.stringify(bodyData);
+    const options = {
+      hostname: host,
+      path: reqPath,
+      method: 'PUT',
+      headers: {
+        'Authorization': `App ${key}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Content-Length': Buffer.byteLength(dataStr)
+      }
+    };
+
+    const req = https.request(options, (resp) => {
+      let data = '';
+      resp.on('data', chunk => data += chunk);
+      resp.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (resp.statusCode && resp.statusCode >= 400 && typeof parsed === 'object') {
+            parsed.statusCode = resp.statusCode;
+          }
+          resolve(parsed);
+        } catch {
+          resolve({ raw: data, statusCode: resp.statusCode });
+        }
+      });
+    });
+
+    req.on('error', (err) => reject(err));
+    req.setTimeout(15000, () => {
+      req.destroy();
+      reject(new Error('Timeout na comunicação com a API da Infobip'));
+    });
+    req.write(dataStr);
+    req.end();
+  });
+}
+
 function parseJsonBody(req, limitBytes = 50 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -2159,6 +2200,172 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.end(responseData);
       return;
+    } catch (err) {
+      return sendError(err.message, 500);
+    }
+  }
+
+  // -------------------------------------------------------------
+  // WHATSAPP EMBEDDED SIGNUP (CADASTRO DE NOVO REMETENTE VIA INFOBIP)
+  // -------------------------------------------------------------
+  if (pathname === '/api/whatsapp/embedded-signup/senders' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const {
+        businessAccountId,
+        countryCode,
+        phoneNumber,
+        displayName,
+        type = 'EXTERNAL_SMS',
+        locale = 'pt_BR',
+        apiKey = INFOBIP_API_KEY,
+        baseUrl = INFOBIP_BASE_URL
+      } = body;
+
+      if (!businessAccountId || !countryCode || !phoneNumber || !displayName) {
+        return sendError('Campos obrigatórios: businessAccountId, countryCode, phoneNumber, displayName', 400);
+      }
+
+      const cleanWabaId = String(businessAccountId).trim();
+      const cleanCountry = String(countryCode).replace(/\D/g, '');
+      const cleanPhone = String(phoneNumber).replace(/\D/g, '');
+      const cleanHost = (baseUrl || INFOBIP_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const activeKey = apiKey || INFOBIP_API_KEY;
+
+      const payload = {
+        countryCode: cleanCountry,
+        phoneNumber: cleanPhone,
+        displayName: displayName.trim(),
+        type: type === 'EXTERNAL_VOICE' ? 'EXTERNAL_VOICE' : 'EXTERNAL_SMS',
+        locale: locale || 'pt_BR'
+      };
+
+      console.log(`[EmbeddedSignup] Solicitando registro de remetente para WABA ${cleanWabaId}: +${cleanCountry}${cleanPhone} (${payload.type})`);
+      const endpoint = `/whatsapp/1/embedded-signup/registrations/business-account/${cleanWabaId}/senders`;
+      const infobipRes = await postJson(cleanHost, endpoint, activeKey, payload);
+
+      if (infobipRes && (infobipRes.statusCode >= 400 || infobipRes.requestError)) {
+        const errMsg = infobipRes.requestError?.serviceException?.text ||
+                       infobipRes.requestError?.clientCorrelator ||
+                       infobipRes.message ||
+                       infobipRes.description ||
+                       JSON.stringify(infobipRes);
+        console.warn('[EmbeddedSignup] Erro retornado pela Infobip:', infobipRes);
+        return sendError(`Infobip: ${errMsg}`, infobipRes.statusCode || 400);
+      }
+
+      console.log('[EmbeddedSignup] Sucesso no envio do registro:', infobipRes);
+      return sendJson({
+        success: true,
+        sender: `${cleanCountry}${cleanPhone}`,
+        businessAccountId: cleanWabaId,
+        displayName: displayName.trim(),
+        ...infobipRes
+      }, 200);
+    } catch (err) {
+      console.error('[EmbeddedSignup] Exceção ao cadastrar remetente:', err);
+      return sendError(err.message, 500);
+    }
+  }
+
+  if (pathname === '/api/whatsapp/embedded-signup/verify' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const {
+        sender,
+        code,
+        apiKey = INFOBIP_API_KEY,
+        baseUrl = INFOBIP_BASE_URL
+      } = body;
+
+      if (!sender || !code) {
+        return sendError('Campos obrigatórios: sender (número com DDI e DDD) e code (código de 6 dígitos)', 400);
+      }
+
+      const cleanSender = String(sender).replace(/\D/g, '');
+      const cleanCode = String(code).trim();
+      const cleanHost = (baseUrl || INFOBIP_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const activeKey = apiKey || INFOBIP_API_KEY;
+
+      const payload = { code: cleanCode };
+      console.log(`[EmbeddedSignup] Verificando código OTP para ${cleanSender}...`);
+      const endpoint = `/whatsapp/1/embedded-signup/registrations/senders/${cleanSender}/verification`;
+      const infobipRes = await postJson(cleanHost, endpoint, activeKey, payload);
+
+      if (infobipRes && (infobipRes.statusCode >= 400 || infobipRes.requestError)) {
+        const errMsg = infobipRes.requestError?.serviceException?.text ||
+                       infobipRes.message ||
+                       infobipRes.description ||
+                       JSON.stringify(infobipRes);
+        console.warn('[EmbeddedSignup] Erro de verificação:', infobipRes);
+        return sendError(`Infobip: ${errMsg}`, infobipRes.statusCode || 400);
+      }
+
+      console.log('[EmbeddedSignup] Remetente verificado com sucesso:', infobipRes);
+      return sendJson({
+        success: true,
+        sender: cleanSender,
+        ...infobipRes
+      }, 200);
+    } catch (err) {
+      console.error('[EmbeddedSignup] Exceção ao verificar remetente:', err);
+      return sendError(err.message, 500);
+    }
+  }
+
+  if (pathname === '/api/whatsapp/embedded-signup/retry-otp' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const {
+        sender,
+        type = 'EXTERNAL_SMS',
+        locale = 'pt_BR',
+        apiKey = INFOBIP_API_KEY,
+        baseUrl = INFOBIP_BASE_URL
+      } = body;
+
+      if (!sender) {
+        return sendError('Campo obrigatório: sender (número completo)', 400);
+      }
+
+      const cleanSender = String(sender).replace(/\D/g, '');
+      const cleanHost = (baseUrl || INFOBIP_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const activeKey = apiKey || INFOBIP_API_KEY;
+
+      const payload = {
+        type: type === 'EXTERNAL_VOICE' ? 'EXTERNAL_VOICE' : 'EXTERNAL_SMS',
+        locale: locale || 'pt_BR'
+      };
+
+      console.log(`[EmbeddedSignup] Reenviando código OTP para ${cleanSender} via ${payload.type}...`);
+      const endpoint = `/whatsapp/1/embedded-signup/registrations/senders/${cleanSender}/verification`;
+      const infobipRes = await putJson(cleanHost, endpoint, activeKey, payload);
+
+      if (infobipRes && (infobipRes.statusCode >= 400 || infobipRes.requestError)) {
+        const errMsg = infobipRes.requestError?.serviceException?.text ||
+                       infobipRes.message ||
+                       infobipRes.description ||
+                       JSON.stringify(infobipRes);
+        return sendError(`Infobip: ${errMsg}`, infobipRes.statusCode || 400);
+      }
+
+      return sendJson({
+        success: true,
+        sender: cleanSender,
+        ...infobipRes
+      }, 200);
+    } catch (err) {
+      console.error('[EmbeddedSignup] Exceção ao reenviar OTP:', err);
+      return sendError(err.message, 500);
+    }
+  }
+
+  if (pathname === '/api/whatsapp/senders' && req.method === 'GET') {
+    try {
+      const activeKey = urlObj.searchParams.get('apiKey') || INFOBIP_API_KEY;
+      const cleanHost = (urlObj.searchParams.get('baseUrl') || INFOBIP_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const sendersRes = await getJson(cleanHost, '/whatsapp/1/senders', activeKey);
+      return sendJson(sendersRes || { senders: [] });
     } catch (err) {
       return sendError(err.message, 500);
     }

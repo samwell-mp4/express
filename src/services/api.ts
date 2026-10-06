@@ -1,4 +1,17 @@
-import { WebhookItem, RedisQueueStatus, InfobipTemplateSummary, InfobipQueueMessage, DispatchRecord } from '../types';
+import { 
+    WebhookItem, 
+    RedisQueueStatus, 
+    InfobipTemplateSummary, 
+    InfobipQueueMessage, 
+    DispatchRecord,
+    AddSenderRequest,
+    AddSenderResponse,
+    VerifySenderRequest,
+    VerifySenderResponse,
+    RetryOtpRequest,
+    RetryOtpResponse,
+    InfobipActiveSender
+} from '../types';
 import { mediaStorage } from './mediaStorage';
 
 // Credenciais de API mantidas estritamente no Server-Side (SECURITY-FIRST)
@@ -596,5 +609,101 @@ export const api = {
     async uploadImage(file: File): Promise<string> {
         const res = await api.uploadMedia(file);
         return res.url;
+    },
+
+    // 12. WhatsApp Embedded Signup (Cadastro de Remetente via Infobip)
+    async addWhatsAppSender(data: AddSenderRequest): Promise<AddSenderResponse> {
+        try {
+            const res = await fetch('/api/whatsapp/embedded-signup/senders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (!res.ok) {
+                return {
+                    success: false,
+                    error: result.error || 'Falha ao solicitar cadastro do remetente na Infobip'
+                };
+            }
+            return {
+                success: true,
+                ...result
+            };
+        } catch (err: any) {
+            return {
+                success: false,
+                error: err.message || 'Erro de conexão ao cadastrar remetente'
+            };
+        }
+    },
+
+    // 13. WhatsApp Embedded Signup - Verificar Código OTP
+    async verifyWhatsAppSender(data: VerifySenderRequest): Promise<VerifySenderResponse> {
+        try {
+            const res = await fetch('/api/whatsapp/embedded-signup/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (!res.ok) {
+                return {
+                    success: false,
+                    error: result.error || 'Código OTP inválido ou expirado'
+                };
+            }
+            return {
+                success: true,
+                ...result
+            };
+        } catch (err: any) {
+            return {
+                success: false,
+                error: err.message || 'Erro de rede ao verificar código OTP'
+            };
+        }
+    },
+
+    // 14. WhatsApp Embedded Signup - Reenviar Código OTP
+    async retryWhatsAppSenderOtp(data: RetryOtpRequest): Promise<RetryOtpResponse> {
+        try {
+            const res = await fetch('/api/whatsapp/embedded-signup/retry-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (!res.ok) {
+                return {
+                    success: false,
+                    error: result.error || 'Falha ao reenviar código OTP'
+                };
+            }
+            return {
+                success: true,
+                ...result
+            };
+        } catch (err: any) {
+            return {
+                success: false,
+                error: err.message || 'Erro de rede ao reenviar OTP'
+            };
+        }
+    },
+
+    // 15. Listar Remetentes Ativos na Infobip
+    async getWhatsAppSenders(params?: { apiKey?: string; baseUrl?: string }): Promise<{ senders: InfobipActiveSender[] }> {
+        try {
+            const query = new URLSearchParams();
+            if (params?.apiKey) query.set('apiKey', params.apiKey);
+            if (params?.baseUrl) query.set('baseUrl', params.baseUrl);
+            const res = await fetch(`/api/whatsapp/senders?${query.toString()}`);
+            if (!res.ok) return { senders: [] };
+            const data = await res.json();
+            return data;
+        } catch {
+            return { senders: [] };
+        }
     }
 };

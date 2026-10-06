@@ -124,6 +124,7 @@ export interface InfobipQueueMessage {
 
 export type AppTab = 
     | 'registry' 
+    | 'embedded-signup'
     | 'dispatch' 
     | 'records' 
     | 'redis' 
@@ -135,6 +136,68 @@ export type AppTab =
     | 'create-template'
     | 'spreadsheet-cleaner'
     | 'media-hosting';
+
+export interface AddSenderRequest {
+    businessAccountId: string;
+    countryCode: string;
+    phoneNumber: string;
+    displayName: string;
+    type: 'EXTERNAL_SMS' | 'EXTERNAL_VOICE';
+    locale?: string;
+    apiKey?: string;
+    baseUrl?: string;
+}
+
+export interface AddSenderResponse {
+    success: boolean;
+    status?: string;
+    sender?: string;
+    businessAccountId?: string;
+    displayName?: string;
+    message?: string;
+    description?: string;
+    error?: string;
+}
+
+export interface VerifySenderRequest {
+    sender: string;
+    code: string;
+    apiKey?: string;
+    baseUrl?: string;
+}
+
+export interface VerifySenderResponse {
+    success: boolean;
+    sender?: string;
+    description?: string;
+    status?: string;
+    error?: string;
+}
+
+export interface RetryOtpRequest {
+    sender: string;
+    type: 'EXTERNAL_SMS' | 'EXTERNAL_VOICE';
+    locale?: string;
+    apiKey?: string;
+    baseUrl?: string;
+}
+
+export interface RetryOtpResponse {
+    success: boolean;
+    sender?: string;
+    description?: string;
+    status?: string;
+    error?: string;
+}
+
+export interface InfobipActiveSender {
+    sender: string;
+    displayName?: string;
+    status?: string;
+    qualityRating?: string;
+    tier?: string;
+    type?: string;
+}
 
 export interface RotatorTarget {
     url: string;

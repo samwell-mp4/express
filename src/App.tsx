@@ -13,6 +13,7 @@ import { TemplateCreatorWizard } from './components/TemplateCreatorWizard';
 import { SpreadsheetCleaner } from './components/SpreadsheetCleaner';
 import { MediaHostingManager } from './components/MediaHostingManager';
 import { LinkRotatorManager } from './components/LinkRotatorManager';
+import { EmbeddedSenderSignup } from './components/EmbeddedSenderSignup';
 import { ParsedContact, SenderConfig, PlaceholderMapping, RedisQueueStatus, AppTab } from './types';
 import { api } from './services/api';
 import { wabaStorage } from './services/wabaStorage';
@@ -348,6 +349,14 @@ export const App: React.FC = () => {
                 {/* TAB 1: REGISTRAR WABA */}
                 {activeTab === 'registry' && (
                     <WabaRegistry />
+                )}
+
+                {/* TAB: CADASTRAR REMETENTE (EMBEDDING) */}
+                {activeTab === 'embedded-signup' && (
+                    <EmbeddedSenderSignup 
+                        onNavigateToDispatch={() => setActiveTab('dispatch')}
+                        onNavigateToRegistry={() => setActiveTab('registry')}
+                    />
                 )}
 
                 {/* TAB 2: MULTI-REMETENTE DISPATCHER */}
