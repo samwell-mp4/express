@@ -851,6 +851,16 @@ async function syncDeliveryReportsFromInfobip() {
       console.warn('[SyncDLR] Erro ao consultar /messages-api/1/reports:', e.message);
     }
 
+    // 1.5. Consultar /messages-api/1/logs?limit=100 (últimos logs persistidos no Infobip)
+    try {
+      const lGeneralRes = await getJson(baseUrl, '/messages-api/1/logs?limit=100', apiKey);
+      if (lGeneralRes?.results && Array.isArray(lGeneralRes.results)) {
+        reports.push(...lGeneralRes.results);
+      }
+    } catch (e) {
+      console.warn('[SyncDLR] Erro ao consultar /messages-api/1/logs gerais:', e.message);
+    }
+
     // 2. Coletar IDs de transmissão (messageId único de cada envio)
     const trackedIds = new Set();
 
@@ -915,47 +925,95 @@ async function syncDeliveryReportsFromInfobip() {
     let updatedCount = 0;
 
     // 5. Atualização no Redis: ESTRITAMENTE POR transmission_id / messageId
-    if (isRedisConnected && uniqueReports.length > 0) {
+    if (isRedisConnected) {
       try {
         const rawLogs = await redisClient.lRange('dispatch_logs', 0, 999);
         const parsedLogs = rawLogs.map(str => {
           try { return JSON.parse(str); } catch { return null; }
         }).filter(Boolean);
 
+        // Auto-correção retroativa: se algum registro no Redis estava com DELIVERED_TO_HANDSET marcado como FAILED/ERROR, conserta imediatamente
+        for (const l of parsedLogs) {
+          const dStat = String(l.delivery_status || l.deliveryReason || '').toUpperCase();
+          if ((dStat === 'DELIVERED_TO_HANDSET' || dStat === 'DELIVERED') && (l.status === 'FAILED' || l.log_type === 'ERROR')) {
+            l.status = 'DELIVERED';
+            l.log_type = 'SUCCESS';
+            l.error_group = 'No Errors';
+            l.error_name = 'No Error (code 0)';
+            if (!l.done_at) l.done_at = l.timestamp || new Date().toISOString();
+            updatedCount++;
+          }
+        }
+
         for (const rep of uniqueReports) {
           const mId = rep.messageId;
           const statusGroup = rep.status?.groupName;
           const statusName = rep.status?.name;
           const doneAt = rep.doneAt || rep.sentAt;
-          const errorGroup = rep.error?.groupName || rep.status?.groupName;
-          const errorDesc = rep.error?.description || rep.status?.description;
-          const errorId = rep.error?.id || rep.status?.id;
           const price = rep.price?.pricePerMessage;
 
-          const isFail = statusGroup === 'UNDELIVERABLE' || 
-                         statusGroup === 'REJECTED' || 
-                         statusGroup === 'FAILED' || 
-                         (statusName && (
-                           statusName.includes('REJECTED') || 
-                           statusName.includes('UNDELIVERABLE') || 
-                           statusName.includes('NOT_DELIVERED') || 
-                           statusName.includes('SPAM') || 
-                           statusName.includes('FAILED')
-                         )) ||
-                         (errorDesc && errorDesc.toLowerCase().includes('spam')) ||
-                         (errorId && String(errorId) !== '0');
+          // ATENÇÃO CRÍTICA:
+          // Para entregas com sucesso, a Infobip retorna:
+          // status: { id: 5, name: 'DELIVERED_TO_HANDSET', groupId: 3, groupName: 'DELIVERED' }
+          // error: { id: 0, name: 'NO_ERROR', description: 'No Error', groupId: 0, groupName: 'OK' }
+          // NUNCA tratar status.id (5) como código de erro, e error.id === 0 é NO_ERROR!
+          const realErrorId = (rep.error?.id !== undefined && rep.error?.id !== null && Number(rep.error.id) > 0)
+            ? Number(rep.error.id)
+            : null;
+          const realErrorDesc = (rep.error?.description && !rep.error.description.toLowerCase().includes('no error'))
+            ? rep.error.description
+            : null;
+          const realErrorGroup = (rep.error?.groupName && !rep.error.groupName.toLowerCase().includes('ok'))
+            ? rep.error.groupName
+            : null;
 
-          const isDeliv = !isFail && (
+          const isDeliv = (
             statusGroup === 'DELIVERED' || 
             statusName === 'DELIVERED_TO_HANDSET' ||
             (statusName && statusName.includes('DELIVERED') && !statusName.includes('NOT') && !statusName.includes('UNDELIVERABLE'))
+          ) && !realErrorId;
+
+          const isFail = !isDeliv && (
+            statusGroup === 'UNDELIVERABLE' || 
+            statusGroup === 'REJECTED' || 
+            statusGroup === 'FAILED' || 
+            statusGroup === 'EXPIRED' ||
+            (statusName && (
+              statusName.includes('REJECTED') || 
+              statusName.includes('UNDELIVERABLE') || 
+              statusName.includes('NOT_DELIVERED') || 
+              statusName.includes('SPAM') || 
+              statusName.includes('FAILED')
+            )) ||
+            Boolean(realErrorId) ||
+            (realErrorDesc && (
+              realErrorDesc.toLowerCase().includes('spam') || 
+              realErrorDesc.toLowerCase().includes('undeliverable') || 
+              realErrorDesc.toLowerCase().includes('failed') || 
+              realErrorDesc.toLowerCase().includes('error')
+            ))
           );
 
-          // VINCULAÇÃO ESTRITA: apenas pelo ID único da transmissão
-          const match = parsedLogs.find(l => (l.transmission_id === mId || l.messageId === mId));
+          // VINCULAÇÃO: por transmission_id / messageId, com fallback por telefone de destino
+          const match = parsedLogs.find(l => {
+            if (l.transmission_id === mId || l.messageId === mId) return true;
+            if (rep.destination && l.recipient) {
+              const cleanL = String(l.recipient).replace(/\D/g, '');
+              const cleanR = String(rep.destination).replace(/\D/g, '');
+              if (cleanL && cleanL === cleanR && (!l.transmission_id || l.transmission_id.startsWith('tx_') || l.transmission_id === mId)) {
+                return true;
+              }
+            }
+            return false;
+          });
 
           if (match) {
             let changed = false;
+
+            if (match.transmission_id !== mId && (!match.transmission_id || match.transmission_id.startsWith('tx_'))) {
+              match.transmission_id = mId;
+              changed = true;
+            }
 
             if (isDeliv) {
               if (match.status !== 'DELIVERED' || match.delivery_status !== (statusName || 'DELIVERED_TO_HANDSET')) {
@@ -963,7 +1021,7 @@ async function syncDeliveryReportsFromInfobip() {
                 match.log_type = 'SUCCESS';
                 match.delivery_status = statusName || 'DELIVERED_TO_HANDSET';
                 match.deliveryReason = statusName || 'DELIVERED_TO_HANDSET';
-                match.done_at = doneAt || new Date().toISOString();
+                match.done_at = doneAt || match.done_at || new Date().toISOString();
                 match.error_group = 'No Errors';
                 match.error_name = 'No Error (code 0)';
                 changed = true;
@@ -975,8 +1033,8 @@ async function syncDeliveryReportsFromInfobip() {
                 match.delivery_status = statusName || statusGroup || 'UNDELIVERABLE_NOT_DELIVERED';
                 match.deliveryReason = statusName || statusGroup || 'UNDELIVERABLE_NOT_DELIVERED';
                 match.done_at = null;
-                match.error_group = errorGroup || 'HANDSET_ERRORS';
-                match.error_name = errorDesc ? (errorId ? `${errorDesc} (code ${errorId})` : errorDesc) : (statusName || 'UNDELIVERABLE_NOT_DELIVERED');
+                match.error_group = realErrorGroup || 'HANDSET_ERRORS';
+                match.error_name = realErrorDesc ? (realErrorId ? `${realErrorDesc} (code ${realErrorId})` : realErrorDesc) : (statusName || 'UNDELIVERABLE_NOT_DELIVERED');
                 changed = true;
               }
             } else {
@@ -1013,39 +1071,64 @@ async function syncDeliveryReportsFromInfobip() {
       }
     }
 
-    // 6. Atualização no PostgreSQL: ESTRITAMENTE POR transmission_id
-    if (isPostgresConnected && uniqueReports.length > 0) {
+    // 6. Atualização no PostgreSQL
+    if (isPostgresConnected) {
       try {
+        // Auto-correção retroativa no Postgres para registros marcados incorretamente como ERROR
+        await pgPool.query(`
+          UPDATE dispatch_records 
+          SET log_type = 'DELIVERED', 
+              error_name = 'No Error (code 0)',
+              done_at = COALESCE(done_at, NOW())
+          WHERE (delivery_status = 'DELIVERED_TO_HANDSET' OR delivery_status = 'DELIVERED') 
+            AND log_type = 'ERROR'
+        `).catch(() => {});
+
         for (const rep of uniqueReports) {
           const mId = rep.messageId;
           if (!mId) continue;
 
           const statusGroup = rep.status?.groupName;
           const statusName = rep.status?.name;
-          const isFail = statusGroup === 'UNDELIVERABLE' || 
-                         statusGroup === 'REJECTED' || 
-                         statusGroup === 'FAILED' || 
-                         (statusName && (
-                           statusName.includes('REJECTED') || 
-                           statusName.includes('UNDELIVERABLE') || 
-                           statusName.includes('NOT_DELIVERED') || 
-                           statusName.includes('SPAM') || 
-                           statusName.includes('FAILED')
-                         )) ||
-                         (rep.error?.description && rep.error.description.toLowerCase().includes('spam')) ||
-                         (rep.error?.id && String(rep.error.id) !== '0');
+          const doneAt = rep.doneAt || rep.sentAt;
 
-          const isDeliv = !isFail && (
+          const realErrorId = (rep.error?.id !== undefined && rep.error?.id !== null && Number(rep.error.id) > 0)
+            ? Number(rep.error.id)
+            : null;
+          const realErrorDesc = (rep.error?.description && !rep.error.description.toLowerCase().includes('no error'))
+            ? rep.error.description
+            : null;
+
+          const isDeliv = (
             statusGroup === 'DELIVERED' || 
             statusName === 'DELIVERED_TO_HANDSET' ||
             (statusName && statusName.includes('DELIVERED') && !statusName.includes('NOT') && !statusName.includes('UNDELIVERABLE'))
+          ) && !realErrorId;
+
+          const isFail = !isDeliv && (
+            statusGroup === 'UNDELIVERABLE' || 
+            statusGroup === 'REJECTED' || 
+            statusGroup === 'FAILED' || 
+            statusGroup === 'EXPIRED' ||
+            (statusName && (
+              statusName.includes('REJECTED') || 
+              statusName.includes('UNDELIVERABLE') || 
+              statusName.includes('NOT_DELIVERED') || 
+              statusName.includes('SPAM') || 
+              statusName.includes('FAILED')
+            )) ||
+            Boolean(realErrorId) ||
+            (realErrorDesc && (
+              realErrorDesc.toLowerCase().includes('spam') || 
+              realErrorDesc.toLowerCase().includes('undeliverable') || 
+              realErrorDesc.toLowerCase().includes('failed') || 
+              realErrorDesc.toLowerCase().includes('error')
+            ))
           );
 
           const logType = isDeliv ? 'DELIVERED' : (isFail ? 'ERROR' : 'SENT');
           const doneAtVal = isDeliv ? (rep.doneAt ? new Date(rep.doneAt) : (rep.sentAt ? new Date(rep.sentAt) : new Date())) : null;
-          const errDesc = rep.error?.description || rep.status?.description;
-          const errId = rep.error?.id || rep.status?.id;
-          const errorFormatted = isDeliv ? 'No Error (code 0)' : (errDesc ? (errId ? `${errorDesc} (code ${errId})` : errorDesc) : (statusName || 'UNDELIVERABLE_NOT_DELIVERED'));
+          const errorFormatted = isDeliv ? 'No Error (code 0)' : (realErrorDesc ? (realErrorId ? `${realErrorDesc} (code ${realErrorId})` : realErrorDesc) : (statusName || 'UNDELIVERABLE_NOT_DELIVERED'));
           const delivStatus = statusName || statusGroup || (isDeliv ? 'DELIVERED_TO_HANDSET' : 'SENT_TO_NETWORK');
 
           await pgPool.query(
@@ -1053,14 +1136,16 @@ async function syncDeliveryReportsFromInfobip() {
              SET log_type = $1, 
                  delivery_status = $2,
                  done_at = $3,
-                 error_name = $4
-             WHERE transmission_id = $5 AND transmission_id IS NOT NULL`,
+                 error_name = $4,
+                 transmission_id = $5
+             WHERE transmission_id = $5 OR (recipient = $6 AND transmission_id LIKE 'tx_%')`,
             [
               logType, 
               delivStatus, 
               doneAtVal, 
               errorFormatted,
-              mId
+              mId,
+              rep.destination || ''
             ]
           ).catch(() => {});
         }

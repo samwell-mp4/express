@@ -383,17 +383,37 @@ export const api = {
                 const statusUpper = String(statusName).toUpperCase();
                 const groupUpper = String(statusGroup).toUpperCase();
 
-                const errDesc = parsedPayload?.error?.description || parsedPayload?.status?.description || parsedPayload?.messages?.[0]?.error?.description || r.error_name || r.errorName || '';
-                const errId = parsedPayload?.error?.id || parsedPayload?.status?.id || parsedPayload?.messages?.[0]?.error?.id || parsedPayload?.messages?.[0]?.status?.id;
+                // Obter erro real da Infobip (Atenção: status.id NÃO é erro! status.id = 5 significa DELIVERED_TO_HANDSET!)
+                const realErrorObj = parsedPayload?.error || parsedPayload?.messages?.[0]?.error || null;
+                const realErrorId = (realErrorObj && realErrorObj.id !== undefined && realErrorObj.id !== null && Number(realErrorObj.id) > 0)
+                    ? Number(realErrorObj.id)
+                    : null;
+                const realErrorDesc = (realErrorObj && realErrorObj.description && !realErrorObj.description.toLowerCase().includes('no error'))
+                    ? realErrorObj.description
+                    : (r.error_name && !r.error_name.toLowerCase().includes('no error') ? r.error_name : '');
 
-                // 1. Detecção rigorosa de FALHA / NÃO ENTREGUE (Prioridade Absoluta):
-                // Jamais pode ser classificado como Delivered se contiver UNDELIVERABLE, NOT_DELIVERED, SPAM, REJECTED, ou erro Meta/Infobip!
-                const isFailed = (
+                // 1. Detecção estrita de ENTREGA CONFIRMADA NO HANDSET
+                const isDelivered = (
+                    groupUpper === 'DELIVERED' || 
+                    statusUpper === 'DELIVERED_TO_HANDSET' || 
+                    deliveryUpper === 'DELIVERED_TO_HANDSET' || 
+                    deliveryUpper === 'DELIVERED' ||
+                    r.status === 'DELIVERED' ||
+                    r.log_type === 'DELIVERED'
+                ) && !deliveryUpper.includes('NOT') && 
+                     !deliveryUpper.includes('UNDELIVERABLE') && 
+                     !statusUpper.includes('NOT') && 
+                     !statusUpper.includes('UNDELIVERABLE') &&
+                     !realErrorId;
+
+                // 2. Detecção estrita de FALHA / NÃO ENTREGUE (apenas se NÃO for Delivered)
+                const isFailed = !isDelivered && (
                     r.status === 'FAILED' || 
                     r.log_type === 'ERROR' || 
                     groupUpper === 'UNDELIVERABLE' || 
                     groupUpper === 'REJECTED' || 
                     groupUpper === 'FAILED' ||
+                    groupUpper === 'EXPIRED' ||
                     statusUpper.includes('UNDELIVERABLE') || 
                     statusUpper.includes('NOT_DELIVERED') || 
                     statusUpper.includes('REJECTED') || 
@@ -408,57 +428,35 @@ export const api = {
                     deliveryUpper.includes('BLOCKED') ||
                     (deliveryUpper.includes('FAILED') && !deliveryUpper.includes('NO')) ||
                     (deliveryUpper.includes('ERROR') && !deliveryUpper.includes('NO_ERROR') && !deliveryUpper.includes('NO ERROR') && !deliveryUpper.includes('CODE 0')) ||
-                    String(errDesc).toUpperCase().includes('SPAM') ||
-                    String(errDesc).toUpperCase().includes('UNDELIVERABLE') ||
-                    (Boolean(errId) && String(errId) !== '0') ||
-                    (Boolean(r.errorReason) && !r.errorReason.includes('No Error'))
-                );
-
-                // 2. Detecção rigorosa de ENTREGUE (Handset Confirmado):
-                // Apenas se NÃO for falha e tiver confirmação positiva de entrega no aparelho
-                const isDelivered = !isFailed && (
-                    r.status === 'DELIVERED' || 
-                    r.log_type === 'DELIVERED' || 
-                    groupUpper === 'DELIVERED' || 
-                    statusUpper === 'DELIVERED_TO_HANDSET' || 
-                    deliveryUpper === 'DELIVERED' || 
-                    deliveryUpper === 'DELIVERED_TO_HANDSET'
+                    Boolean(realErrorId) ||
+                    Boolean(realErrorDesc && !realErrorDesc.includes('No Error'))
                 );
 
                 let recordStatus: 'DELIVERED' | 'SENT' | 'PENDING' | 'FAILED' = 'PENDING';
-                if (isFailed) {
-                    recordStatus = 'FAILED';
-                } else if (isDelivered) {
+                if (isDelivered) {
                     recordStatus = 'DELIVERED';
+                } else if (isFailed) {
+                    recordStatus = 'FAILED';
                 } else if (isSuccess || r.status === 'SENT' || deliveryUpper.includes('PENDING') || deliveryUpper.includes('ENROUTE') || deliveryUpper.includes('WAITING') || groupUpper === 'PENDING') {
                     recordStatus = 'SENT';
                 }
 
                 const diagnostic = recordStatus === 'FAILED' ? parseInfobipErrorDiagnostic(parsedPayload) : null;
                 
-                let finalErrorReason = diagnostic 
-                    ? (diagnostic.code ? `[${diagnostic.code}] ${diagnostic.description}` : diagnostic.description) 
-                    : (r.errorReason || errDesc || (recordStatus === 'FAILED' ? (deliveryStatus || 'UNDELIVERABLE_NOT_DELIVERED') : undefined));
+                let finalErrorReason = recordStatus === 'DELIVERED'
+                    ? undefined
+                    : (diagnostic 
+                        ? (diagnostic.code ? `[${diagnostic.code}] ${diagnostic.description}` : diagnostic.description) 
+                        : (r.errorReason || realErrorDesc || (recordStatus === 'FAILED' ? (deliveryStatus || 'UNDELIVERABLE_NOT_DELIVERED') : undefined)));
 
                 if (isFailed && deliveryStatus && (!finalErrorReason || finalErrorReason === 'Falha no envio')) {
-                    finalErrorReason = errId ? `${errDesc || 'Erro no envio'} (code ${errId}) · Reason: ${deliveryStatus}` : `Reason: ${deliveryStatus}`;
+                    finalErrorReason = realErrorId ? `${realErrorDesc || 'Erro no envio'} (code ${realErrorId}) · Reason: ${deliveryStatus}` : `Reason: ${deliveryStatus}`;
                 }
 
-                // Data de entrega: EXCLUSIVAMENTE para mensagens efetivamente entregues no handset
+                // Data de entrega: apenas para mensagens realmente entregues
                 let validDoneAt: string | undefined = undefined;
                 if (recordStatus === 'DELIVERED') {
-                    const candidateDoneAt = r.done_at || r.doneAt;
-                    if (candidateDoneAt && r.timestamp) {
-                        const dTime = new Date(candidateDoneAt).getTime();
-                        const sTime = new Date(r.timestamp).getTime();
-                        if (dTime >= sTime - 30000) {
-                            validDoneAt = candidateDoneAt;
-                        } else {
-                            validDoneAt = r.timestamp;
-                        }
-                    } else {
-                        validDoneAt = r.timestamp;
-                    }
+                    validDoneAt = r.done_at || r.doneAt || r.timestamp;
                 }
 
                 const toNum = r.recipient || '';
