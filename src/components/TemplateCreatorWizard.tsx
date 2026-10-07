@@ -289,7 +289,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         const structure: any = {
             body: {
                 text: bodyText,
-                examples: bodyExamplesArray
+                ...(bodyExamplesArray.length > 0 ? { examples: bodyExamplesArray } : {})
             }
         };
 

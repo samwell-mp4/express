@@ -2686,14 +2686,14 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Proxy Seguro Infobip (Restrito estritamente a leitura de templates de remetentes cadastrados)
+  // Proxy Seguro Infobip (Restrito estritamente a leitura e criação de templates de remetentes cadastrados)
   if (pathname.startsWith('/infobip-proxy/')) {
-    // 1. Bloquear qualquer método HTTP que não seja GET (defesa anti-Burp Suite / Pentest)
-    if (req.method !== 'GET') {
+    // 1. Permitir apenas GET (leitura) e POST (criação de templates)
+    if (req.method !== 'GET' && req.method !== 'POST') {
       return sendError('Método não permitido no proxy', 405);
     }
 
-    // 2. Permitir APENAS a rota de busca de templates: /infobip-proxy/whatsapp/2/senders/:digits/templates
+    // 2. Permitir APENAS a rota de busca/criação de templates: /infobip-proxy/whatsapp/2/senders/:digits/templates
     const match = pathname.match(/^\/infobip-proxy\/whatsapp\/2\/senders\/([0-9]{8,20})\/templates$/);
     if (!match) {
       return sendError('Acesso negado: rota de proxy não autorizada ou formato de remetente inválido', 403);
@@ -2709,10 +2709,17 @@ const server = http.createServer(async (req, res) => {
       'user-agent': 'FastPlug-SecureProxy/1.0'
     };
 
+    if (req.headers['content-type']) {
+      proxyHeaders['content-type'] = req.headers['content-type'];
+    }
+    if (req.headers['content-length']) {
+      proxyHeaders['content-length'] = req.headers['content-length'];
+    }
+
     const proxyReq = https.request({
       hostname: INFOBIP_BASE_URL,
       path: targetPath,
-      method: 'GET',
+      method: req.method,
       headers: proxyHeaders
     }, (proxyRes) => {
       res.writeHead(proxyRes.statusCode || 200, {
@@ -2725,7 +2732,12 @@ const server = http.createServer(async (req, res) => {
     proxyReq.on('error', (err) => {
       sendError(`Proxy error: ${err.message}`, 502);
     });
-    proxyReq.end();
+
+    if (req.method === 'POST') {
+      req.pipe(proxyReq);
+    } else {
+      proxyReq.end();
+    }
     return;
   }
 
