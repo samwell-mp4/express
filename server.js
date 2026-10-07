@@ -2701,42 +2701,70 @@ const server = http.createServer(async (req, res) => {
 
     const senderDigits = match[1];
     const targetPath = `/whatsapp/2/senders/${senderDigits}/templates` + (urlObj.search || '');
+    const cleanHost = sanitizeInfobipHost(INFOBIP_BASE_URL);
+
+    // Ler corpo para requisições POST
+    let bodyBuffer = null;
+    if (req.method === 'POST') {
+      try {
+        const chunks = [];
+        for await (const chunk of req) {
+          chunks.push(chunk);
+        }
+        bodyBuffer = Buffer.concat(chunks);
+      } catch (readErr) {
+        return sendError('Erro ao processar corpo da requisição', 400);
+      }
+    }
 
     const proxyHeaders = {
-      'host': INFOBIP_BASE_URL,
       'authorization': `App ${INFOBIP_API_KEY}`,
       'accept': 'application/json',
       'user-agent': 'FastPlug-SecureProxy/1.0'
     };
 
-    if (req.headers['content-type']) {
-      proxyHeaders['content-type'] = req.headers['content-type'];
-    }
-    if (req.headers['content-length']) {
-      proxyHeaders['content-length'] = req.headers['content-length'];
+    if (bodyBuffer) {
+      proxyHeaders['content-type'] = req.headers['content-type'] || 'application/json';
+      proxyHeaders['content-length'] = bodyBuffer.length;
     }
 
-    const proxyReq = https.request({
-      hostname: INFOBIP_BASE_URL,
-      path: targetPath,
-      method: req.method,
-      headers: proxyHeaders
-    }, (proxyRes) => {
-      res.writeHead(proxyRes.statusCode || 200, {
-        'content-type': proxyRes.headers['content-type'] || 'application/json',
-        'cache-control': 'no-cache'
+    try {
+      const proxyReq = https.request({
+        hostname: cleanHost,
+        path: targetPath,
+        method: req.method,
+        headers: proxyHeaders,
+        timeout: 15000
+      }, (proxyRes) => {
+        const respChunks = [];
+        proxyRes.on('data', chunk => respChunks.push(chunk));
+        proxyRes.on('end', () => {
+          const respData = Buffer.concat(respChunks);
+          res.writeHead(proxyRes.statusCode || 200, {
+            'content-type': proxyRes.headers['content-type'] || 'application/json',
+            'cache-control': 'no-cache'
+          });
+          res.end(respData);
+        });
       });
-      proxyRes.pipe(res);
-    });
 
-    proxyReq.on('error', (err) => {
-      sendError(`Proxy error: ${err.message}`, 502);
-    });
+      proxyReq.on('timeout', () => {
+        proxyReq.destroy();
+        sendError('Tempo limite excedido na comunicação com a Infobip', 504);
+      });
 
-    if (req.method === 'POST') {
-      req.pipe(proxyReq);
-    } else {
+      proxyReq.on('error', (err) => {
+        console.warn('[Proxy Infobip Error]:', err.message);
+        sendError(`Falha na comunicação com a Infobip: ${err.message}`, 502);
+      });
+
+      if (bodyBuffer) {
+        proxyReq.write(bodyBuffer);
+      }
       proxyReq.end();
+    } catch (reqErr) {
+      console.warn('[Proxy Infobip Exception]:', reqErr.message);
+      return sendError(`Exceção no proxy: ${reqErr.message}`, 500);
     }
     return;
   }
