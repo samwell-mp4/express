@@ -23,6 +23,9 @@ import {
     MessageSquare,
     ImageIcon,
     Video,
+    Bookmark,
+    FolderOpen,
+    Save,
     ExternalLink,
     X,
     Filter,
@@ -102,6 +105,7 @@ const TEMPLATE_PRESETS: Record<'2' | '4' | '5', {
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+    RASCUNHO: { label: 'Rascunho', color: '#9333ea', bg: '#faf5ff', border: '#e9d5ff' },
     PENDENTE: { label: 'Pendente', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
     'EM ANDAMENTO': { label: 'Em Andamento', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
     GERADO: { label: 'Gerado', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
@@ -311,6 +315,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     // WIZARD / CREATE NEW MODAL STATE
     // -------------------------------------------------------------
     const [showNewModal, setShowNewModal] = useState(false);
+    const [showDuplicateSelector, setShowDuplicateSelector] = useState(false);
     const [wizardStep, setWizardStep] = useState<number>(1);
     const [isSavingSubmission, setIsSavingSubmission] = useState(false);
 
@@ -660,22 +665,24 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
         }
     };
 
-    // Save wizard submission
-    const handleSaveWizardSubmission = async (dispatchImmediately = false) => {
-        if (!formCampaignName.trim()) {
-            alert('Por favor, informe o Nome da Campanha.');
-            setWizardStep(1);
-            return;
-        }
-        if (!formProfileName.trim()) {
-            alert('Por favor, informe o Nome do Atendimento.');
-            setWizardStep(1);
-            return;
-        }
-        if (!formDdd.trim()) {
-            alert('Por favor, informe o DDD regional.');
-            setWizardStep(1);
-            return;
+    // Save wizard submission (com suporte a Rascunho)
+    const handleSaveWizardSubmission = async (dispatchImmediately = false, isDraft = false) => {
+        if (!isDraft) {
+            if (!formCampaignName.trim()) {
+                alert('Por favor, informe o Nome da Campanha.');
+                setWizardStep(1);
+                return;
+            }
+            if (!formProfileName.trim()) {
+                alert('Por favor, informe o Nome do Atendimento.');
+                setWizardStep(1);
+                return;
+            }
+            if (!formDdd.trim()) {
+                alert('Por favor, informe o DDD regional.');
+                setWizardStep(1);
+                return;
+            }
         }
 
         setIsSavingSubmission(true);
@@ -696,7 +703,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
             if (validTargets.length > 1 && (!finalButtonLink || !finalButtonLink.includes('/r/'))) {
                 try {
                     const rot = await rotatorStorage.createRotator({
-                        title: `Rotacionador: ${formCampaignName.trim()}`,
+                        title: `Rotacionador: ${formCampaignName.trim() || 'Rascunho'}`,
                         slug: formRotatorSlug || undefined,
                         targets: validTargets
                     });
@@ -709,11 +716,14 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                 finalButtonLink = validTargets[0].url;
             }
 
+            const effectiveCampaignName = formCampaignName.trim() || `Rascunho_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}_${new Date().toLocaleTimeString('pt-BR').slice(0, 5)}`;
+            const effectiveProfileName = formProfileName.trim() || effectiveCampaignName;
+
             const newSub: Partial<ClientSubmission> = {
-                campaign_name: formCampaignName.trim(),
+                campaign_name: effectiveCampaignName,
                 sender_phone: formSenderPhone.trim(),
-                profile_name: formProfileName.trim(),
-                client_name: formCampaignName.trim(),
+                profile_name: effectiveProfileName,
+                client_name: effectiveCampaignName,
                 ddd: formDdd.trim().replace(/\D/g, '').substring(0, 2) || '11',
                 profile_photo: formProfilePhoto,
                 dispatch_date: formDispatchDate || '',
@@ -726,7 +736,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                 showFifthVariable: formShowFifthVar,
                 cta_targets: validTargets,
                 rotator_slug: finalSlug,
-                status: formDispatchDate ? 'AGENDADO' : 'PENDENTE',
+                status: isDraft ? 'RASCUNHO' : (formDispatchDate ? 'AGENDADO' : 'PENDENTE'),
                 fileName: wizardFile ? wizardFile.name : 'sem_planilha.xlsx',
                 validCount: contacts.length,
                 totalRows: wizardAnalysis ? (wizardAnalysis.totalRows || wizardAnalysis.stats.totalRows) : contacts.length,
@@ -734,7 +744,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                 headers,
                 ads: [{
                     id: '1',
-                    ad_name: formCampaignName.trim(),
+                    ad_name: effectiveCampaignName,
                     sender_phone: formSenderPhone.trim(),
                     template_type: formTemplateType,
                     message_mode: 'manual',
@@ -750,19 +760,38 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
             };
 
             const created = await clientSubmissionStorage.createSubmission(newSub);
-            showToast('✓ Campanha cadastrada com sucesso!');
+            showToast(isDraft ? '✓ Campanha salva como Rascunho!' : '✓ Campanha cadastrada com sucesso!');
             setShowNewModal(false);
             resetWizardForm();
             await loadSubmissions();
 
             if (dispatchImmediately && contacts.length > 0) {
-                onSendToDispatch(contacts, headers, formCampaignName.trim());
+                onSendToDispatch(contacts, headers, effectiveCampaignName);
             }
         } catch (err: any) {
             alert(`Erro ao salvar campanha: ${err.message}`);
         } finally {
             setIsSavingSubmission(false);
         }
+    };
+
+    const handleDuplicateIntoWizard = (sub: ClientSubmission) => {
+        setFormCampaignName(`${sub.campaign_name || sub.profile_name} (Cópia)`);
+        setFormProfileName(sub.profile_name);
+        setFormSenderPhone(sub.sender_phone || '');
+        setFormDdd(sub.ddd || '11');
+        setFormProfilePhoto(sub.profile_photo || '');
+        setFormTemplateType(sub.template_type || 'TEXT');
+        setFormMediaUrl(sub.media_url || '');
+        setFormButtonLink(sub.button_link || '');
+        setFormAdCopy(sub.ad_copy || '');
+        setFormVariables(sub.variables || ['', '', '', '', '']);
+        setFormShowFifthVar(sub.showFifthVariable || false);
+        setFormNotes(sub.notes || '');
+        if (sub.cta_targets && sub.cta_targets.length > 0) {
+            setFormCtaTargets(sub.cta_targets);
+        }
+        showToast(`✓ Dados duplicados da campanha "${sub.profile_name}"!`);
     };
 
     const resetWizardForm = () => {
@@ -2275,6 +2304,27 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                 <Sparkles size={11} color="#059669" />
                                 Criador de Templates Meta ({submissions.filter(s => s.origin === 'TEMPLATE_CREATOR').length})
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => setStatusFilter(statusFilter === 'RASCUNHO' ? 'ALL' : 'RASCUNHO')}
+                                style={{
+                                    padding: '3px 10px',
+                                    borderRadius: '12px',
+                                    border: statusFilter === 'RASCUNHO' ? '1px solid #9333EA' : '1px solid #E2E8F0',
+                                    background: statusFilter === 'RASCUNHO' ? '#FAF5FF' : '#FFFFFF',
+                                    color: statusFilter === 'RASCUNHO' ? '#7E22CE' : 'var(--text-muted)',
+                                    fontSize: '11.5px',
+                                    fontWeight: statusFilter === 'RASCUNHO' ? 700 : 500,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    transition: 'all 120ms ease'
+                                }}
+                            >
+                                <Bookmark size={11} color={statusFilter === 'RASCUNHO' ? '#9333EA' : '#64748B'} />
+                                Rascunhos ({submissions.filter(s => s.status === 'RASCUNHO').length})
+                            </button>
                         </div>
 
                         {/* Collapsible Smart Filter Options */}
@@ -2313,6 +2363,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                         style={{ width: '100%', height: '32px', padding: '0 8px', borderRadius: '5px', border: '1px solid #D1D5DB', fontSize: '12px', background: '#FFFFFF' }}
                                     >
                                         <option value="ALL">Todos os Status</option>
+                                        <option value="RASCUNHO">📝 Rascunhos</option>
                                         <option value="PENDENTE">Pendente</option>
                                         <option value="AGENDADO">Agendado</option>
                                         <option value="EM ANDAMENTO">Em Andamento</option>
@@ -4030,13 +4081,87 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                     Defina nome da campanha, dados do atendimento, mensagem e horário com preview em tempo real.
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowNewModal(false)}
-                                style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: '4px' }}
-                            >
-                                <X size={20} />
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {submissions.length > 0 && (
+                                    <div style={{ position: 'relative' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowDuplicateSelector(!showDuplicateSelector)}
+                                            style={{
+                                                padding: '6px 12px',
+                                                borderRadius: '6px',
+                                                border: '1px solid #CBD5E1',
+                                                background: '#FFFFFF',
+                                                color: '#334155',
+                                                fontSize: '11.5px',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '5px'
+                                            }}
+                                            title="Preencher dados a partir de uma campanha já cadastrada"
+                                        >
+                                            <Copy size={13} color="#059669" />
+                                            Duplicar de Existente
+                                        </button>
+                                        {showDuplicateSelector && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '100%',
+                                                right: 0,
+                                                marginTop: '4px',
+                                                background: '#FFFFFF',
+                                                border: '1px solid #E2E8F0',
+                                                borderRadius: '8px',
+                                                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                                                zIndex: 1000,
+                                                width: '290px',
+                                                maxHeight: '260px',
+                                                overflowY: 'auto',
+                                                padding: '6px'
+                                            }}>
+                                                <div style={{ padding: '6px 8px', fontSize: '11px', fontWeight: 700, color: '#64748B', borderBottom: '1px solid #F1F5F9' }}>
+                                                    Duplicar configuração de:
+                                                </div>
+                                                {submissions.map(sub => (
+                                                    <div
+                                                        key={sub.id}
+                                                        onClick={() => {
+                                                            handleDuplicateIntoWizard(sub);
+                                                            setShowDuplicateSelector(false);
+                                                        }}
+                                                        style={{
+                                                            padding: '8px 10px',
+                                                            borderRadius: '5px',
+                                                            fontSize: '12px',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: '2px',
+                                                            borderBottom: '1px solid #F8FAFC'
+                                                        }}
+                                                        onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
+                                                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                                    >
+                                                        <strong style={{ color: '#0F172A' }}>{sub.campaign_name || sub.profile_name}</strong>
+                                                        <span style={{ fontSize: '10.5px', color: '#64748B' }}>
+                                                            DDD {sub.ddd} • {sub.template_type} • {sub.status}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowNewModal(false)}
+                                    style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: '4px' }}
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Stepper Navigation */}
@@ -4919,7 +5044,33 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                         </button>
                                     ) : <div />}
 
-                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        {/* SALVAR COMO RASCUNHO (DISPONÍVEL EM QUALQUER ETAPA) */}
+                                        <button
+                                            type="button"
+                                            disabled={isSavingSubmission}
+                                            onClick={() => handleSaveWizardSubmission(false, true)}
+                                            style={{
+                                                height: '36px',
+                                                padding: '0 14px',
+                                                fontSize: '12.5px',
+                                                background: '#FAF5FF',
+                                                color: '#7E22CE',
+                                                border: '1px solid #E9D5FF',
+                                                borderRadius: '6px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                cursor: 'pointer',
+                                                fontWeight: 600,
+                                                transition: 'all 0.15s'
+                                            }}
+                                            title="Salvar como rascunho para continuar editando ou enviar mais tarde"
+                                        >
+                                            <Bookmark size={14} color="#9333EA" />
+                                            Salvar como Rascunho
+                                        </button>
+
                                         {wizardStep < 3 ? (
                                             <button
                                                 type="button"

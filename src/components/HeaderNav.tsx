@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, ShieldCheck, Activity, Layers, Database, RefreshCw } from 'lucide-react';
+import { Zap, ShieldCheck, Activity, Layers, Database, RefreshCw, Send } from 'lucide-react';
 import { RedisQueueStatus } from '../types';
 
 interface HeaderNavProps {
@@ -140,7 +140,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
                             transition: 'all 0.2s'
                         }}
                     >
-                        <Activity size={16} />
+                        <Send size={16} />
                         Multi-Remetente
                         {contactCount > 0 && (
                             <span style={{ 

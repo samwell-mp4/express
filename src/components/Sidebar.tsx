@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Zap, Smartphone, Activity, Layers, UploadCloud, PlusCircle, FileSpreadsheet, Image as ImageIcon, Link as LinkIcon, User, LogOut, UserPlus } from 'lucide-react';
+import { Zap, Smartphone, Activity, Layers, UploadCloud, PlusCircle, FileSpreadsheet, Image as ImageIcon, Link as LinkIcon, User, LogOut, UserPlus, Send } from 'lucide-react';
 import { RedisQueueStatus, AppTab } from '../types';
 
 interface SidebarProps {
@@ -242,7 +242,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={`sidebar-nav-item ${activeTab === 'dispatch' ? 'active' : ''}`}
                     onClick={() => setActiveTab('dispatch')}
                 >
-                    <Activity size={16} />
+                    <Send size={16} />
                     <span style={{ flex: 1 }}>Multi-Remetente</span>
                     {contactCount > 0 && (
                         <span style={{
