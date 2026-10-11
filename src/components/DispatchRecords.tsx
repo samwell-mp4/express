@@ -4,7 +4,7 @@ import {
     Search, Filter, Smartphone, Trash2, ArrowUpRight, Send, Check, 
     Radio, ShieldCheck, Download, ExternalLink, Zap, Copy, X, Info, 
     FileText, Layers, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-    Calendar, FileSpreadsheet, Eye, Sparkles,
+    Calendar, FileSpreadsheet, Eye, EyeOff, Sparkles,
     CheckCheck, BarChart3, ArrowLeft, Pause, Play
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -59,6 +59,25 @@ export const DispatchRecords: React.FC = () => {
     const [isClearingLogs, setIsClearingLogs] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(50);
+
+    // Modo de Apresentação para Cliente (Oculta múltiplos números de remetentes)
+    const [hideSenderNumbers, setHideSenderNumbers] = useState<boolean>(() => {
+        try {
+            return localStorage.getItem('express_dispatch_hide_senders') === 'true';
+        } catch {
+            return false;
+        }
+    });
+
+    const toggleHideSenderNumbers = () => {
+        setHideSenderNumbers(prev => {
+            const next = !prev;
+            try {
+                localStorage.setItem('express_dispatch_hide_senders', String(next));
+            } catch {}
+            return next;
+        });
+    };
 
     const pollCountRef = useRef(0);
 
@@ -716,6 +735,30 @@ export const DispatchRecords: React.FC = () => {
                                 DUPLICAR
                             </button>
 
+                            {/* TOGGLE MODO CLIENTE (OCULTAR NÚMEROS) */}
+                            <button
+                                type="button"
+                                onClick={toggleHideSenderNumbers}
+                                style={{
+                                    height: '36px',
+                                    padding: '0 13px',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    borderRadius: '6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    color: hideSenderNumbers ? '#c2410c' : '#475569',
+                                    background: hideSenderNumbers ? '#fff7ed' : '#ffffff',
+                                    border: hideSenderNumbers ? '1px solid #fed7aa' : '1px solid #cbd5e1',
+                                    cursor: 'pointer'
+                                }}
+                                title={hideSenderNumbers ? 'Números ocultos para clientes (clique para mostrar)' : 'Ocultar múltiplos números para clientes'}
+                            >
+                                {hideSenderNumbers ? <EyeOff size={14} color="#ea580c" /> : <Eye size={14} color="#64748b" />}
+                                {hideSenderNumbers ? 'Modo Cliente Ativo' : 'Ocultar Números'}
+                            </button>
+
                             {/* VISUALIZAR ESTATÍSTICAS / SINCRONIZAR */}
                             <button
                                 type="button"
@@ -818,10 +861,60 @@ export const DispatchRecords: React.FC = () => {
 
                             {/* Card 2: Resumo da Transmissão (Imagem 2) */}
                             <div style={{ background: '#ffffff', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '16px 20px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
-                                        Resumo da transmissão
-                                    </h3>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                                            Resumo da transmissão
+                                        </h3>
+
+                                        {/* Toggle para Ocultar / Anonimizar Remetentes (Modo Apresentação / Cliente) */}
+                                        <button
+                                            type="button"
+                                            onClick={toggleHideSenderNumbers}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '3px 10px',
+                                                borderRadius: '6px',
+                                                fontSize: '11.5px',
+                                                fontWeight: 600,
+                                                border: hideSenderNumbers ? '1px solid #fed7aa' : '1px solid #cbd5e1',
+                                                background: hideSenderNumbers ? '#fff7ed' : '#f8fafc',
+                                                color: hideSenderNumbers ? '#c2410c' : '#475569',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.15s ease',
+                                                userSelect: 'none'
+                                            }}
+                                            title={hideSenderNumbers ? 'Modo Cliente ativado: clique para exibir os números reais' : 'Clique para ocultar os números dos remetentes (Modo Cliente)'}
+                                        >
+                                            {hideSenderNumbers ? <EyeOff size={13} color="#ea580c" /> : <Eye size={13} color="#64748b" />}
+                                            <span>{hideSenderNumbers ? 'Ocultar Números (Ativo)' : 'Ocultar Números'}</span>
+                                            <span style={{
+                                                display: 'inline-block',
+                                                width: '26px',
+                                                height: '14px',
+                                                borderRadius: '10px',
+                                                background: hideSenderNumbers ? '#ea580c' : '#cbd5e1',
+                                                position: 'relative',
+                                                transition: 'background 0.2s',
+                                                verticalAlign: 'middle'
+                                            }}>
+                                                <span style={{
+                                                    position: 'absolute',
+                                                    top: '1px',
+                                                    left: hideSenderNumbers ? '13px' : '1px',
+                                                    width: '12px',
+                                                    height: '12px',
+                                                    borderRadius: '50%',
+                                                    background: '#ffffff',
+                                                    transition: 'left 0.2s',
+                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                                                }} />
+                                            </span>
+                                        </button>
+                                    </div>
+
                                     <span style={{ fontSize: '12px', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                         Saiba mais <ExternalLink size={11} />
                                     </span>
@@ -849,9 +942,26 @@ export const DispatchRecords: React.FC = () => {
                                     {/* Remetente(s) */}
                                     <div>
                                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                            <Radio size={13} /> {activeCampaign.senderNumbers.length > 1 ? `Remetentes (${activeCampaign.senderNumbers.length})` : 'Remetente'}
+                                            <Radio size={13} /> {hideSenderNumbers ? 'Remetente' : (activeCampaign.senderNumbers.length > 1 ? `Remetentes (${activeCampaign.senderNumbers.length})` : 'Remetente')}
                                         </div>
-                                        {activeCampaign.senderNumbers.length > 1 ? (
+                                        {hideSenderNumbers ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                <span style={{
+                                                    background: '#ecfdf5',
+                                                    border: '1px solid #bbf7d0',
+                                                    padding: '3px 10px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '12px',
+                                                    fontWeight: 600,
+                                                    color: '#15803d',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}>
+                                                    <ShieldCheck size={14} color="#16a34a" /> Canal Oficial WhatsApp (Verificado)
+                                                </span>
+                                            </div>
+                                        ) : activeCampaign.senderNumbers.length > 1 ? (
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxWidth: '380px' }}>
                                                 {activeCampaign.senderNumbers.map((num, sIdx) => {
                                                     const countForNum = activeCampaign.records.filter(r => r.senderNumber === num).length;
@@ -977,8 +1087,12 @@ export const DispatchRecords: React.FC = () => {
                                                         <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-main)' }}>
                                                             {r.recipient}
                                                         </td>
-                                                        <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '11.5px', color: '#0369a1', fontWeight: 600 }}>
-                                                            {r.senderNumber || '—'}
+                                                        <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '11.5px', color: hideSenderNumbers ? '#15803d' : '#0369a1', fontWeight: 600 }}>
+                                                            {hideSenderNumbers ? (
+                                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                    <ShieldCheck size={12} color="#16a34a" /> Canal Oficial
+                                                                </span>
+                                                            ) : (r.senderNumber || '—')}
                                                         </td>
                                                         <td style={{ padding: '8px 12px' }}>
                                                             {isDelivered ? (
@@ -1120,12 +1234,16 @@ export const DispatchRecords: React.FC = () => {
                                         </div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {activeCampaign.senderNumbers.length > 1 
-                                                    ? `${activeCampaign.senderNumbers[0]} (+${activeCampaign.senderNumbers.length - 1} WABAs)` 
-                                                    : (activeCampaign.senderNumber || '554891159480')}
+                                                {hideSenderNumbers
+                                                    ? 'Canal Oficial Verificado'
+                                                    : (activeCampaign.senderNumbers.length > 1 
+                                                        ? `${activeCampaign.senderNumbers[0]} (+${activeCampaign.senderNumbers.length - 1} WABAs)` 
+                                                        : (activeCampaign.senderNumber || '554891159480'))}
                                             </div>
                                             <div style={{ fontSize: '10.5px', color: '#a7f3d0' }}>
-                                                {activeCampaign.senderNumbers.length > 1 ? `${activeCampaign.senderNumbers.length} remetentes ativos` : 'Active now'}
+                                                {hideSenderNumbers
+                                                    ? 'Conta Comercial Oficial'
+                                                    : (activeCampaign.senderNumbers.length > 1 ? `${activeCampaign.senderNumbers.length} remetentes ativos` : 'Active now')}
                                             </div>
                                         </div>
                                     </div>
@@ -1291,7 +1409,24 @@ export const DispatchRecords: React.FC = () => {
                                             {camp.name}
                                         </h4>
                                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                            {camp.senderNumbers.length > 1 ? (
+                                            {hideSenderNumbers ? (
+                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+                                                    <span style={{ 
+                                                        background: '#ecfdf5', 
+                                                        color: '#15803d', 
+                                                        border: '1px solid #bbf7d0',
+                                                        padding: '2px 8px', 
+                                                        borderRadius: '4px', 
+                                                        fontSize: '11px', 
+                                                        fontWeight: 600,
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px'
+                                                    }}>
+                                                        <ShieldCheck size={12} color="#16a34a" /> Canal Oficial WhatsApp (Verificado)
+                                                    </span>
+                                                </div>
+                                            ) : camp.senderNumbers.length > 1 ? (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                         <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Remetentes:</span>
@@ -1650,8 +1785,12 @@ export const DispatchRecords: React.FC = () => {
                                                     </td>
 
                                                     {/* Remetente */}
-                                                    <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: 'var(--text-muted)', fontSize: '12.5px' }}>
-                                                        {r.senderNumber || '—'}
+                                                    <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: hideSenderNumbers ? '#15803d' : 'var(--text-muted)', fontSize: '12.5px' }}>
+                                                        {hideSenderNumbers ? (
+                                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                <ShieldCheck size={12} color="#16a34a" /> Canal Oficial
+                                                            </span>
+                                                        ) : (r.senderNumber || '—')}
                                                     </td>
 
                                                     {/* Template */}
