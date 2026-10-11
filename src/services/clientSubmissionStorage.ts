@@ -67,10 +67,37 @@ export const clientSubmissionStorage = {
                 if (res.ok) {
                     const data = await res.json();
                     if (Array.isArray(data) && data.length > 0) {
-                        const remoteList: ClientSubmission[] = data.map(item => ({
-                            ...item,
-                            ads: typeof item.ads === 'string' ? JSON.parse(item.ads) : (item.ads || [])
-                        }));
+                        const remoteList: ClientSubmission[] = data.map(item => {
+                            let contacts = item.contacts;
+                            if (typeof contacts === 'string') {
+                                try { contacts = JSON.parse(contacts); } catch (e) { contacts = []; }
+                            }
+                            let headers = item.headers;
+                            if (typeof headers === 'string') {
+                                try { headers = JSON.parse(headers); } catch (e) { headers = []; }
+                            }
+                            let senders = item.senders;
+                            if (typeof senders === 'string') {
+                                try { senders = JSON.parse(senders); } catch (e) { senders = []; }
+                            }
+                            let mappings = item.mappings;
+                            if (typeof mappings === 'string') {
+                                try { mappings = JSON.parse(mappings); } catch (e) { mappings = []; }
+                            }
+                            let ads = item.ads;
+                            if (typeof ads === 'string') {
+                                try { ads = JSON.parse(ads); } catch (e) { ads = []; }
+                            }
+
+                            return {
+                                ...item,
+                                contacts: Array.isArray(contacts) ? contacts : [],
+                                headers: Array.isArray(headers) ? headers : [],
+                                senders: Array.isArray(senders) ? senders : [],
+                                mappings: Array.isArray(mappings) ? mappings : [],
+                                ads: Array.isArray(ads) ? ads : []
+                            };
+                        });
 
                         // SAFE MERGE: Keep ALL local items that are not in remoteList
                         const remoteIds = new Set(remoteList.map(r => String(r.id)));
@@ -79,11 +106,26 @@ export const clientSubmissionStorage = {
                         const merged = [
                             ...localOnly,
                             ...remoteList.map(rem => {
-                                const loc = localList.find(l => String(l.id) === String(rem.id));
-                                return loc ? { ...rem, contacts: loc.contacts, headers: loc.headers } : rem;
+                                const loc = localList.find(l => String(l.id) === String(rem.id) || (rem.campaign_name && l.campaign_name === rem.campaign_name));
+                                const contacts = (loc?.contacts && Array.isArray(loc.contacts) && loc.contacts.length > 0) ? loc.contacts : rem.contacts;
+                                const headers = (loc?.headers && Array.isArray(loc.headers) && loc.headers.length > 0) ? loc.headers : rem.headers;
+                                const senders = (loc?.senders && Array.isArray(loc.senders) && loc.senders.length > 0) ? loc.senders : rem.senders;
+                                const mappings = (loc?.mappings && Array.isArray(loc.mappings) && loc.mappings.length > 0) ? loc.mappings : rem.mappings;
+                                return {
+                                    ...rem,
+                                    contacts: contacts || [],
+                                    headers: headers || [],
+                                    senders: senders || [],
+                                    mappings: mappings || [],
+                                    template_name: rem.template_name || loc?.template_name || ''
+                                };
                             })
                         ];
-                        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(merged));
+                        try {
+                            localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(merged));
+                        } catch (quotaErr) {
+                            console.warn('[clientSubmissionStorage] Erro ao persistir merged no localStorage:', quotaErr);
+                        }
                         return merged;
                     }
                 }
@@ -131,7 +173,10 @@ export const clientSubmissionStorage = {
             headers: payload.headers || [],
             fileName: payload.fileName || 'contatos.xlsx',
             validCount: payload.validCount || (payload.contacts ? payload.contacts.length : 0),
-            totalRows: payload.totalRows || (payload.contacts ? payload.contacts.length : 0)
+            totalRows: payload.totalRows || (payload.contacts ? payload.contacts.length : 0),
+            senders: payload.senders || [],
+            template_name: payload.template_name || '',
+            mappings: payload.mappings || []
         };
 
         // 1. Persist directly to local storage IMMEDIATELY (synchronous, 100% reliable)
@@ -144,7 +189,11 @@ export const clientSubmissionStorage = {
         }
 
         const updated = [localCreated, ...localList.filter(s => String(s.id) !== String(localCreated.id))];
-        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(updated));
+        try {
+            localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(updated));
+        } catch (e) {
+            console.warn('[clientSubmissionStorage] Falha ao salvar no localStorage (cota excedida?):', e);
+        }
 
         // 2. Dispatch event so UI updates instantly
         window.dispatchEvent(new CustomEvent('client_submissions_updated'));
@@ -182,7 +231,10 @@ export const clientSubmissionStorage = {
                         headers: localCreated.headers,
                         fileName: localCreated.fileName,
                         validCount: localCreated.validCount,
-                        totalRows: localCreated.totalRows
+                        totalRows: localCreated.totalRows,
+                        senders: localCreated.senders,
+                        template_name: localCreated.template_name,
+                        mappings: localCreated.mappings
                     })
                 }).then(async res => {
                     if (res.ok) {

@@ -156,14 +156,58 @@ export const SenderManager: React.FC<SenderManagerProps> = ({
         };
     };
 
+    // Sincroniza e sintetiza excelAnalysis sempre que contatos forem carregados externamente (ex: de um rascunho salvo)
+    useEffect(() => {
+        if (contacts && contacts.length > 0) {
+            const hasExisting = excelAnalysis && excelAnalysis.contacts && excelAnalysis.contacts.length === contacts.length;
+            if (!hasExisting) {
+                const sample = contacts.slice(0, 10);
+                const firstContact = contacts[0] || {};
+                const cols = Object.keys(firstContact);
+                const detectedHeaders = cols.length > 0 ? cols : ['Telefone', 'Nome'];
+
+                const pIdx = detectedHeaders.findIndex(h => {
+                    const l = h.toLowerCase();
+                    return l.includes('tel') || l.includes('cel') || l.includes('fone') || l.includes('phone') || l.includes('numero') || l.includes('número');
+                });
+                const nIdx = detectedHeaders.findIndex(h => {
+                    const l = h.toLowerCase();
+                    return l.includes('nome') || l.includes('name') || l.includes('cliente');
+                });
+
+                setExcelAnalysis({
+                    stats: {
+                        totalRows: contacts.length,
+                        validCount: contacts.length,
+                        duplicateCount: 0,
+                        invalidCount: 0
+                    },
+                    totalRows: contacts.length,
+                    validCount: contacts.length,
+                    duplicateCount: 0,
+                    invalidCount: 0,
+                    headers: detectedHeaders,
+                    samplePreview: sample,
+                    contacts: contacts,
+                    detectedPhoneCol: pIdx >= 0 ? pIdx : 0,
+                    detectedNameCol: nIdx >= 0 ? nIdx : (detectedHeaders.length > 1 ? 1 : -1)
+                });
+
+                if (!uploadedFileName) {
+                    setUploadedFileName('Planilha Carregada do Rascunho');
+                }
+            }
+        }
+    }, [contacts]);
+
     // Load templates for senders that already have numbers
     useEffect(() => {
         senders.forEach(s => {
-            if (s.senderNumber && (!s.templates || s.templates.length === 0)) {
+            if (s.senderNumber && (!s.templates || s.templates.length === 0) && !s.isLoadingTemplates) {
                 loadTemplatesForSender(s.id, s.senderNumber);
             }
         });
-    }, []);
+    }, [senders]);
 
     // Fetch approved templates for a specific sender
     const loadTemplatesForSender = async (senderId: string, number: string) => {

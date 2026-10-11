@@ -135,6 +135,9 @@ async function initDB() {
 
     await client.query(`ALTER TABLE client_submissions ADD COLUMN IF NOT EXISTS origin TEXT DEFAULT 'CLIENT_FORM'`);
     await client.query(`ALTER TABLE client_submissions ADD COLUMN IF NOT EXISTS sender_phone TEXT`);
+    await client.query(`ALTER TABLE client_submissions ADD COLUMN IF NOT EXISTS senders JSONB DEFAULT '[]'`).catch(() => {});
+    await client.query(`ALTER TABLE client_submissions ADD COLUMN IF NOT EXISTS mappings JSONB DEFAULT '[]'`).catch(() => {});
+    await client.query(`ALTER TABLE client_submissions ADD COLUMN IF NOT EXISTS template_name TEXT`).catch(() => {});
 
     // 3. Tabela pro_rotators (Link Rotator PRO)
     await client.query(`
@@ -1462,11 +1465,40 @@ const server = http.createServer(async (req, res) => {
         result = await pgPool.query('SELECT * FROM client_submissions ORDER BY id DESC');
       }
 
-      const sanitized = result.rows.map(row => ({
-        ...row,
-        contacts: row.download_count >= (row.max_downloads || 3) ? [] : row.contacts,
-        is_exhausted: row.download_count >= (row.max_downloads || 3)
-      }));
+      const sanitized = result.rows.map(row => {
+        let parsedContacts = row.contacts;
+        if (typeof parsedContacts === 'string') {
+          try { parsedContacts = JSON.parse(parsedContacts); } catch (e) { parsedContacts = []; }
+        }
+        let parsedHeaders = row.headers;
+        if (typeof parsedHeaders === 'string') {
+          try { parsedHeaders = JSON.parse(parsedHeaders); } catch (e) { parsedHeaders = []; }
+        }
+        let parsedAds = row.ads;
+        if (typeof parsedAds === 'string') {
+          try { parsedAds = JSON.parse(parsedAds); } catch (e) { parsedAds = []; }
+        }
+        let parsedSenders = row.senders;
+        if (typeof parsedSenders === 'string') {
+          try { parsedSenders = JSON.parse(parsedSenders); } catch (e) { parsedSenders = []; }
+        }
+        let parsedMappings = row.mappings;
+        if (typeof parsedMappings === 'string') {
+          try { parsedMappings = JSON.parse(parsedMappings); } catch (e) { parsedMappings = []; }
+        }
+
+        const isExhausted = row.download_count >= (row.max_downloads || 3) && row.status !== 'RASCUNHO';
+
+        return {
+          ...row,
+          contacts: isExhausted ? [] : (parsedContacts || []),
+          headers: parsedHeaders || [],
+          ads: parsedAds || [],
+          senders: parsedSenders || [],
+          mappings: parsedMappings || [],
+          is_exhausted: isExhausted
+        };
+      });
 
       return sendJson(sanitized);
     } catch (err) {
@@ -1494,6 +1526,9 @@ const server = http.createServer(async (req, res) => {
       const contacts = Array.isArray(body.contacts) ? body.contacts : [];
       const headers = Array.isArray(body.headers) ? body.headers : [];
       const ads = Array.isArray(body.ads) ? body.ads : [];
+      const senders = Array.isArray(body.senders) ? body.senders : [];
+      const mappings = Array.isArray(body.mappings) ? body.mappings : [];
+      const template_name = body.template_name || '';
       const status = body.status || 'PENDENTE';
       const sender_number = body.sender_number || body.sender_phone || '';
       const sender_phone = body.sender_phone || body.sender_number || '';
@@ -1516,6 +1551,9 @@ const server = http.createServer(async (req, res) => {
           contacts,
           headers,
           ads,
+          senders,
+          mappings,
+          template_name,
           status,
           sender_number,
           sender_phone,
@@ -1529,14 +1567,16 @@ const server = http.createServer(async (req, res) => {
         `INSERT INTO client_submissions (
           campaign_name, profile_name, ddd, template_type, media_url, ad_copy,
           button_link, spreadsheet_url, file_name, valid_count, total_rows,
-          contacts, headers, ads, status, sender_number, sender_phone, origin, notes, user_id, download_count, max_downloads
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 0, 3)
+          contacts, headers, ads, status, sender_number, sender_phone, origin, notes, user_id, download_count, max_downloads,
+          senders, mappings, template_name
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 0, 3, $21, $22, $23)
         RETURNING *`,
         [
           campaign_name, profile_name, ddd, template_type, media_url, ad_copy,
           button_link, spreadsheet_url, file_name, valid_count, total_rows,
           JSON.stringify(contacts), JSON.stringify(headers), JSON.stringify(ads),
-          status, sender_number, sender_phone, origin, notes, user_id
+          status, sender_number, sender_phone, origin, notes, user_id,
+          JSON.stringify(senders), JSON.stringify(mappings), template_name
         ]
       );
 
@@ -1577,7 +1617,7 @@ const server = http.createServer(async (req, res) => {
       const allowlist = [
         'campaign_name', 'profile_name', 'ddd', 'template_type', 'media_url',
         'ad_copy', 'button_link', 'spreadsheet_url', 'file_name', 'status',
-        'accepted_by', 'assigned_to', 'sender_number', 'notes'
+        'accepted_by', 'assigned_to', 'sender_number', 'notes', 'template_name'
       ];
 
       for (const field of allowlist) {
@@ -1592,6 +1632,16 @@ const server = http.createServer(async (req, res) => {
         values.push(JSON.stringify(body.ads));
       }
 
+      if (body.senders !== undefined) {
+        updates.push(`senders = $${paramIdx++}`);
+        values.push(JSON.stringify(body.senders));
+      }
+
+      if (body.mappings !== undefined) {
+        updates.push(`mappings = $${paramIdx++}`);
+        values.push(JSON.stringify(body.mappings));
+      }
+
       if (body.contacts !== undefined) {
         updates.push(`contacts = $${paramIdx++}`);
         values.push(JSON.stringify(body.contacts));
@@ -1602,8 +1652,8 @@ const server = http.createServer(async (req, res) => {
         updates.push(`download_count = $${paramIdx++}`);
         values.push(count);
 
-        // Se atingiu o limite de 3 downloads, expurga contatos permanentemente
-        if (count >= (record.max_downloads || 3)) {
+        // Se atingiu o limite de 3 downloads, expurga contatos permanentemente (apenas se não for RASCUNHO)
+        if (count >= (record.max_downloads || 3) && record.status !== 'RASCUNHO') {
           updates.push(`contacts = '[]'::jsonb`);
           updates.push(`headers = '[]'::jsonb`);
           updates.push(`file_name = 'Planilha Excluída (Limite de 3 downloads atingido)'`);

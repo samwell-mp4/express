@@ -300,6 +300,9 @@ export interface ClientSubmission {
     cta_targets?: RotatorTarget[];
     rotator_slug?: string;
     download_count?: number;
+    senders?: SenderConfig[];
+    template_name?: string;
+    mappings?: PlaceholderMapping[];
 }
 
 export interface ClientBatchRecord {

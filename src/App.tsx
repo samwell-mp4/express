@@ -289,25 +289,40 @@ export const App: React.FC = () => {
         const primarySender = senders[0]?.senderNumber ? senders[0].senderNumber.replace(/\D/g, '') : '';
         const ddd = primarySender.length >= 4 ? primarySender.slice(2, 4) : '11';
 
+        // Sanitização e preservação de todos os remetentes configurados
+        const cleanSenders: SenderConfig[] = senders.map((s, idx) => ({
+            ...s,
+            id: s.id || String(idx + 1),
+            senderNumber: (s.senderNumber || '').replace(/\D/g, ''),
+            templateName: s.templateName || currentActiveTemplate,
+            headerType: s.headerType || currentHeaderType,
+            mediaUrl: s.mediaUrl || mediaUrl
+        }));
+
         const newDraft: Partial<ClientSubmission> = {
             campaign_name: campaignName,
             profile_name: campaignName,
             client_name: campaignName,
             ddd,
-            sender_phone: senders.map(s => s.senderNumber).filter(Boolean).join(', ') || primarySender,
+            sender_phone: cleanSenders.map(s => s.senderNumber).filter(Boolean).join(', ') || primarySender,
+            sender_number: primarySender,
             template_type: currentHeaderType === 'IMAGE' ? 'IMAGE' : (currentHeaderType === 'VIDEO' ? 'VIDEO' : 'TEXT'),
             media_url: mediaUrl,
             button_link: targetUrl || '',
             status: 'RASCUNHO',
-            contacts,
-            headers,
+            contacts: contacts || [],
+            headers: headers || [],
+            fileName: `${campaignName}.xlsx`,
             validCount: contacts.length,
             totalRows: contacts.length,
+            senders: cleanSenders,
+            template_name: currentActiveTemplate,
+            mappings: mappings || [],
             variables: mappings.map(m => m.columnName || m.fixedValue || ''),
             ads: [{
                 id: '1',
                 ad_name: campaignName,
-                sender_phone: senders.map(s => s.senderNumber).filter(Boolean).join(', ') || primarySender,
+                sender_phone: cleanSenders.map(s => s.senderNumber).filter(Boolean).join(', ') || primarySender,
                 template_type: currentHeaderType === 'IMAGE' ? 'IMAGE' : (currentHeaderType === 'VIDEO' ? 'VIDEO' : 'TEXT'),
                 message_mode: 'manual',
                 media_url: mediaUrl,
@@ -319,7 +334,7 @@ export const App: React.FC = () => {
 
         try {
             await clientSubmissionStorage.createSubmission(newDraft);
-            showToast(`✓ Campanha "${campaignName}" salva como Rascunho com sucesso!`);
+            showToast(`✓ Campanha "${campaignName}" salva com ${contacts.length} contatos e ${cleanSenders.filter(s => s.senderNumber).length} remetente(s)!`);
         } catch (e: any) {
             alert(`Erro ao salvar rascunho: ${e.message}`);
         }
@@ -343,20 +358,134 @@ export const App: React.FC = () => {
     };
 
     const handleLoadSubmissionIntoDispatch = (sub: ClientSubmission) => {
-        if (sub.contacts && sub.contacts.length > 0) {
-            setContacts(sub.contacts);
-            setHeaders(sub.headers || ['Telefone', 'Nome']);
+        // 1. Planilha / Contatos e Cabeçalhos
+        let parsedContacts: ParsedContact[] = [];
+        if (Array.isArray(sub.contacts)) {
+            parsedContacts = sub.contacts;
+        } else if (typeof sub.contacts === 'string') {
+            try {
+                parsedContacts = JSON.parse(sub.contacts);
+            } catch (e) {
+                console.error('Erro ao ler contatos do rascunho:', e);
+            }
         }
+
+        let parsedHeaders: string[] = [];
+        if (Array.isArray(sub.headers)) {
+            parsedHeaders = sub.headers;
+        } else if (typeof sub.headers === 'string') {
+            try {
+                parsedHeaders = JSON.parse(sub.headers);
+            } catch (e) {
+                parsedHeaders = [];
+            }
+        }
+
+        if (Array.isArray(parsedContacts) && parsedContacts.length > 0) {
+            setContacts(parsedContacts);
+            const detectedHeaders = (Array.isArray(parsedHeaders) && parsedHeaders.length > 0)
+                ? parsedHeaders
+                : Object.keys(parsedContacts[0]).length > 0
+                    ? Object.keys(parsedContacts[0])
+                    : ['Telefone', 'Nome'];
+            setHeaders(detectedHeaders);
+        }
+
+        // 2. Nome da Campanha
         setSelectedClient(sub.campaign_name || sub.profile_name || 'Campanha');
+
+        // 3. Mídia
         if (sub.media_url) {
             setMediaUrl(sub.media_url);
-            setSenders(prev => prev.map(s => ({ ...s, mediaUrl: sub.media_url })));
         }
+
+        // 4. Link do Botão
         if (sub.button_link) {
             setTargetUrl(sub.button_link);
         }
+
+        // 5. Template Ativo
+        const loadedTemplateName = sub.template_name || (sub.ads?.[0]?.ad_copy?.match(/Template:\s*([^\s]+)/)?.[1]) || currentActiveTemplate;
+
+        // 6. Remetentes (Senders)
+        const currentSavedWabas = wabaStorage.getSavedWabas();
+        let loadedSenders: SenderConfig[] = [];
+
+        let rawSenders = sub.senders;
+        if (typeof rawSenders === 'string') {
+            try { rawSenders = JSON.parse(rawSenders); } catch (e) { rawSenders = []; }
+        }
+
+        if (Array.isArray(rawSenders) && rawSenders.length > 0) {
+            loadedSenders = rawSenders.map((s, idx) => {
+                const cleanNum = (s.senderNumber || '').replace(/\D/g, '');
+                const matchedWaba = currentSavedWabas.find(w => w.number.replace(/\D/g, '') === cleanNum);
+                return {
+                    ...s,
+                    id: s.id || String(idx + 1),
+                    senderNumber: cleanNum,
+                    label: s.label || (matchedWaba ? matchedWaba.label : `Remetente ${idx + 1}`),
+                    limit: s.limit || matchedWaba?.defaultLimit || 250,
+                    templateName: s.templateName || loadedTemplateName || matchedWaba?.templateName || 'ivo_01',
+                    templateLanguage: s.templateLanguage || 'pt_BR',
+                    templates: (s.templates && s.templates.length > 0) ? s.templates : (matchedWaba?.templates || []),
+                    headerType: s.headerType || (sub.template_type as any) || matchedWaba?.headerType || 'NONE',
+                    mediaUrl: s.mediaUrl || sub.media_url || matchedWaba?.mediaUrl || ''
+                };
+            });
+        } else {
+            // Reconstrução a partir de sender_phone ou sender_number
+            const rawPhoneStr = sub.sender_phone || sub.sender_number || '';
+            const phoneList = rawPhoneStr
+                .split(',')
+                .map(p => p.replace(/\D/g, '').trim())
+                .filter(Boolean);
+
+            if (phoneList.length > 0) {
+                loadedSenders = phoneList.map((cleanNum, idx) => {
+                    const matchedWaba = currentSavedWabas.find(w => w.number.replace(/\D/g, '') === cleanNum);
+                    return {
+                        id: String(idx + 1),
+                        label: matchedWaba ? matchedWaba.label : `Remetente ${idx + 1}`,
+                        senderNumber: cleanNum,
+                        limit: matchedWaba?.defaultLimit || 250,
+                        templateName: loadedTemplateName || matchedWaba?.templateName || 'ivo_01',
+                        templateLanguage: 'pt_BR',
+                        templates: matchedWaba?.templates || [],
+                        headerType: (sub.template_type as any) || matchedWaba?.headerType || 'NONE',
+                        mediaUrl: sub.media_url || matchedWaba?.mediaUrl || ''
+                    };
+                });
+            }
+        }
+
+        if (loadedSenders.length > 0) {
+            setSenders(loadedSenders);
+        } else if (sub.media_url) {
+            setSenders(prev => prev.map(s => ({ ...s, mediaUrl: sub.media_url! })));
+        }
+
+        // 7. Mapeamento de Variáveis (Mappings)
+        let rawMappings = sub.mappings;
+        if (typeof rawMappings === 'string') {
+            try { rawMappings = JSON.parse(rawMappings); } catch (e) { rawMappings = []; }
+        }
+
+        if (Array.isArray(rawMappings) && rawMappings.length > 0) {
+            setMappings(rawMappings);
+        } else if (Array.isArray(sub.variables) && sub.variables.length > 0) {
+            setMappings(sub.variables.map((v, idx) => ({
+                id: idx + 1,
+                type: 'column',
+                columnName: v,
+                fixedValue: ''
+            })));
+        }
+
         setShowLoadDraftModal(false);
-        showToast(`✓ Campanha "${sub.campaign_name || sub.profile_name}" carregada no Multi-Remetente!`);
+        const contactTxt = parsedContacts.length > 0 ? `${parsedContacts.length} contatos` : 'sem contatos';
+        const senderTxt = loadedSenders.length > 0 ? `${loadedSenders.length} remetente(s)` : 'sem remetentes';
+        showToast(`✓ Campanha "${sub.campaign_name || sub.profile_name}" carregada (${contactTxt}, ${senderTxt})!`);
     };
 
     const savedWabas = wabaStorage.getSavedWabas();
@@ -769,12 +898,10 @@ export const App: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => {
-                                                            setSelectedClient(`${sub.campaign_name || sub.profile_name} (Cópia)`);
-                                                            if (sub.contacts) setContacts(sub.contacts);
-                                                            if (sub.headers) setHeaders(sub.headers);
-                                                            if (sub.media_url) setMediaUrl(sub.media_url);
-                                                            setShowLoadDraftModal(false);
-                                                            showToast(`✓ Cópia da campanha criada no Multi-Remetente!`);
+                                                            handleLoadSubmissionIntoDispatch({
+                                                                ...sub,
+                                                                campaign_name: `${sub.campaign_name || sub.profile_name} (Cópia)`
+                                                            });
                                                         }}
                                                         style={{
                                                             height: '30px',
