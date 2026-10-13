@@ -42,8 +42,24 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
         return mappings.map(m => ({ ...m }));
     });
 
-    // Compute partitions
-    const partitionedSenders = excelService.partitionContacts(contacts, senders);
+    const [sendToEntireList, setSendToEntireList] = useState(true);
+
+    // Compute partitions com suporte a envio de 100% da lista de contatos
+    const effectiveSenders = React.useMemo(() => {
+        if (!sendToEntireList) return senders;
+        if (senders.length === 0) return senders;
+        if (senders.length === 1) {
+            return [{ ...senders[0], limit: Math.max(senders[0].limit || 0, contacts.length) }];
+        }
+        const base = Math.floor(contacts.length / senders.length);
+        const rem = contacts.length % senders.length;
+        return senders.map((s, idx) => ({
+            ...s,
+            limit: base + (idx < rem ? 1 : 0)
+        }));
+    }, [senders, contacts.length, sendToEntireList]);
+
+    const partitionedSenders = excelService.partitionContacts(contacts, effectiveSenders);
     const activePartitions = partitionedSenders.filter(s => s.allocatedContacts && s.allocatedContacts.length > 0);
     const totalAllocated = activePartitions.reduce((acc, s) => acc + (s.allocatedContacts?.length || 0), 0);
 
@@ -317,7 +333,7 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
 
                 const existingRaw = localStorage.getItem('express_live_dispatch_records');
                 const existing = existingRaw ? JSON.parse(existingRaw) : [];
-                localStorage.setItem('express_live_dispatch_records', JSON.stringify([...newRecords, ...existing].slice(0, 1000)));
+                localStorage.setItem('express_live_dispatch_records', JSON.stringify([...newRecords, ...existing].slice(0, 20000)));
             } catch (storageErr) {
                 console.warn('Erro ao salvar registros locais:', storageErr);
             }
@@ -472,6 +488,44 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                     </div>
                 ) : (
                     <>
+                        {/* Banner de Garantia de Alocação Total da Lista de Contatos */}
+                        <div style={{
+                            background: totalAllocated < contacts.length ? '#fffbeb' : '#f0fdf4',
+                            border: `1.5px solid ${totalAllocated < contacts.length ? '#fde68a' : '#bbf7d0'}`,
+                            borderRadius: '8px',
+                            padding: '10px 14px',
+                            marginBottom: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '8px'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input
+                                    type="checkbox"
+                                    id="sendToEntireListCheck"
+                                    checked={sendToEntireList}
+                                    onChange={(e) => setSendToEntireList(e.target.checked)}
+                                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary-color)' }}
+                                />
+                                <label htmlFor="sendToEntireListCheck" style={{ fontSize: '13px', fontWeight: 600, color: totalAllocated < contacts.length ? '#92400e' : '#166534', cursor: 'pointer' }}>
+                                    Disparar para TODA a lista de contatos ({contacts.length} destinatários)
+                                </label>
+                            </div>
+                            {totalAllocated < contacts.length ? (
+                                <span style={{ fontSize: '12px', color: '#b45309', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <AlertTriangle size={14} color="#d97706" />
+                                    Limite configurado exclui {contacts.length - totalAllocated} contatos da lista!
+                                </span>
+                            ) : (
+                                <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <CheckCircle2 size={14} color="#16a34a" />
+                                    100% dos contatos alocados ({totalAllocated}/{contacts.length})
+                                </span>
+                            )}
+                        </div>
+
                         {/* Summary Stats Grid */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginBottom: '14px' }}>
                             <div className="glass-card" style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>

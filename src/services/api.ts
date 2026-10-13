@@ -398,9 +398,12 @@ export const api = {
     },
 
     // 8. Fetch Real-time Dispatch Records / Logs
-    async getDispatchLogs(): Promise<DispatchRecord[]> {
+    async getDispatchLogs(campaignId?: string, limit = 10000): Promise<DispatchRecord[]> {
         try {
-            const res = await fetch('/api/dispatch/logs');
+            const query = new URLSearchParams();
+            query.set('limit', String(limit));
+            if (campaignId) query.set('campaignId', campaignId);
+            const res = await fetch(`/api/dispatch/logs?${query.toString()}`);
             if (!res.ok) return [];
             const rows = await res.json();
             return (rows || []).map((r: any) => {
@@ -447,14 +450,23 @@ export const api = {
                      !statusUpper.includes('UNDELIVERABLE') &&
                      !realErrorId;
 
-                // 2. Detecção estrita de FALHA / NÃO ENTREGUE (apenas se NÃO for Handset Delivered e NÃO for Operator)
-                const isFailed = !isDelivered && !isOperatorOnly && (
-                    r.status === 'FAILED' || 
-                    r.log_type === 'ERROR' || 
+                // 2. Detecção de status PENDENTE / EM TRÂNSITO (NÃO é falha!)
+                const isPending = isOperatorOnly || 
+                                  deliveryUpper.includes('PENDING') || 
+                                  deliveryUpper.includes('ENROUTE') || 
+                                  deliveryUpper.includes('WAITING') || 
+                                  statusUpper.includes('PENDING') || 
+                                  statusUpper.includes('ENROUTE') || 
+                                  statusUpper.includes('WAITING') || 
+                                  groupUpper === 'PENDING' || 
+                                  (r.status === 'SENT' && !isDelivered && !deliveryUpper.includes('REJECTED') && !deliveryUpper.includes('UNDELIVERABLE'));
+
+                // 3. Detecção de FALHA / NÃO ENTREGUE (apenas falhas reais confirmadas)
+                const isFailed = !isDelivered && !isPending && (
                     groupUpper === 'UNDELIVERABLE' || 
                     groupUpper === 'REJECTED' || 
-                    groupUpper === 'FAILED' ||
-                    groupUpper === 'EXPIRED' ||
+                    groupUpper === 'FAILED' || 
+                    groupUpper === 'EXPIRED' || 
                     statusUpper.includes('UNDELIVERABLE') || 
                     statusUpper.includes('NOT_DELIVERED') || 
                     statusUpper.includes('REJECTED') || 
@@ -464,13 +476,11 @@ export const api = {
                     deliveryUpper.includes('NOT_DELIVERED') || 
                     deliveryUpper.includes('REJECTED') || 
                     deliveryUpper.includes('SPAM') || 
-                    deliveryUpper.includes('EXPIRED') ||
-                    deliveryUpper.includes('BOUNCE') ||
-                    deliveryUpper.includes('BLOCKED') ||
-                    (deliveryUpper.includes('FAILED') && !deliveryUpper.includes('NO')) ||
-                    (deliveryUpper.includes('ERROR') && !deliveryUpper.includes('NO_ERROR') && !deliveryUpper.includes('NO ERROR') && !deliveryUpper.includes('CODE 0')) ||
-                    Boolean(realErrorId) ||
-                    Boolean(realErrorDesc && !realErrorDesc.includes('No Error'))
+                    deliveryUpper.includes('EXPIRED') || 
+                    deliveryUpper.includes('BOUNCE') || 
+                    deliveryUpper.includes('BLOCKED') || 
+                    Boolean(realErrorId && realErrorId > 0) || 
+                    Boolean(realErrorDesc && !realErrorDesc.toLowerCase().includes('no error'))
                 );
 
                 let recordStatus: 'DELIVERED' | 'SENT' | 'PENDING' | 'FAILED' = 'PENDING';
@@ -478,10 +488,9 @@ export const api = {
                     recordStatus = 'DELIVERED';
                 } else if (isFailed) {
                     recordStatus = 'FAILED';
-                } else if (isSuccess || r.status === 'SENT' || isOperatorOnly || deliveryUpper.includes('PENDING') || deliveryUpper.includes('ENROUTE') || deliveryUpper.includes('WAITING') || groupUpper === 'PENDING') {
-                    recordStatus = 'SENT';
+                } else {
+                    recordStatus = 'PENDING';
                 }
-
                 const diagnostic = recordStatus === 'FAILED' ? parseInfobipErrorDiagnostic(parsedPayload) : null;
                 
                 let finalErrorReason = recordStatus === 'DELIVERED'
@@ -557,13 +566,33 @@ export const api = {
     },
 
     // 8.1 Sincronizar Relatórios de Entrega (DLR) com a Infobip
-    async syncDeliveryReports(): Promise<{ success: boolean; synced: number; updated: number; sample?: any[] }> {
+    async syncDeliveryReports(options?: { campaignId?: string; senderNumber?: string; messageIds?: string[] }): Promise<{ success: boolean; synced: number; updated: number; sample?: any[] }> {
         try {
-            const res = await fetch('/api/dispatch/sync-reports', { method: 'POST' });
+            const res = await fetch('/api/dispatch/sync-reports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(options || {})
+            });
             if (!res.ok) return { success: false, synced: 0, updated: 0 };
             return await res.json();
         } catch (err) {
             console.warn('Erro ao sincronizar relatórios Infobip:', err);
+            return { success: false, synced: 0, updated: 0 };
+        }
+    },
+
+    // 8.1.1 Sincronização focada por Campanha e lista de IDs
+    async syncCampaignDelivery(campaignId: string, senderNumber?: string, messageIds?: string[]): Promise<{ success: boolean; synced: number; updated: number; sample?: any[] }> {
+        try {
+            const res = await fetch('/api/dispatch/sync-campaign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ campaignId, senderNumber, messageIds })
+            });
+            if (!res.ok) return { success: false, synced: 0, updated: 0 };
+            return await res.json();
+        } catch (err) {
+            console.warn('Erro ao sincronizar campanha Infobip:', err);
             return { success: false, synced: 0, updated: 0 };
         }
     },

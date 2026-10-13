@@ -712,12 +712,18 @@ async function runDispatchWorker() {
 
         const firstMsg = res?.messages?.[0];
         const statusGroup = firstMsg?.status?.groupName;
+        const statusName = firstMsg?.status?.name;
+        const msgError = firstMsg?.error || res?.error;
+        const hasRealErrorId = msgError?.id !== undefined && msgError?.id !== null && Number(msgError.id) > 0;
+        const hasRealErrorDesc = msgError?.description && !msgError.description.toLowerCase().includes('no error');
+
         if (
           res?.statusCode >= 400 ||
           statusGroup === 'REJECTED' || 
           statusGroup === 'UNDELIVERABLE' || 
           res?.requestError ||
-          res?.error ||
+          hasRealErrorId ||
+          hasRealErrorDesc ||
           res?.errorMessage
         ) {
           logType = 'ERROR';
@@ -734,14 +740,16 @@ async function runDispatchWorker() {
       const messageId = firstMsg?.messageId || `tx_${Date.now()}`;
       const statusGroup = firstMsg?.status?.groupName;
       const statusName = firstMsg?.status?.name;
-      const errorId = firstMsg?.status?.id || firstMsg?.error?.id;
-      const errorDesc = firstMsg?.status?.description || firstMsg?.error?.description || '';
+      const errorId = (firstMsg?.error?.id !== undefined && firstMsg?.error?.id !== null) ? Number(firstMsg.error.id) : null;
+      const errorDesc = firstMsg?.error?.description || firstMsg?.status?.description || '';
 
       let initialStatus = 'SENT';
-      if (logType === 'ERROR' || statusGroup === 'REJECTED' || statusGroup === 'UNDELIVERABLE') {
+      if (logType === 'ERROR' || statusGroup === 'REJECTED' || statusGroup === 'UNDELIVERABLE' || (errorId && errorId > 0)) {
         initialStatus = 'FAILED';
       } else if (statusName === 'DELIVERED_TO_HANDSET' || firstMsg?.status?.id === 5) {
         initialStatus = 'DELIVERED';
+      } else {
+        initialStatus = 'SENT';
       }
 
       let deliveryStatus = statusName || statusGroup || 'PENDING_ENROUTE';
@@ -763,17 +771,25 @@ async function runDispatchWorker() {
         log_type: logType,
         status: initialStatus,
         delivery_status: deliveryStatus,
-        done_at: null,
+        done_at: initialStatus === 'DELIVERED' ? new Date().toISOString() : null,
         media_url: job.content?.templateData?.header?.mediaUrl || job.mediaUrl || '',
         header_type: job.content?.templateData?.header?.type || job.headerType || 'NONE',
         payload: payload
       };
 
-      // Gravação do log no Redis
+      // Gravação do log no Redis (Capacidade expandida para 20.000 mensagens e indexação por ID)
       try {
         await redisClient.lPush('dispatch_logs', JSON.stringify(logRecord));
-        await redisClient.lTrim('dispatch_logs', 0, 999);
+        await redisClient.lTrim('dispatch_logs', 0, 19999);
         await redisClient.incr('dispatch_processed');
+
+        // Indexação de alta confiabilidade por ID da mensagem e por campanha
+        if (messageId && !messageId.startsWith('tx_')) {
+          await redisClient.hSet('dispatch_records_map', messageId, JSON.stringify(logRecord));
+        }
+        if (campaignId) {
+          await redisClient.sAdd(`campaign_message_ids:${campaignId}`, messageId);
+        }
       } catch (logErr) {
         console.warn('[Worker] Erro ao gravar log no Redis:', logErr);
       }
@@ -845,7 +861,8 @@ setInterval(async () => {
 // -------------------------------------------------------------
 let isSyncInProgress = false;
 
-async function syncDeliveryReportsFromInfobip() {
+async function syncDeliveryReportsFromInfobip(options = {}) {
+  const { campaignId, messageIds, senderNumber, limit = 1000 } = options;
   if (isSyncInProgress) return { synced: 0, updated: 0, sample: [] };
   isSyncInProgress = true;
 
@@ -855,7 +872,7 @@ async function syncDeliveryReportsFromInfobip() {
 
     let reports = [];
 
-    // 1. Consultar /messages-api/1/reports?limit=1000 (DLRs não lidos em tempo real)
+    // 1. Consultar /messages-api/1/reports?limit=1000 (DLRs não consumidos em tempo real)
     try {
       const rRes = await getJson(baseUrl, '/messages-api/1/reports?limit=1000', apiKey);
       if (rRes?.results && Array.isArray(rRes.results)) {
@@ -865,9 +882,9 @@ async function syncDeliveryReportsFromInfobip() {
       console.warn('[SyncDLR] Erro ao consultar /messages-api/1/reports:', e.message);
     }
 
-    // 1.5. Consultar /messages-api/1/logs?limit=100 (últimos logs persistidos no Infobip)
+    // 2. Consultar /messages-api/1/logs?limit=1000 (puxa até 1000 logs recentes da Infobip em 1 request!)
     try {
-      const lGeneralRes = await getJson(baseUrl, '/messages-api/1/logs?limit=100', apiKey);
+      const lGeneralRes = await getJson(baseUrl, `/messages-api/1/logs?limit=${Math.min(1000, limit || 1000)}`, apiKey);
       if (lGeneralRes?.results && Array.isArray(lGeneralRes.results)) {
         reports.push(...lGeneralRes.results);
       }
@@ -875,42 +892,70 @@ async function syncDeliveryReportsFromInfobip() {
       console.warn('[SyncDLR] Erro ao consultar /messages-api/1/logs gerais:', e.message);
     }
 
-    // 2. Coletar IDs de transmissão (messageId único de cada envio)
-    const trackedIds = new Set();
+    // 2.5 Se remetente informado (ou da campanha), consulta logs específicos desse remetente
+    if (senderNumber) {
+      const cleanSender = String(senderNumber).replace(/\D/g, '');
+      if (cleanSender) {
+        try {
+          const sRes = await getJson(baseUrl, `/messages-api/1/logs?sender=${cleanSender}&limit=1000`, apiKey);
+          if (sRes?.results && Array.isArray(sRes.results)) {
+            reports.push(...sRes.results);
+          }
+        } catch (e) {
+          console.warn(`[SyncDLR] Erro ao consultar logs para remetente ${cleanSender}:`, e.message);
+        }
+      }
+    }
 
-    if (isRedisConnected) {
+    // 3. Coletar IDs de transmissão que precisam de conferência
+    const trackedIds = new Set();
+    if (Array.isArray(messageIds) && messageIds.length > 0) {
+      for (const mId of messageIds) {
+        if (mId && !mId.startsWith('tx_')) trackedIds.add(mId);
+      }
+    }
+
+    // Pega IDs pendentes do Redis (até 3000 logs recentes)
+    if (isRedisConnected && trackedIds.size < 500) {
       try {
-        const rawLogs = await redisClient.lRange('dispatch_logs', 0, 499);
+        const rawLogs = await redisClient.lRange('dispatch_logs', 0, 2999);
         for (const str of rawLogs) {
           try {
             const l = JSON.parse(str);
             const mId = l.transmission_id || l.messageId;
+            const stat = String(l.status || '').toUpperCase();
+            const dStat = String(l.delivery_status || '').toUpperCase();
             if (mId && !mId.startsWith('tx_')) {
-              trackedIds.add(mId);
+              if (campaignId && (l.campaign_id === campaignId || l.campaignId === campaignId || l.campaign_name === campaignId)) {
+                trackedIds.add(mId);
+              } else if (stat === 'SENT' || stat === 'PENDING' || dStat.includes('PENDING') || dStat.includes('ENROUTE') || dStat.includes('OPERATOR')) {
+                trackedIds.add(mId);
+              }
             }
           } catch {}
+          if (trackedIds.size >= 500) break;
         }
       } catch {}
     }
 
-    if (isPostgresConnected) {
+    // Pega IDs pendentes do Postgres
+    if (isPostgresConnected && trackedIds.size < 500) {
       try {
         const pgTracked = await pgPool.query(`
           SELECT transmission_id 
           FROM dispatch_records 
           WHERE transmission_id IS NOT NULL 
             AND transmission_id NOT LIKE 'tx_%'
+            AND (delivery_status IS NULL OR delivery_status NOT IN ('DELIVERED_TO_HANDSET', 'DELIVERED', 'UNDELIVERABLE_NOT_DELIVERED', 'REJECTED'))
           ORDER BY id DESC LIMIT 500
         `);
         for (const row of pgTracked.rows) {
-          if (row.transmission_id) {
-            trackedIds.add(row.transmission_id);
-          }
+          if (row.transmission_id) trackedIds.add(row.transmission_id);
         }
       } catch {}
     }
 
-    // 3. Consultar /messages-api/1/logs em lotes usando estritamente os IDs únicos
+    // 4. Consultar /messages-api/1/logs em lotes usando estritamente os IDs únicos
     if (trackedIds.size > 0) {
       const idArray = Array.from(trackedIds);
       for (let i = 0; i < idArray.length; i += 50) {
@@ -927,7 +972,7 @@ async function syncDeliveryReportsFromInfobip() {
       }
     }
 
-    // 4. Dedup de relatórios exclusivamente pelo messageId
+    // 5. Dedup de relatórios exclusivamente pelo messageId
     const seenMap = new Map();
     for (const r of reports) {
       if (r.messageId) {
@@ -935,18 +980,17 @@ async function syncDeliveryReportsFromInfobip() {
       }
     }
     const uniqueReports = Array.from(seenMap.values());
-
     let updatedCount = 0;
 
-    // 5. Atualização no Redis: ESTRITAMENTE POR transmission_id / messageId
+    // 6. Atualização no Redis: ATÔMICA COM RENAME (NUNCA del('dispatch_logs') sem swap!)
     if (isRedisConnected) {
       try {
-        const rawLogs = await redisClient.lRange('dispatch_logs', 0, 999);
+        const rawLogs = await redisClient.lRange('dispatch_logs', 0, 19999);
         const parsedLogs = rawLogs.map(str => {
           try { return JSON.parse(str); } catch { return null; }
         }).filter(Boolean);
 
-        // Auto-correção retroativa: se algum registro no Redis estava com DELIVERED_TO_HANDSET marcado como FAILED/ERROR, conserta imediatamente
+        // Auto-correção retroativa: conserta logs marcados com erro que na verdade foram entregues
         for (const l of parsedLogs) {
           const dStat = String(l.delivery_status || l.deliveryReason || '').toUpperCase();
           if ((dStat === 'DELIVERED_TO_HANDSET' || dStat === 'DELIVERED') && (l.status === 'FAILED' || l.log_type === 'ERROR')) {
@@ -967,10 +1011,6 @@ async function syncDeliveryReportsFromInfobip() {
           const doneAt = rep.doneAt || rep.sentAt;
           const price = rep.price?.pricePerMessage;
 
-          // ATENÇÃO CRÍTICA (Documentação Oficial Infobip):
-          // status.id === 5 (DELIVERED_TO_HANDSET) -> Entregue com sucesso no aparelho do cliente.
-          // status.id === 2 (DELIVERED_TO_OPERATOR) -> Entregue à operadora, mas AINDA PENDENTE no aparelho!
-          // rep.error.id === 0 é NO_ERROR (sucesso). NUNCA tratar status.id como código de erro!
           const realErrorId = (rep.error?.id !== undefined && rep.error?.id !== null && Number(rep.error.id) > 0)
             ? Number(rep.error.id)
             : null;
@@ -986,7 +1026,7 @@ async function syncDeliveryReportsFromInfobip() {
             statusName === 'DELIVERED_TO_HANDSET' || statusId === 5
           ) && !realErrorId;
 
-          // DELIVERED_TO_OPERATOR é tratado como PENDENTE (enviado à operadora, aguarda aparelho)
+          // DELIVERED_TO_OPERATOR é tratado como PENDENTE (em trânsito)
           const isOperatorDelivered = (
             statusName === 'DELIVERED_TO_OPERATOR' || statusId === 2
           );
@@ -1012,7 +1052,7 @@ async function syncDeliveryReportsFromInfobip() {
             ))
           );
 
-          // VINCULAÇÃO: por transmission_id / messageId, com fallback por telefone de destino
+          // Vinculação por transmission_id / messageId, com fallback por telefone
           const match = parsedLogs.find(l => {
             if (l.transmission_id === mId || l.messageId === mId) return true;
             if (rep.destination && l.recipient) {
@@ -1056,7 +1096,6 @@ async function syncDeliveryReportsFromInfobip() {
                 changed = true;
               }
             } else {
-              // Status em trânsito / operadora (DELIVERED_TO_OPERATOR, PENDING_WAITING_DELIVERY, PENDING_ENROUTE)
               const pendStatus = isOperatorDelivered ? 'DELIVERED_TO_OPERATOR' : (statusName || 'PENDING_WAITING_DELIVERY');
               if (match.delivery_status !== pendStatus || match.status !== 'SENT') {
                 match.status = 'SENT';
@@ -1075,25 +1114,30 @@ async function syncDeliveryReportsFromInfobip() {
               changed = true;
             }
 
-            if (changed) updatedCount++;
+            if (changed) {
+              updatedCount++;
+              redisClient.hSet('dispatch_records_map', mId, JSON.stringify(match)).catch(() => {});
+            }
           }
         }
 
-        if (updatedCount > 0) {
-          await redisClient.del('dispatch_logs');
-          for (let i = parsedLogs.length - 1; i >= 0; i--) {
-            await redisClient.rPush('dispatch_logs', JSON.stringify(parsedLogs[i]));
+        // SWAP ATÔMICO NO REDIS: NUNCA deixa a lista vazia ou em estado intermediário!
+        if (updatedCount > 0 && parsedLogs.length > 0) {
+          const swapKey = `dispatch_logs_swap_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+          const stringified = parsedLogs.map(l => JSON.stringify(l));
+          for (let i = stringified.length - 1; i >= 0; i--) {
+            await redisClient.rPush(swapKey, stringified[i]);
           }
+          await redisClient.rename(swapKey, 'dispatch_logs');
         }
       } catch (err) {
         console.warn('[SyncDLR] Erro ao sincronizar logs no Redis:', err.message);
       }
     }
 
-    // 6. Atualização no PostgreSQL
+    // 7. Atualização no PostgreSQL
     if (isPostgresConnected) {
       try {
-        // Auto-correção retroativa no Postgres para registros marcados incorretamente como ERROR
         await pgPool.query(`
           UPDATE dispatch_records 
           SET log_type = 'DELIVERED', 
@@ -2088,24 +2132,42 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Consultar Logs de Envio
+  // Consultar Logs de Envio (Capacidade expandida até 20.000 mensagens e filtro por campanha)
   if (pathname === '/api/dispatch/logs' && req.method === 'GET') {
     try {
-      // Dispara sincronização em segundo plano caso haja mensagens pendentes
-      syncDeliveryReportsFromInfobip().catch(() => {});
+      const urlObj = new URL(req.url, 'http://localhost');
+      const reqCampaignId = urlObj.searchParams.get('campaignId');
+      const reqLimit = Math.min(20000, parseInt(urlObj.searchParams.get('limit') || '10000', 10));
 
       if (!isRedisConnected) {
         if (isPostgresConnected) {
-          const pgLogs = await pgPool.query('SELECT * FROM dispatch_records ORDER BY id DESC LIMIT 500');
+          let pgLogs;
+          if (reqCampaignId) {
+            pgLogs = await pgPool.query(
+              'SELECT * FROM dispatch_records WHERE campaign_id = $1 OR campaign_name = $1 ORDER BY id DESC LIMIT $2',
+              [reqCampaignId, reqLimit]
+            );
+          } else {
+            pgLogs = await pgPool.query('SELECT * FROM dispatch_records ORDER BY id DESC LIMIT $1', [reqLimit]);
+          }
           return sendJson(pgLogs.rows);
         }
         return sendJson([]);
       }
 
-      const rawLogs = await redisClient.lRange('dispatch_logs', 0, 999);
-      const logs = rawLogs.map(str => {
+      const rawLogs = await redisClient.lRange('dispatch_logs', 0, reqLimit - 1);
+      let logs = rawLogs.map(str => {
         try { return JSON.parse(str); } catch { return null; }
       }).filter(Boolean);
+
+      if (reqCampaignId) {
+        logs = logs.filter(l => 
+          l.campaign_id === reqCampaignId || 
+          l.campaignId === reqCampaignId || 
+          l.campaign_name === reqCampaignId ||
+          l.campaignName === reqCampaignId
+        );
+      }
 
       return sendJson(logs);
     } catch (err) {
@@ -2119,6 +2181,7 @@ const server = http.createServer(async (req, res) => {
       if (isRedisConnected) {
         await redisClient.del('dispatch_logs');
         await redisClient.del('dispatch_batches');
+        await redisClient.del('dispatch_records_map');
       }
       if (isPostgresConnected) {
         await pgPool.query('DELETE FROM dispatch_records').catch(() => {});
@@ -2129,10 +2192,37 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Sincronizar Campanha Específica (por IDs, Remetente e Campanha)
+  if ((pathname === '/api/dispatch/sync-campaign' || pathname === '/api/dispatch/sync-campaign/') && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req).catch(() => ({}));
+      const syncResult = await syncDeliveryReportsFromInfobip({
+        campaignId: body?.campaignId,
+        senderNumber: body?.senderNumber,
+        messageIds: body?.messageIds,
+        limit: 1000
+      });
+      return sendJson({ 
+        success: true, 
+        synced: syncResult.synced, 
+        updated: syncResult.updated,
+        sample: syncResult.sample 
+      });
+    } catch (err) {
+      return sendError(err.message, 500);
+    }
+  }
+
   // Sincronizar Relatórios de Entrega (DLR) em tempo real diretamente da Infobip
   if ((pathname === '/api/dispatch/sync-reports' || pathname === '/api/dispatch/sync-reports/') && (req.method === 'GET' || req.method === 'POST')) {
     try {
-      const syncResult = await syncDeliveryReportsFromInfobip();
+      const body = req.method === 'POST' ? await parseJsonBody(req).catch(() => ({})) : {};
+      const syncResult = await syncDeliveryReportsFromInfobip({
+        campaignId: body?.campaignId,
+        senderNumber: body?.senderNumber,
+        messageIds: body?.messageIds,
+        limit: 1000
+      });
       return sendJson({ 
         success: true, 
         synced: syncResult.synced, 

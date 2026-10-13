@@ -60,6 +60,11 @@ export const DispatchRecords: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(50);
 
+    // Filtros e busca para a tabela de detalhes da campanha (Card 3)
+    const [card3Search, setCard3Search] = useState('');
+    const [card3StatusFilter, setCard3StatusFilter] = useState<'ALL' | 'DELIVERED' | 'PENDING' | 'FAILED'>('ALL');
+    const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
     // Modo de Apresentação para Cliente (Oculta múltiplos números de remetentes)
     const [hideSenderNumbers, setHideSenderNumbers] = useState<boolean>(() => {
         try {
@@ -132,17 +137,22 @@ export const DispatchRecords: React.FC = () => {
                 setPausedCampaignIds(new Set(pausedList));
             } catch {}
 
-            // 1. Logs oficiais do servidor (Postgres + Redis com relatórios da Infobip)
-            const serverLogs = await api.getDispatchLogs();
+            // 1. Logs oficiais do servidor (Postgres + Redis com relatórios da Infobip) até 20.000 mensagens
+            const serverLogs = await api.getDispatchLogs(undefined, 20000);
             
             // 2. Registros locais temporários
             const localRaw = localStorage.getItem('express_live_dispatch_records');
             const localLogs: DispatchRecord[] = localRaw ? JSON.parse(localRaw) : [];
 
             // Se o servidor já gravou os logs, removemos os placeholders locais para não duplicar
-            // nem deixar mensagens antigas presas em "Enviado"
-            const serverRecipientSet = new Set(serverLogs.map(s => s.recipient));
-            const pendingLocalLogs = localLogs.filter(l => !serverRecipientSet.has(l.recipient));
+            const serverIds = new Set(serverLogs.map(s => s.transmissionId || s.messageId || s.id));
+            const serverRecipientKey = new Set(serverLogs.map(s => `${s.recipient}_${s.campaignName || ''}`));
+            const pendingLocalLogs = localLogs.filter(l => {
+                if (l.transmissionId && serverIds.has(l.transmissionId)) return false;
+                if (l.messageId && serverIds.has(l.messageId)) return false;
+                if (serverRecipientKey.has(`${l.recipient}_${l.campaignName || ''}`)) return false;
+                return true;
+            });
 
             if (pendingLocalLogs.length !== localLogs.length) {
                 localStorage.setItem('express_live_dispatch_records', JSON.stringify(pendingLocalLogs));
@@ -166,8 +176,26 @@ export const DispatchRecords: React.FC = () => {
         try {
             // Limpa placeholders locais para prevalecerem os dados oficiais da Infobip
             localStorage.removeItem('express_live_dispatch_records');
-            const res = await api.syncDeliveryReports();
-            await loadRecords();
+
+            let res: { success: boolean; synced: number; updated: number };
+            if (activeCampaign) {
+                // Coleta todos os messageIds e remetente da campanha selecionada
+                const messageIds = Array.from(new Set(
+                    activeCampaign.records
+                        .map(r => r.messageId || r.transmissionId)
+                        .filter(id => id && !id.startsWith('tx_') && !id.startsWith('disp_'))
+                )) as string[];
+
+                res = await api.syncCampaignDelivery(
+                    activeCampaign.id,
+                    activeCampaign.senderNumber,
+                    messageIds.length > 0 ? messageIds : undefined
+                );
+            } else {
+                res = await api.syncDeliveryReports();
+            }
+
+            await loadRecords(false);
             if (res.updated > 0) {
                 setSyncBanner(`✓ Sincronização concluída! ${res.updated} status de entrega/rejeição atualizados via Infobip.`);
             } else {
@@ -208,18 +236,18 @@ export const DispatchRecords: React.FC = () => {
         setTimeout(() => setCopiedLog(false), 2000);
     };
 
-    // Agrupamento por Campanha - Separação estrita de lotes/campanhas
+    // Agrupamento por Campanha - Unifica transmissões de mesmo nome no mesmo dia
     const campaigns: CampaignGroup[] = useMemo(() => {
         const map = new Map<string, DispatchRecord[]>();
 
         records.forEach(r => {
-            // Se tem campaignId específico do lote, usa ele como chave única
-            // Se não tem, agrupa por nome + cluster de tempo para nunca juntar campanhas distintas
-            let groupKey = r.campaignId;
-            if (!groupKey) {
-                const timeCluster = r.timestamp ? r.timestamp.slice(0, 14) : 'legacy';
-                groupKey = `${r.campaignName || 'Campanha'}_${timeCluster}`;
-            }
+            const dateStr = r.timestamp ? r.timestamp.slice(0, 10) : 'hoje';
+            const cleanName = (r.campaignName || '').trim();
+            // Se possui nome explícito da campanha, agrupa por nome + data para não fragmentar por hora/chunk
+            const groupKey = cleanName 
+                ? `${cleanName}_${dateStr}` 
+                : (r.campaignId || `Campanha_${dateStr}`);
+
             if (!map.has(groupKey)) map.set(groupKey, []);
             map.get(groupKey)!.push(r);
         });
@@ -261,8 +289,32 @@ export const DispatchRecords: React.FC = () => {
     // Campanha atualmente aberta para detalhamento individual (Imagem 2)
     const activeCampaign = useMemo(() => {
         if (!selectedCampaignId) return null;
-        return campaigns.find(c => c.id === selectedCampaignId) || null;
+        return campaigns.find(c => c.id === selectedCampaignId || c.name === selectedCampaignId) || null;
     }, [campaigns, selectedCampaignId]);
+
+    // Registros filtrados do Card 3 (detalhes da campanha com busca e filtros rápidos)
+    const filteredCard3Records = useMemo(() => {
+        if (!activeCampaign) return [];
+        let list = activeCampaign.records;
+        if (card3StatusFilter === 'DELIVERED') {
+            list = list.filter(r => r.status === 'DELIVERED');
+        } else if (card3StatusFilter === 'FAILED') {
+            list = list.filter(r => r.status === 'FAILED');
+        } else if (card3StatusFilter === 'PENDING') {
+            list = list.filter(r => r.status !== 'DELIVERED' && r.status !== 'FAILED');
+        }
+
+        const q = card3Search.toLowerCase().trim();
+        if (q) {
+            list = list.filter(r => 
+                (r.recipient && r.recipient.toLowerCase().includes(q)) ||
+                (r.messageId && r.messageId.toLowerCase().includes(q)) ||
+                (r.transmissionId && r.transmissionId.toLowerCase().includes(q)) ||
+                (r.senderNumber && r.senderNumber.toLowerCase().includes(q))
+            );
+        }
+        return list;
+    }, [activeCampaign, card3StatusFilter, card3Search]);
 
     // Exportação Completa de Relatório XLS / CSV no Padrão Infobip (Imagem 3)
     const handleExportDetailedReport = (campaign: CampaignGroup, format: 'xlsx' | 'csv' = 'xlsx') => {
@@ -1015,12 +1067,17 @@ export const DispatchRecords: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Card 3: Lista Detalhada dos Números & Status da Campanha */}
+                            {/* Card 3: Lista Detalhada dos Números & Status da Campanha com ID Infobip */}
                             <div style={{ background: '#ffffff', border: '1px solid var(--border-subtle)', borderRadius: '8px', overflow: 'hidden' }}>
-                                <div style={{ padding: '12px 18px', background: '#f8fafc', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <strong style={{ fontSize: '13.5px', color: 'var(--text-main)' }}>
-                                        Detalhes dos Números ({activeCampaign.records.length})
-                                    </strong>
+                                <div style={{ padding: '12px 18px', background: '#f8fafc', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                    <div>
+                                        <strong style={{ fontSize: '13.5px', color: 'var(--text-main)' }}>
+                                            Detalhes dos Números ({filteredCard3Records.length} de {activeCampaign.records.length})
+                                        </strong>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                            Identificadores oficiais de entrega Infobip rastreados individualmente
+                                        </div>
+                                    </div>
                                     <div style={{ display: 'flex', gap: '6px' }}>
                                         <button
                                             type="button"
@@ -1063,11 +1120,101 @@ export const DispatchRecords: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div style={{ overflowX: 'auto', maxHeight: '420px', overflowY: 'auto' }}>
+                                {/* Barra de busca e filtros rápidos para Card 3 */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '10px 18px', background: '#f8fafc', borderBottom: '1px solid var(--border-subtle)' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '5px 10px', flex: 1, minWidth: '220px' }}>
+                                        <Search size={13} color="#94a3b8" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Buscar telefone ou ID da mensagem Infobip..." 
+                                            value={card3Search} 
+                                            onChange={e => setCard3Search(e.target.value)} 
+                                            style={{ border: 'none', outline: 'none', width: '100%', fontSize: '12px', background: 'transparent' }} 
+                                        />
+                                        {card3Search && (
+                                            <button type="button" onClick={() => setCard3Search('')} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>
+                                                <X size={12} color="#94a3b8" />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCard3StatusFilter('ALL')}
+                                            style={{
+                                                border: 'none',
+                                                background: card3StatusFilter === 'ALL' ? '#0284c7' : '#ffffff',
+                                                color: card3StatusFilter === 'ALL' ? '#ffffff' : '#475569',
+                                                borderWidth: card3StatusFilter === 'ALL' ? '0' : '1px',
+                                                borderStyle: 'solid',
+                                                borderColor: '#cbd5e1',
+                                                fontSize: '11px',
+                                                fontWeight: 600,
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Todos ({activeCampaign.total})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCard3StatusFilter('DELIVERED')}
+                                            style={{
+                                                border: 'none',
+                                                background: card3StatusFilter === 'DELIVERED' ? '#16a34a' : '#dcfce7',
+                                                color: card3StatusFilter === 'DELIVERED' ? '#ffffff' : '#166534',
+                                                fontSize: '11px',
+                                                fontWeight: 600,
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Entregues ({activeCampaign.delivered})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCard3StatusFilter('PENDING')}
+                                            style={{
+                                                border: 'none',
+                                                background: card3StatusFilter === 'PENDING' ? '#2563eb' : '#dbeafe',
+                                                color: card3StatusFilter === 'PENDING' ? '#ffffff' : '#1e40af',
+                                                fontSize: '11px',
+                                                fontWeight: 600,
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Pendentes ({activeCampaign.pending})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCard3StatusFilter('FAILED')}
+                                            style={{
+                                                border: 'none',
+                                                background: card3StatusFilter === 'FAILED' ? '#dc2626' : '#fee2e2',
+                                                color: card3StatusFilter === 'FAILED' ? '#ffffff' : '#991b1b',
+                                                fontSize: '11px',
+                                                fontWeight: 600,
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Não Entregues ({activeCampaign.failed})
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div style={{ overflowX: 'auto', maxHeight: '440px', overflowY: 'auto' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px', textAlign: 'left' }}>
                                         <thead style={{ position: 'sticky', top: 0, background: '#f1f5f9', zIndex: 1 }}>
                                             <tr style={{ borderBottom: '1px solid #e2e8f0', color: 'var(--text-muted)' }}>
                                                 <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>DESTINATÁRIO</th>
+                                                <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>ID INFOBIP</th>
                                                 <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>REMETENTE (WABA)</th>
                                                 <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>STATUS</th>
                                                 <th style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600 }}>OPERADORA</th>
@@ -1076,106 +1223,157 @@ export const DispatchRecords: React.FC = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {activeCampaign.records.map((r, idx) => {
-                                                const isDelivered = r.status === 'DELIVERED';
-                                                const isFailed = r.status === 'FAILED';
-                                                const isOperatorOnly = !isDelivered && !isFailed && (r.deliveryReason === 'DELIVERED_TO_OPERATOR' || String(r.deliveryReason).includes('OPERATOR'));
-                                                const operator = r.operator || api.detectOperator(r.recipient);
+                                            {filteredCard3Records.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                                        Nenhum registro encontrado para os filtros selecionados.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                filteredCard3Records.map((r, idx) => {
+                                                    const isDelivered = r.status === 'DELIVERED';
+                                                    const isFailed = r.status === 'FAILED';
+                                                    const isOperatorOnly = !isDelivered && !isFailed && (r.deliveryReason === 'DELIVERED_TO_OPERATOR' || String(r.deliveryReason).includes('OPERATOR'));
+                                                    const operator = r.operator || api.detectOperator(r.recipient);
+                                                    const mid = r.messageId || r.transmissionId;
+                                                    const isOfficialId = mid && !mid.startsWith('tx_') && !mid.startsWith('disp_');
 
-                                                return (
-                                                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                        <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-main)' }}>
-                                                            {r.recipient}
-                                                        </td>
-                                                        <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '11.5px', color: hideSenderNumbers ? '#15803d' : '#0369a1', fontWeight: 600 }}>
-                                                            {hideSenderNumbers ? (
-                                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                                                    <ShieldCheck size={12} color="#16a34a" /> Canal Oficial
-                                                                </span>
-                                                            ) : (r.senderNumber || '—')}
-                                                        </td>
-                                                        <td style={{ padding: '8px 12px' }}>
-                                                            {isDelivered ? (
-                                                                <span style={{
-                                                                    background: '#dcfce7',
-                                                                    color: '#15803d',
-                                                                    border: '1px solid #86efac',
-                                                                    padding: '2px 8px',
-                                                                    borderRadius: '4px',
-                                                                    fontSize: '11px',
-                                                                    fontWeight: 600,
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '4px'
-                                                                }}>
-                                                                    <CheckCircle2 size={12} color="#16a34a" /> Delivered
-                                                                </span>
-                                                            ) : isFailed ? (
-                                                                <span 
-                                                                    onClick={() => setSelectedRecordForLog(r)}
-                                                                    style={{
-                                                                        background: '#fee2e2',
-                                                                        color: '#991b1b',
-                                                                        border: '1px solid #fca5a5',
+                                                    return (
+                                                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-main)' }}>
+                                                                {r.recipient}
+                                                            </td>
+                                                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '11px' }}>
+                                                                {mid ? (
+                                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: isOfficialId ? '#ecfdf5' : '#f8fafc', padding: '2px 6px', borderRadius: '4px', border: isOfficialId ? '1px solid #bbf7d0' : '1px solid #e2e8f0' }}>
+                                                                        <span 
+                                                                            title={mid} 
+                                                                            style={{ 
+                                                                                maxWidth: '120px', 
+                                                                                overflow: 'hidden', 
+                                                                                textOverflow: 'ellipsis', 
+                                                                                whiteSpace: 'nowrap',
+                                                                                color: isOfficialId ? '#15803d' : '#64748b',
+                                                                                fontWeight: isOfficialId ? 600 : 400
+                                                                            }}
+                                                                        >
+                                                                            {mid}
+                                                                        </span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                navigator.clipboard.writeText(mid);
+                                                                                setCopiedMessageId(mid);
+                                                                                setTimeout(() => setCopiedMessageId(null), 2000);
+                                                                            }}
+                                                                            title="Copiar ID da Mensagem"
+                                                                            style={{
+                                                                                border: 'none',
+                                                                                background: 'transparent',
+                                                                                cursor: 'pointer',
+                                                                                padding: '1px',
+                                                                                display: 'inline-flex',
+                                                                                alignItems: 'center',
+                                                                                color: copiedMessageId === mid ? '#16a34a' : '#94a3b8'
+                                                                            }}
+                                                                        >
+                                                                            {copiedMessageId === mid ? <Check size={11} color="#16a34a" /> : <Copy size={11} />}
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span style={{ color: '#94a3b8', fontSize: '11px' }}>—</span>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '11.5px', color: hideSenderNumbers ? '#15803d' : '#0369a1', fontWeight: 600 }}>
+                                                                {hideSenderNumbers ? (
+                                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                        <ShieldCheck size={12} color="#16a34a" /> Canal Oficial
+                                                                    </span>
+                                                                ) : (r.senderNumber || '—')}
+                                                            </td>
+                                                            <td style={{ padding: '8px 12px' }}>
+                                                                {isDelivered ? (
+                                                                    <span style={{
+                                                                        background: '#dcfce7',
+                                                                        color: '#15803d',
+                                                                        border: '1px solid #86efac',
                                                                         padding: '2px 8px',
                                                                         borderRadius: '4px',
                                                                         fontSize: '11px',
                                                                         fontWeight: 600,
-                                                                        cursor: 'pointer',
                                                                         display: 'inline-flex',
                                                                         alignItems: 'center',
                                                                         gap: '4px'
-                                                                    }}
-                                                                >
-                                                                    <AlertTriangle size={12} /> Falha (Ver)
-                                                                </span>
-                                                            ) : isOperatorOnly ? (
-                                                                <span style={{
-                                                                    background: '#fef3c7',
-                                                                    color: '#92400e',
-                                                                    border: '1px solid #fde68a',
-                                                                    padding: '2px 8px',
-                                                                    borderRadius: '4px',
-                                                                    fontSize: '11px',
-                                                                    fontWeight: 600,
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '4px'
-                                                                }} title="Entregue à operadora telefônica, aguardando confirmação do aparelho">
-                                                                    <Clock size={12} /> Operadora OK (Pendente)
-                                                                </span>
-                                                            ) : (
-                                                                <span style={{
-                                                                    background: '#e0f2fe',
-                                                                    color: '#0369a1',
-                                                                    border: '1px solid #7dd3fc',
-                                                                    padding: '2px 8px',
-                                                                    borderRadius: '4px',
-                                                                    fontSize: '11px',
-                                                                    fontWeight: 600,
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '4px'
-                                                                }}>
-                                                                    <Clock size={12} /> Enviado
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td style={{ padding: '8px 12px', color: '#475569', fontSize: '11.5px' }}>
-                                                            {operator}
-                                                        </td>
-                                                        <td style={{ padding: '8px 12px', fontSize: '11.5px', color: '#64748b' }}>
-                                                            <div>Env: {r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '—'}</div>
-                                                            {isDelivered && r.doneAt && <div style={{ color: '#16a34a' }}>Ent: {new Date(r.doneAt).toLocaleTimeString()}</div>}
-                                                            {isFailed && <div style={{ color: '#dc2626', fontWeight: 500 }}>Não entregue</div>}
-                                                            {isOperatorOnly && <div style={{ color: '#d97706', fontWeight: 500 }}>Aguardando aparelho</div>}
-                                                        </td>
-                                                        <td style={{ padding: '8px 12px', fontSize: '11.5px', color: isDelivered ? '#166534' : (isFailed ? '#dc2626' : (isOperatorOnly ? '#b45309' : '#64748b')) }}>
-                                                            {r.deliveryReason || (isDelivered ? 'DELIVERED_TO_HANDSET' : (isFailed ? (r.errorReason || 'UNDELIVERABLE_NOT_DELIVERED') : (isOperatorOnly ? 'DELIVERED_TO_OPERATOR' : 'SENT_TO_NETWORK')))}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
+                                                                    }}>
+                                                                        <CheckCircle2 size={12} color="#16a34a" /> Delivered
+                                                                    </span>
+                                                                ) : isFailed ? (
+                                                                    <span 
+                                                                        onClick={() => setSelectedRecordForLog(r)}
+                                                                        style={{
+                                                                            background: '#fee2e2',
+                                                                            color: '#991b1b',
+                                                                            border: '1px solid #fca5a5',
+                                                                            padding: '2px 8px',
+                                                                            borderRadius: '4px',
+                                                                            fontSize: '11px',
+                                                                            fontWeight: 600,
+                                                                            cursor: 'pointer',
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px'
+                                                                        }}
+                                                                    >
+                                                                        <AlertTriangle size={12} /> Falha (Ver)
+                                                                    </span>
+                                                                ) : isOperatorOnly ? (
+                                                                    <span style={{
+                                                                        background: '#fef3c7',
+                                                                        color: '#92400e',
+                                                                        border: '1px solid #fde68a',
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '4px',
+                                                                        fontSize: '11px',
+                                                                        fontWeight: 600,
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px'
+                                                                    }} title="Entregue à operadora telefônica, aguardando confirmação do aparelho">
+                                                                        <Clock size={12} /> Operadora OK (Pendente)
+                                                                    </span>
+                                                                ) : (
+                                                                    <span style={{
+                                                                        background: '#e0f2fe',
+                                                                        color: '#0369a1',
+                                                                        border: '1px solid #7dd3fc',
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '4px',
+                                                                        fontSize: '11px',
+                                                                        fontWeight: 600,
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px'
+                                                                    }}>
+                                                                        <Clock size={12} /> Enviado
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ padding: '8px 12px', color: '#475569', fontSize: '11.5px' }}>
+                                                                {operator}
+                                                            </td>
+                                                            <td style={{ padding: '8px 12px', fontSize: '11.5px', color: '#64748b' }}>
+                                                                <div>Env: {r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '—'}</div>
+                                                                {isDelivered && r.doneAt && <div style={{ color: '#16a34a' }}>Ent: {new Date(r.doneAt).toLocaleTimeString()}</div>}
+                                                                {isFailed && <div style={{ color: '#dc2626', fontWeight: 500 }}>Não entregue</div>}
+                                                                {isOperatorOnly && <div style={{ color: '#d97706', fontWeight: 500 }}>Aguardando aparelho</div>}
+                                                            </td>
+                                                            <td style={{ padding: '8px 12px', fontSize: '11.5px', color: isDelivered ? '#166534' : (isFailed ? '#dc2626' : (isOperatorOnly ? '#b45309' : '#64748b')) }}>
+                                                                {r.deliveryReason || (isDelivered ? 'DELIVERED_TO_HANDSET' : (isFailed ? (r.errorReason || 'UNDELIVERABLE_NOT_DELIVERED') : (isOperatorOnly ? 'DELIVERED_TO_OPERATOR' : 'SENT_TO_NETWORK')))}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
