@@ -64,23 +64,14 @@ export interface CampaignBatch {
 
 // Leandro standard presets
 const PRESET_2_VARS = 'Olá, {{1}}.\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara revisar os dados relacionados a essa solicitação, utilize uma das opções abaixo.';
-const PRESET_4_VARS = 'Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}.\n\nPara {{4}} Clique no botão abaixo!';
-const PRESET_5_VARS = 'Olá {{1}}\n\nEstamos informando que: {{2}}.\n\n{{3}}.\n\n{{4}}.\n\nPara saber mais {{5}} Clique no botão abaixo!';
+const PRESET_3_VARS = 'Olá, {{1}}!\n\nRecebemos sua solicitação {{2}} e confirmamos a atualização.\n\n{{3}}\n\nClique no botão abaixo para acessar e validar.';
 const DEFAULT_FOOTER = 'Digite "sair" para não receber mais mensagens';
 
 const LEANDRO_EXAMPLES_2 = ['Leandro', '7164427'];
-const LEANDRO_EXAMPLES_4 = [
+const LEANDRO_EXAMPLES_3 = [
     'Leandro',
-    'recebemos a confirmação do protocolo 7164427',
-    'O comprovante digital já se encontra disponível',
-    'acessar o comprovante digital e verificar a entrega'
-];
-const LEANDRO_EXAMPLES_5 = [
-    'Leandro',
-    'recebemos a confirmação do protocolo 7164427',
-    'O comprovante digital já se encontra disponível',
-    'verificação realizada em 12/10/2026',
-    'acessar o comprovante digital e verificar a entrega'
+    '7164427',
+    'O comprovante digital já se encontra disponível'
 ];
 
 export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
@@ -112,7 +103,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     const [mediaUrl, setMediaUrl] = useState('https://i.imgur.com/gZLbY6p.jpeg');
 
     // Message Body & Variables
-    const [activePreset, setActivePreset] = useState<2 | 4 | 5>(2);
+    const [activePreset, setActivePreset] = useState<2 | 3>(2);
     const [bodyText, setBodyText] = useState(PRESET_2_VARS);
     const [variableExamples, setVariableExamples] = useState<{ [key: string]: string }>({
         '1': 'Leandro',
@@ -222,28 +213,18 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         return unique.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
     }, [bodyText]);
 
-    // Apply Presets (2, 4, 5)
-    const handleApplyPreset = (varsCount: 2 | 4 | 5) => {
+    // Apply Presets (2, 3)
+    const handleApplyPreset = (varsCount: 2 | 3) => {
         setActivePreset(varsCount);
         if (varsCount === 2) {
             setBodyText(PRESET_2_VARS);
             setVariableExamples({ '1': LEANDRO_EXAMPLES_2[0], '2': LEANDRO_EXAMPLES_2[1] });
-        } else if (varsCount === 4) {
-            setBodyText(PRESET_4_VARS);
-            setVariableExamples({
-                '1': LEANDRO_EXAMPLES_4[0],
-                '2': LEANDRO_EXAMPLES_4[1],
-                '3': LEANDRO_EXAMPLES_4[2],
-                '4': LEANDRO_EXAMPLES_4[3]
-            });
         } else {
-            setBodyText(PRESET_5_VARS);
+            setBodyText(PRESET_3_VARS);
             setVariableExamples({
-                '1': LEANDRO_EXAMPLES_5[0],
-                '2': LEANDRO_EXAMPLES_5[1],
-                '3': LEANDRO_EXAMPLES_5[2],
-                '4': LEANDRO_EXAMPLES_5[3],
-                '5': LEANDRO_EXAMPLES_5[4]
+                '1': LEANDRO_EXAMPLES_3[0],
+                '2': LEANDRO_EXAMPLES_3[1],
+                '3': LEANDRO_EXAMPLES_3[2]
             });
         }
     };
@@ -512,7 +493,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
             message_mode: 'manual',
             media_url: effectiveMedia,
             ad_copy: bodyText,
-            variables: bodyExamplesArray.length > 0 ? [...bodyExamplesArray] : ['', '', '', '', ''],
+            variables: bodyExamplesArray.length > 0 ? [...bodyExamplesArray] : ['', '', ''],
             button_link: effectiveBtnUrl,
             sender_phone: cleanSender,
             sender_number: cleanSender,
@@ -943,7 +924,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                         message_mode: 'manual',
                         media_url: rowMedia,
                         ad_copy: bodyText,
-                        variables: bodyExamplesArray.length > 0 ? [...bodyExamplesArray] : ['', '', '', '', ''],
+                        variables: bodyExamplesArray.length > 0 ? [...bodyExamplesArray] : ['', '', ''],
                         button_link: rowBtnUrl,
                         sender_phone: rowSender,
                         sender_number: rowSender,
@@ -1294,19 +1275,11 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    className={`badge ${activePreset === 4 ? 'badge-approved' : 'badge-neutral'}`}
-                                                    onClick={() => handleApplyPreset(4)}
+                                                    className={`badge ${activePreset === 3 ? 'badge-approved' : 'badge-neutral'}`}
+                                                    onClick={() => handleApplyPreset(3)}
                                                     style={{ cursor: 'pointer' }}
                                                 >
-                                                    Preset 4 Vars
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className={`badge ${activePreset === 5 ? 'badge-approved' : 'badge-neutral'}`}
-                                                    onClick={() => handleApplyPreset(5)}
-                                                    style={{ cursor: 'pointer' }}
-                                                >
-                                                    Preset 5 Vars
+                                                    Preset 3 Vars
                                                 </button>
                                             </div>
                                         </div>
@@ -1581,19 +1554,11 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => handleApplyPreset(4)}
-                                                className={`badge ${activePreset === 4 ? 'badge-approved' : 'badge-neutral'}`}
+                                                onClick={() => handleApplyPreset(3)}
+                                                className={`badge ${activePreset === 3 ? 'badge-approved' : 'badge-neutral'}`}
                                                 style={{ cursor: 'pointer' }}
                                             >
-                                                4 Vars
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleApplyPreset(5)}
-                                                className={`badge ${activePreset === 5 ? 'badge-approved' : 'badge-neutral'}`}
-                                                style={{ cursor: 'pointer' }}
-                                            >
-                                                5 Vars
+                                                3 Vars
                                             </button>
                                         </div>
 
