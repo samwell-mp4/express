@@ -1,4 +1,5 @@
 import { ClientSubmission, SubmissionAd, ParsedContact } from '../types';
+import { safeStorage } from './safeStorage';
 
 const STORAGE_SUBMISSIONS_KEY = 'express_dispatch_client_submissions_v2';
 const LEGACY_STORAGE_KEY = 'express_dispatch_client_batches_v1';
@@ -9,7 +10,7 @@ export const clientSubmissionStorage = {
         // 1. Read local storage first (instant, guaranteed)
         let localList: ClientSubmission[] = [];
         try {
-            const raw = localStorage.getItem(STORAGE_SUBMISSIONS_KEY);
+            const raw = safeStorage.getItem(STORAGE_SUBMISSIONS_KEY);
             if (raw) {
                 localList = JSON.parse(raw);
             } else {
@@ -44,7 +45,7 @@ export const clientSubmissionStorage = {
                                 button_link: ''
                             }]
                         }));
-                        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(localList));
+                        safeStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(localList));
                     }
                 }
             }
@@ -122,7 +123,7 @@ export const clientSubmissionStorage = {
                             })
                         ];
                         try {
-                            localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(merged));
+                            safeStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(merged));
                         } catch (quotaErr) {
                             console.warn('[clientSubmissionStorage] Erro ao persistir merged no localStorage:', quotaErr);
                         }
@@ -189,11 +190,7 @@ export const clientSubmissionStorage = {
         }
 
         const updated = [localCreated, ...localList.filter(s => String(s.id) !== String(localCreated.id))];
-        try {
-            localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(updated));
-        } catch (e) {
-            console.warn('[clientSubmissionStorage] Falha ao salvar no localStorage (cota excedida?):', e);
-        }
+        safeStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(updated));
 
         // 2. Dispatch event so UI updates instantly
         window.dispatchEvent(new CustomEvent('client_submissions_updated'));
@@ -241,13 +238,13 @@ export const clientSubmissionStorage = {
                         const remoteData = await res.json();
                         if (remoteData && remoteData.id) {
                             try {
-                                const rawNow = localStorage.getItem(STORAGE_SUBMISSIONS_KEY);
+                                const rawNow = safeStorage.getItem(STORAGE_SUBMISSIONS_KEY);
                                 if (rawNow) {
                                     const list = JSON.parse(rawNow);
                                     const idx = list.findIndex((s: any) => String(s.id) === String(localCreated.id));
                                     if (idx !== -1) {
                                         list[idx] = { ...list[idx], id: remoteData.id };
-                                        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(list));
+                                        safeStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(list));
                                     }
                                 }
                             } catch (e) {}
@@ -287,7 +284,7 @@ export const clientSubmissionStorage = {
         const index = existing.findIndex(s => String(s.id) === String(id));
         if (index !== -1) {
             existing[index] = { ...existing[index], ...payload };
-            localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(existing));
+            safeStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(existing));
             return existing[index];
         }
 
@@ -311,7 +308,7 @@ export const clientSubmissionStorage = {
 
         const existing = await clientSubmissionStorage.getSubmissions();
         const filtered = existing.filter(s => String(s.id) !== String(id));
-        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(filtered));
+        safeStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(filtered));
         return true;
     },
 
@@ -344,7 +341,7 @@ export const clientSubmissionStorage = {
             }
             return s;
         });
-        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(updated));
+        safeStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(updated));
         return true;
     },
 
@@ -362,7 +359,7 @@ export const clientSubmissionStorage = {
             }
             return s;
         });
-        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(updated));
+        safeStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(updated));
         return true;
     },
 
@@ -371,7 +368,7 @@ export const clientSubmissionStorage = {
         const existing = await clientSubmissionStorage.getSubmissions();
         const idSet = new Set(ids.map(String));
         const filtered = existing.filter(s => !idSet.has(String(s.id)));
-        localStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(filtered));
+        safeStorage.setItem(STORAGE_SUBMISSIONS_KEY, JSON.stringify(filtered));
         return true;
     }
 };

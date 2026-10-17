@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { ProRotator, RotatorTarget, RotatorStats } from '../types';
 import { rotatorStorage } from '../services/rotatorStorage';
+import { safeStorage } from '../services/safeStorage';
 
 export interface LinkRotatorManagerProps {
     isEmbedded?: boolean;
@@ -127,14 +128,14 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
             return;
         }
 
+        const normalizedTargets = validTargets.map(t => ({
+            ...t,
+            url: ensureProtocol(t.url),
+            weight: Number(t.weight) || 1
+        }));
+
         setIsCreating(true);
         try {
-            const normalizedTargets = validTargets.map(t => ({
-                ...t,
-                url: ensureProtocol(t.url),
-                weight: Number(t.weight) || 1
-            }));
-
             await rotatorStorage.createRotator({
                 title: title.trim() || 'Rotacionador PRO',
                 slug: slug.trim() || undefined,
@@ -147,6 +148,25 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
             showToast('✓ Link Rotator criado com sucesso!');
             await loadRotators();
         } catch (err: any) {
+            const isQuota = typeof err?.message === 'string' && (err.message.includes('quota') || err.message.includes('Quota'));
+            if (isQuota) {
+                try {
+                    safeStorage.forceFreeQuota();
+                    await rotatorStorage.createRotator({
+                        title: title.trim() || 'Rotacionador PRO',
+                        slug: slug.trim() || undefined,
+                        targets: normalizedTargets
+                    });
+                    setTitle('');
+                    setSlug('');
+                    setTargets([{ url: '', weight: 1 }]);
+                    showToast('✓ Link Rotator criado com sucesso!');
+                    await loadRotators();
+                    return;
+                } catch (retryErr) {
+                    console.warn('Erro após liberar cota:', retryErr);
+                }
+            }
             alert(`Erro ao criar rotacionador: ${err.message}`);
         } finally {
             setIsCreating(false);
@@ -190,13 +210,13 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
         const validTargets = editTargets.filter(t => t.url.trim() !== '');
         if (validTargets.length === 0) return alert('Adicione pelo menos um link de destino válido.');
 
+        const formattedTargets = validTargets.map(t => ({
+            url: ensureProtocol(t.url),
+            weight: Number(t.weight) || 1
+        }));
+
         setIsSavingEdit(true);
         try {
-            const formattedTargets = validTargets.map(t => ({
-                url: ensureProtocol(t.url),
-                weight: Number(t.weight) || 1
-            }));
-
             await rotatorStorage.updateRotator(editingRotator.id, {
                 title: editTitle.trim(),
                 slug: editSlug.trim(),
@@ -207,6 +227,23 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
             setEditingRotator(null);
             await loadRotators();
         } catch (err: any) {
+            const isQuota = typeof err?.message === 'string' && (err.message.includes('quota') || err.message.includes('Quota'));
+            if (isQuota) {
+                try {
+                    safeStorage.forceFreeQuota();
+                    await rotatorStorage.updateRotator(editingRotator.id, {
+                        title: editTitle.trim(),
+                        slug: editSlug.trim(),
+                        targets: formattedTargets
+                    });
+                    showToast('✓ Rotacionador atualizado com sucesso!');
+                    setEditingRotator(null);
+                    await loadRotators();
+                    return;
+                } catch (retryErr) {
+                    console.warn('Erro após liberar cota no update:', retryErr);
+                }
+            }
             alert(`Erro ao atualizar rotacionador: ${err.message}`);
         } finally {
             setIsSavingEdit(false);

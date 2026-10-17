@@ -3,6 +3,7 @@ import { X, Database, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Smar
 import { SenderConfig, ParsedContact, PlaceholderMapping, InfobipQueueMessage, DispatchRecord } from '../types';
 import { api } from '../services/api';
 import { excelService } from '../services/excelService';
+import { safeStorage } from '../services/safeStorage';
 
 interface QueueConfirmModalProps {
     senders: SenderConfig[];
@@ -331,9 +332,11 @@ export const QueueConfirmModal: React.FC<QueueConfirmModalProps> = ({
                     headerType: m.headerType || 'NONE'
                 }));
 
-                const existingRaw = localStorage.getItem('express_live_dispatch_records');
+                const existingRaw = safeStorage.getItem('express_live_dispatch_records');
                 const existing = existingRaw ? JSON.parse(existingRaw) : [];
-                localStorage.setItem('express_live_dispatch_records', JSON.stringify([...newRecords, ...existing].slice(0, 20000)));
+                // Salva no safeStorage (IndexedDB completo + limite seguro para não estourar cota do localStorage)
+                const mergedRecords = [...newRecords, ...existing].slice(0, 5000);
+                safeStorage.setItem('express_live_dispatch_records', JSON.stringify(mergedRecords));
             } catch (storageErr) {
                 console.warn('Erro ao salvar registros locais:', storageErr);
             }

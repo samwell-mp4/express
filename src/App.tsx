@@ -22,6 +22,7 @@ import { bmSheetService } from './services/bmSheetService';
 import { templateService } from './services/templateService';
 import { templateHelper } from './services/templateHelper';
 import { clientSubmissionStorage } from './services/clientSubmissionStorage';
+import { safeStorage } from './services/safeStorage';
 import { Login } from './components/Login';
 
 const isLocalhost = typeof window !== 'undefined' && (

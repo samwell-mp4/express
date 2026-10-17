@@ -10,6 +10,7 @@ import {
 import * as XLSX from 'xlsx';
 import { DispatchRecord } from '../types';
 import { api, parseInfobipErrorDiagnostic, DiagnosticError } from '../services/api';
+import { safeStorage } from '../services/safeStorage';
 
 interface CampaignGroup {
     id: string;
@@ -140,8 +141,8 @@ export const DispatchRecords: React.FC = () => {
             // 1. Logs oficiais do servidor (Postgres + Redis com relatórios da Infobip) até 20.000 mensagens
             const serverLogs = await api.getDispatchLogs(undefined, 20000);
             
-            // 2. Registros locais temporários
-            const localRaw = localStorage.getItem('express_live_dispatch_records');
+            // 2. Registros locais temporários via safeStorage
+            const localRaw = safeStorage.getItem('express_live_dispatch_records');
             const localLogs: DispatchRecord[] = localRaw ? JSON.parse(localRaw) : [];
 
             // Se o servidor já gravou os logs, removemos os placeholders locais para não duplicar
@@ -155,7 +156,7 @@ export const DispatchRecords: React.FC = () => {
             });
 
             if (pendingLocalLogs.length !== localLogs.length) {
-                localStorage.setItem('express_live_dispatch_records', JSON.stringify(pendingLocalLogs));
+                safeStorage.setItem('express_live_dispatch_records', JSON.stringify(pendingLocalLogs));
             }
 
             // Unificação oficial
@@ -175,7 +176,7 @@ export const DispatchRecords: React.FC = () => {
         setSyncBanner(null);
         try {
             // Limpa placeholders locais para prevalecerem os dados oficiais da Infobip
-            localStorage.removeItem('express_live_dispatch_records');
+            safeStorage.removeItem('express_live_dispatch_records');
 
             let res: { success: boolean; synced: number; updated: number };
             if (activeCampaign) {
@@ -214,13 +215,13 @@ export const DispatchRecords: React.FC = () => {
         setIsClearingLogs(true);
         try {
             await api.clearDispatchLogs();
-            localStorage.removeItem('express_live_dispatch_records');
+            safeStorage.removeItem('express_live_dispatch_records');
             setRecords([]);
             setSelectedCampaignId(null);
             setCurrentPage(1);
         } catch (err: any) {
             console.error('Falha ao limpar logs no servidor:', err);
-            localStorage.removeItem('express_live_dispatch_records');
+            safeStorage.removeItem('express_live_dispatch_records');
             setRecords([]);
             setSelectedCampaignId(null);
             setCurrentPage(1);

@@ -1,10 +1,11 @@
 import { ProRotator, RotatorTarget, RotatorStats } from '../types';
+import { safeStorage } from './safeStorage';
 
 const STORAGE_KEY = 'plugesales_pro_rotators_v1';
 
 function getLocalListSafe(): ProRotator[] {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = safeStorage.getItem(STORAGE_KEY);
         return raw ? JSON.parse(raw) : [];
     } catch {
         return [];
@@ -20,7 +21,7 @@ function notifyRotatorsUpdated() {
 export const rotatorStorage = {
     // 1. Get all rotators
     async getRotators(): Promise<ProRotator[]> {
-        const token = localStorage.getItem('auth_token');
+        const token = safeStorage.getItem('auth_token') || localStorage.getItem('auth_token');
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -33,8 +34,8 @@ export const rotatorStorage = {
                         ...r,
                         targets: typeof r.targets === 'string' ? JSON.parse(r.targets) : (r.targets || [])
                     }));
-                    // Cache in localStorage
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+                    // Cache via safeStorage (IndexedDB + safe localStorage)
+                    safeStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
                     return parsed;
                 }
             }
@@ -100,10 +101,10 @@ export const rotatorStorage = {
             };
         }
 
-        // Update local cache
+        // Update local cache via safeStorage
         const current = getLocalListSafe();
         const updated = [createdItem, ...current.filter(r => r.id !== createdItem!.id)];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 
         notifyRotatorsUpdated();
 
@@ -152,7 +153,7 @@ export const rotatorStorage = {
                 targets: data.targets !== undefined ? data.targets : existing.targets
             };
             current[index] = updatedItem || merged;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+            safeStorage.setItem(STORAGE_KEY, JSON.stringify(current));
             notifyRotatorsUpdated();
             return current[index];
         }
@@ -181,7 +182,7 @@ export const rotatorStorage = {
 
         const current = getLocalListSafe();
         const filtered = current.filter(r => String(r.id) !== String(id));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
         notifyRotatorsUpdated();
         return true;
     },
@@ -265,7 +266,7 @@ export const rotatorStorage = {
         const idsSet = new Set(ids.map(String));
         const current = getLocalListSafe();
         const filtered = current.filter(r => !idsSet.has(String(r.id)));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
         notifyRotatorsUpdated();
         return true;
     },
@@ -297,7 +298,7 @@ export const rotatorStorage = {
             }
             return r;
         });
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
         notifyRotatorsUpdated();
         return true;
     },
@@ -329,7 +330,7 @@ export const rotatorStorage = {
             }
             return r;
         });
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
         notifyRotatorsUpdated();
         return true;
     },
