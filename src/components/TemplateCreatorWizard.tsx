@@ -102,7 +102,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
 
     // Header & Media (Only NONE, IMAGE, VIDEO per user directive)
     const [headerType, setHeaderType] = useState<'NONE' | 'IMAGE' | 'VIDEO'>('IMAGE');
-    const [mediaUrl, setMediaUrl] = useState('https://i.imgur.com/gZLbY6p.jpeg');
+    const [mediaUrl, setMediaUrl] = useState('https://i.imgur.com/PSkg9mi.jpeg');
 
     // Message Body & Variables
     const [activePreset, setActivePreset] = useState<1 | 2 | 3>(1);
@@ -130,7 +130,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     // ==========================================
     const [globalSender, setGlobalSender] = useState<string>('');
     const [globalLinkInput, setGlobalLinkInput] = useState<string>('https://fastdispatch.com.br/r/ivo');
-    const [globalMediaUrl, setGlobalMediaUrl] = useState<string>('https://i.imgur.com/gZLbY6p.jpeg');
+    const [globalMediaUrl, setGlobalMediaUrl] = useState<string>('https://i.imgur.com/PSkg9mi.jpeg');
     const [globalHeaderType, setGlobalHeaderType] = useState<'NONE' | 'IMAGE' | 'VIDEO'>('IMAGE');
     const [enableBulkCustomText, setEnableBulkCustomText] = useState(false);
 
@@ -157,7 +157,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                     suffix: '001',
                     sender: '',
                     headerType: 'IMAGE',
-                    mediaUrl: 'https://i.imgur.com/gZLbY6p.jpeg',
+                    mediaUrl: 'https://i.imgur.com/PSkg9mi.jpeg',
                     hasButtons: true,
                     buttonUrls: ['https://fastdispatch.com.br/r/ivo'],
                     buttonTexts: ['Clique Aqui'],
@@ -167,7 +167,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                     suffix: '002',
                     sender: '',
                     headerType: 'IMAGE',
-                    mediaUrl: 'https://i.imgur.com/gZLbY6p.jpeg',
+                    mediaUrl: 'https://i.imgur.com/PSkg9mi.jpeg',
                     hasButtons: true,
                     buttonUrls: ['https://fastdispatch.com.br/r/ivo'],
                     buttonTexts: ['Clique Aqui'],
@@ -281,7 +281,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         if (finalHeader !== 'NONE') {
             structure.header = {
                 format: finalHeader,
-                example: finalMedia || 'https://i.imgur.com/gZLbY6p.jpeg'
+                example: finalMedia || 'https://i.imgur.com/PSkg9mi.jpeg'
             };
         }
 
@@ -332,7 +332,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                 type: 'HEADER',
                 format: finalHeader,
                 example: {
-                    header_handle: [finalMedia || 'https://i.imgur.com/gZLbY6p.jpeg']
+                    header_handle: [finalMedia || 'https://i.imgur.com/PSkg9mi.jpeg']
                 }
             });
         }

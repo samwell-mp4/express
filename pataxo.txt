@@ -1,0 +1,90 @@
+{
+  "song_title": "Muká Mukaú",
+  "duration": 90.046984,
+  "sync_ranges": [
+    {
+      "start": 6,
+      "end": 9,
+      "text": "Pataxó  Muká, mukaú",
+      "translation": "Pataxó"
+    },
+    {
+      "start": 9,
+      "end": 12.2,
+      "text": "Muká, mukaú (2X)",
+      "translation": "Unir, reunir (3X)"
+    },
+    {
+      "start": 13.31,
+      "end": 17,
+      "text": "Pataxó mayõ werimehe",
+      "translation": "Povo Pataxó unido"
+    },
+    {
+      "start": 17,
+      "end": 22,
+      "text": "Mayõ werimere (3X)",
+      "translation": "Unido (2X)"
+    },
+    {
+      "start": 22,
+      "end": 30,
+      "text": "Ertõ, ertõ, ertõ pataxó (2X)",
+      "translation": "Força, força, força Pataxó (2X)"
+    },
+    {
+      "start": 30,
+      "end": 38,
+      "text": "Kotê kawi suniatá heruê (2X)",
+      "translation": "Bebemos o cauim sagrado (2X)"
+    },
+    {
+      "start": 38,
+      "end": 47,
+      "text": "Heruê, hê-hê-heruê, heruê (4X)",
+      "translation": "Heruê, hê-hê-heruê, heruê (4X)"
+    },
+ {
+      "start": 47,
+      "end": 50,
+      "text": "Pataxó  Muká, mukaú",
+      "translation": "Pataxó"
+    },
+ {
+      "start": 50,
+      "end": 55,
+      "text": "Muká, mukaú (2X)",
+      "translation": "Unir, reunir (3X)"
+    },
+ {
+      "start": 55,
+      "end": 59,
+      "text": "Pataxó mayõ werimehe",
+      "translation": "Povo Pataxó unido"
+    },
+  {
+      "start": 59,
+      "end": 63,
+      "text": "Mayõ werimere (3X)",
+      "translation": "Unido (2X)"
+    },
+ {
+      "start": 63,
+      "end": 71,
+      "text": "Ertõ, ertõ, ertõ pataxó (2X)",
+      "translation": "Força, força, força Pataxó (2X)"
+    },
+{
+      "start": 71,
+      "end": 80,
+      "text": "Kotê kawi suniatá heruê (2X)",
+      "translation": "Bebemos o cauim sagrado (2X)"
+    },
+{
+      "start": 80,
+      "end": 89.95,
+      "text": "Heruê, hê-hê-heruê, heruê (4X)",
+      "translation": "Heruê, hê-hê-heruê, heruê (4X)"
+    }
+  ]
+}

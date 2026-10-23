@@ -1,0 +1,78 @@
+{
+  "song_title": "Ãguarê",
+  "duration": 94.551655,
+  "sync_ranges": [
+    {
+      "start": 4.5,
+      "end": 11.9,
+      "text": "Ãguaré dxaháiõ ĩtohã meá dxê",
+      "translation": "Ãguaré, guardião da mata"
+    },
+    {
+      "start": 12,
+      "end": 18.4,
+      "text": "Ãguaré dxaháiõ ĩtohã meá dxê ãgnaray",
+      "translation": "Ãguaré nos protege"
+    },
+    {
+      "start": 18.5,
+      "end": 23.5,
+      "text": "Tânará mehexó iupúkjitaiá suniatá",
+      "translation": "Na força dos antepassados"
+    },
+    {
+      "start": 23.5,
+      "end": 29.5,
+      "text": "Uhitué apônẽ iuá meá nõmaysõ",
+      "translation": "Caminhamos junto na terra"
+    },
+    {
+      "start": 30.5,
+      "end": 39.5,
+      "text": "Kahabiutxê ê, ê, ê, ê uu",
+      "translation": "Cantamos, cantamos"
+    },
+    {
+      "start": 39.5,
+      "end": 49.5,
+      "text": "Kahabiutxê ê ,ê,é,ê uu",
+      "translation": "Cabtamos,cantamos"
+    },
+    {
+      "start": 48.5,
+      "end": 55,
+      "text": "Ãguaré dxaháiõ ĩtohã meá dxê",
+      "translation": "Ãguaré, guardião da mata"
+    },
+    {
+      "start": 55,
+      "end": 61,
+      "text": "Ãguaré dxaháiõ ĩtohã meá dxê ãgnaray",
+      "translation": "Ãguaré nos protege"
+    },
+    {
+      "start": 61,
+      "end": 67,
+      "text": "Tânará mehexó iupúkjitaiá suniatá",
+      "translation": "Na força dos antepassados"
+    },
+    {
+      "start": 67.5,
+      "end": 72,
+      "text": "Uhitué apônẽ iuá meá nõmaysõ",
+      "translation": "Caminhamos junto na terra"
+    },
+    {
+      "start": 72,
+      "end": 81,
+      "text": "Kahabiutxê ê, ê, ê, ê uu",
+      "translation": "Cantamos, cantamos"
+    },
+    {
+      "start": 81,
+      "end": 92.05,
+      "text": "Kahabiutxê ê ,ê,é,ê uu",
+      "translation": "Cabtamos,cantamos"
+    }
+  ]
+}
