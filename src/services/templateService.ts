@@ -5,6 +5,39 @@ const STORAGE_KEY = 'plugesales_meta_templates_cache_v2';
 // Seed inicial verificado diretamente na API Infobip da BM do Luiz (últimos dias)
 export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
     {
+        id: 'pedido_confirmado_4v',
+        businessAccountId: 947619051737869,
+        businessName: 'BM do Luiz (+1 555-932-1381)',
+        name: 'pedido_confirmado_4v',
+        language: 'pt_BR',
+        status: 'APPROVED',
+        category: 'UTILITY',
+        structure: {
+            header: { format: 'IMAGE' },
+            body: {
+                text: 'Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n{{1}}\n\nInformo que {{2}}\n\n{{3}}\n\n{{4}}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.',
+                examples: [
+                    'Geraldo',
+                    'seu pedido de número 34634574754 está próximo de sair para entrega',
+                    'Esperamos que goste!',
+                    'Para rastrear seu pedido, clique abaixo.'
+                ]
+            },
+            footer: { text: 'Digite "sair" para não receber mais mensagens' },
+            buttons: [
+                { type: 'URL', text: 'Clique Aqui', url: 'https://fastdispatch.com.br/r/ivo' },
+                { type: 'QUICK_REPLY', text: 'Não Reconheço' }
+            ],
+            type: 'MEDIA'
+        },
+        createdAt: '2026-10-24T12:00:00.000+0000',
+        lastUpdatedAt: '2026-10-24T12:00:00.000+0000',
+        _account: 'BM do Luiz',
+        _accountId: 'luiz',
+        _sender: '15559321381',
+        _senderFormatted: '+1 555-932-1381'
+    },
+    {
         id: '1780317556534479',
         businessAccountId: 947619051737869,
         businessName: 'BM do Luiz (+1 555-932-1381)',
@@ -315,6 +348,17 @@ export const templateService = {
             if (raw) {
                 const parsed = JSON.parse(raw);
                 if (parsed && Array.isArray(parsed.templates) && parsed.templates.length > 0) {
+                    const existingNames = new Set(parsed.templates.map((t: any) => (t.name || '').trim().toLowerCase()));
+                    let updated = false;
+                    for (const initTpl of INITIAL_VERIFIED_TEMPLATES) {
+                        if (!existingNames.has(initTpl.name.trim().toLowerCase())) {
+                            parsed.templates.unshift(initTpl);
+                            updated = true;
+                        }
+                    }
+                    if (updated) {
+                        this.saveCached(parsed.templates);
+                    }
                     return parsed;
                 }
             }

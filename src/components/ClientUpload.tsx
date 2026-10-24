@@ -55,6 +55,7 @@ import { ParsedContact, ClientSubmission, SubmissionAd, RotatorTarget } from '..
 import { excelService, SpreadsheetAnalysis } from '../services/excelService';
 import { clientSubmissionStorage } from '../services/clientSubmissionStorage';
 import { rotatorStorage } from '../services/rotatorStorage';
+import { generateRandomOrderNumber, PRESET_4V_TEXT } from '../services/templateHelper';
 
 interface ClientUploadProps {
     onSendToDispatch: (contacts: ParsedContact[], headers: string[], clientName: string) => void;
@@ -66,6 +67,7 @@ const TEMPLATE_PRESETS: Record<'2' | '4' | '5', {
     showFifth: boolean;
     defaultText: string;
     placeholders: string[];
+    defaultVariables?: string[];
 }> = {
     '2': {
         label: '2 Variáveis',
@@ -78,15 +80,21 @@ const TEMPLATE_PRESETS: Record<'2' | '4' | '5', {
         ]
     },
     '4': {
-        label: '4 Variáveis',
+        label: '4 Variáveis (Pedido)',
         variablesCount: 4,
         showFifth: false,
-        defaultText: 'Olá {{1}}!\n\nEstamos informando que {{2}}.\n\nMais detalhes: {{3}}\n\nPara {{4}}, clique no botão abaixo!',
+        defaultText: PRESET_4V_TEXT,
         placeholders: [
-            'Ex: Nome do Contato ({{1}})',
-            'Ex: Assunto / Informação ({{2}})',
-            'Ex: Detalhes ou Desconto ({{3}})',
-            'Ex: Ação / Aproveitar ({{4}})'
+            'Ex: Geraldo ({{1}})',
+            'Ex: seu pedido de número 34634574754... ({{2}})',
+            'Ex: Esperamos que goste! ({{3}})',
+            'Ex: Para rastrear seu pedido, clique abaixo. ({{4}})'
+        ],
+        defaultVariables: [
+            'Geraldo',
+            'seu pedido de número 34634574754 está próximo de sair para entrega',
+            'Esperamos que goste!',
+            'Para rastrear seu pedido, clique abaixo.'
         ]
     },
     '5': {
@@ -335,7 +343,13 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
 
     // Variable Presets (2 / 4 / 5 or custom) & Individual Variable Inputs
     const [formVariablePreset, setFormVariablePreset] = useState<'2' | '4' | '5' | 'custom'>('4');
-    const [formVariables, setFormVariables] = useState<string[]>(['', '', '', '', '']);
+    const [formVariables, setFormVariables] = useState<string[]>(() => [
+        'Geraldo',
+        `seu pedido de número ${generateRandomOrderNumber()} está próximo de sair para entrega`,
+        'Esperamos que goste!',
+        'Para rastrear seu pedido, clique abaixo.',
+        ''
+    ]);
     const [formShowFifthVar, setFormShowFifthVar] = useState(false);
     const [formAdCopy, setFormAdCopy] = useState(TEMPLATE_PRESETS['4'].defaultText);
 
@@ -457,34 +471,89 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
         if (isEdit) {
             setEditVariablePreset(presetKey);
             setEditShowFifthVar(preset.showFifth);
-            const v1 = editVariables[0] || '{{1}}';
-            const v2 = editVariables[1] || '{{2}}';
-            const v3 = editVariables[2] || '{{3}}';
-            const v4 = editVariables[3] || '{{4}}';
-            const v5 = editVariables[4] || '{{5}}';
+
+            let vArr = [...editVariables];
+            if (presetKey === '4') {
+                const orderNum = generateRandomOrderNumber();
+                vArr = [
+                    vArr[0] && vArr[0] !== '{{1}}' ? vArr[0] : 'Geraldo',
+                    `seu pedido de número ${orderNum} está próximo de sair para entrega`,
+                    vArr[2] && vArr[2] !== '{{3}}' ? vArr[2] : 'Esperamos que goste!',
+                    vArr[3] && vArr[3] !== '{{4}}' ? vArr[3] : 'Para rastrear seu pedido, clique abaixo.',
+                    ''
+                ];
+                setEditVariables(vArr);
+            }
+
+            const v1 = vArr[0] || '{{1}}';
+            const v2 = vArr[1] || '{{2}}';
+            const v3 = vArr[2] || '{{3}}';
+            const v4 = vArr[3] || '{{4}}';
+            const v5 = vArr[4] || '{{5}}';
 
             if (presetKey === '2') {
                 setEditAdCopy(`Olá ${v1}!\n\nEstamos informando que ${v2}.\n\nPara aproveitar agora, clique no botão abaixo!`);
+            } else if (presetKey === '4') {
+                setEditAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
             } else if (presetKey === '5') {
                 setEditAdCopy(`Olá ${v1}, tudo bem?\n\nEstamos passando por aqui para informar que ${v2}.\n\nMais detalhes: ${v3}\n\nObservação importante: ${v4}\n\nPara ${v5}, clique no botão abaixo 👇`);
-            } else {
-                setEditAdCopy(`Olá ${v1}!\n\nEstamos informando que ${v2}.\n\nMais detalhes: ${v3}\n\nPara ${v4}, clique no botão abaixo!`);
             }
         } else {
             setFormVariablePreset(presetKey);
             setFormShowFifthVar(preset.showFifth);
-            const v1 = formVariables[0] || '{{1}}';
-            const v2 = formVariables[1] || '{{2}}';
-            const v3 = formVariables[2] || '{{3}}';
-            const v4 = formVariables[3] || '{{4}}';
-            const v5 = formVariables[4] || '{{5}}';
+
+            let vArr = [...formVariables];
+            if (presetKey === '4') {
+                const orderNum = generateRandomOrderNumber();
+                vArr = [
+                    vArr[0] && vArr[0] !== '{{1}}' ? vArr[0] : 'Geraldo',
+                    `seu pedido de número ${orderNum} está próximo de sair para entrega`,
+                    vArr[2] && vArr[2] !== '{{3}}' ? vArr[2] : 'Esperamos que goste!',
+                    vArr[3] && vArr[3] !== '{{4}}' ? vArr[3] : 'Para rastrear seu pedido, clique abaixo.',
+                    ''
+                ];
+                setFormVariables(vArr);
+            }
+
+            const v1 = vArr[0] || '{{1}}';
+            const v2 = vArr[1] || '{{2}}';
+            const v3 = vArr[2] || '{{3}}';
+            const v4 = vArr[3] || '{{4}}';
+            const v5 = vArr[4] || '{{5}}';
 
             if (presetKey === '2') {
                 setFormAdCopy(`Olá ${v1}!\n\nEstamos informando que ${v2}.\n\nPara aproveitar agora, clique no botão abaixo!`);
+            } else if (presetKey === '4') {
+                setFormAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
             } else if (presetKey === '5') {
                 setFormAdCopy(`Olá ${v1}, tudo bem?\n\nEstamos passando por aqui para informar que ${v2}.\n\nMais detalhes: ${v3}\n\nObservação importante: ${v4}\n\nPara ${v5}, clique no botão abaixo 👇`);
-            } else {
-                setFormAdCopy(`Olá ${v1}!\n\nEstamos informando que ${v2}.\n\nMais detalhes: ${v3}\n\nPara ${v4}, clique no botão abaixo!`);
+            }
+        }
+    };
+
+    // Helper: rotaciona número do pedido de 11 dígitos
+    const handleRandomizeVariables = (isEdit = false) => {
+        const orderNum = generateRandomOrderNumber();
+        const v2 = `seu pedido de número ${orderNum} está próximo de sair para entrega`;
+        if (isEdit) {
+            const updated = [...editVariables];
+            if (!updated[0] || updated[0] === '{{1}}') updated[0] = 'Geraldo';
+            updated[1] = v2;
+            if (!updated[2] || updated[2] === '{{3}}') updated[2] = 'Esperamos que goste!';
+            if (!updated[3] || updated[3] === '{{4}}') updated[3] = 'Para rastrear seu pedido, clique abaixo.';
+            setEditVariables(updated);
+            if (editVariablePreset === '4') {
+                setEditAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${updated[0]}\n\nInformo que ${updated[1]}\n\n${updated[2]}\n\n${updated[3]}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
+            }
+        } else {
+            const updated = [...formVariables];
+            if (!updated[0] || updated[0] === '{{1}}') updated[0] = 'Geraldo';
+            updated[1] = v2;
+            if (!updated[2] || updated[2] === '{{3}}') updated[2] = 'Esperamos que goste!';
+            if (!updated[3] || updated[3] === '{{4}}') updated[3] = 'Para rastrear seu pedido, clique abaixo.';
+            setFormVariables(updated);
+            if (formVariablePreset === '4') {
+                setFormAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${updated[0]}\n\nInformo que ${updated[1]}\n\n${updated[2]}\n\n${updated[3]}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
             }
         }
     };
@@ -506,10 +575,10 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
 
                 if (editVariablePreset === '2') {
                     setEditAdCopy(`Olá ${v1}!\n\nEstamos informando que ${v2}.\n\nPara aproveitar agora, clique no botão abaixo!`);
+                } else if (editVariablePreset === '4') {
+                    setEditAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
                 } else if (editVariablePreset === '5' || editShowFifthVar) {
                     setEditAdCopy(`Olá ${v1}, tudo bem?\n\nEstamos passando por aqui para informar que ${v2}.\n\nMais detalhes: ${v3}\n\nObservação importante: ${v4}\n\nPara ${v5}, clique no botão abaixo 👇`);
-                } else {
-                    setEditAdCopy(`Olá ${v1}!\n\nEstamos informando que ${v2}.\n\nMais detalhes: ${v3}\n\nPara ${v4}, clique no botão abaixo!`);
                 }
             }
         } else {
@@ -527,14 +596,15 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
 
                 if (formVariablePreset === '2') {
                     setFormAdCopy(`Olá ${v1}!\n\nEstamos informando que ${v2}.\n\nPara aproveitar agora, clique no botão abaixo!`);
+                } else if (formVariablePreset === '4') {
+                    setFormAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
                 } else if (formVariablePreset === '5' || formShowFifthVar) {
                     setFormAdCopy(`Olá ${v1}, tudo bem?\n\nEstamos passando por aqui para informar que ${v2}.\n\nMais detalhes: ${v3}\n\nObservação importante: ${v4}\n\nPara ${v5}, clique no botão abaixo 👇`);
-                } else {
-                    setFormAdCopy(`Olá ${v1}!\n\nEstamos informando que ${v2}.\n\nMais detalhes: ${v3}\n\nPara ${v4}, clique no botão abaixo!`);
                 }
             }
         }
     };
+
 
     // Helper: calculate distribution percentage for Rotator targets
     const calculateTargetPercentage = (weight: number, list: RotatorTarget[]) => {
@@ -4793,10 +4863,10 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                 </span>
                                             </div>
 
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
                                                 {[
+                                                    { key: '4' as const, label: '4 Variáveis (Pedido)' },
                                                     { key: '2' as const, label: '2 Variáveis' },
-                                                    { key: '4' as const, label: '4 Variáveis' },
                                                     { key: '5' as const, label: '5 Variáveis' },
                                                     { key: 'custom' as const, label: 'Texto Aberto' }
                                                 ].map(item => {
@@ -4833,7 +4903,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                     Texto da Mensagem (WhatsApp Copy)
                                                 </label>
                                                 <span style={{ fontSize: '11px', color: 'var(--primary-color)', fontWeight: 600 }}>
-                                                    {formVariablePreset === 'custom' ? 'Modo Texto Aberto' : `Padrão ${formVariablePreset} Variáveis Ativo`}
+                                                    {formVariablePreset === 'custom' ? 'Modo Texto Aberto' : (TEMPLATE_PRESETS[formVariablePreset]?.label || `${formVariablePreset} Variáveis`)}
                                                 </span>
                                             </div>
                                             <textarea
@@ -4865,7 +4935,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                             flexDirection: 'column',
                                             gap: '10px'
                                         }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
                                                 <div>
                                                     <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-main)', display: 'block' }}>
                                                         Editar Variáveis Individualmente:
@@ -4874,17 +4944,39 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                         Digite os valores abaixo para atualizar o texto da mensagem e a prévia do celular em tempo real.
                                                     </span>
                                                 </div>
-                                                <span style={{
-                                                    fontSize: '10.5px',
-                                                    fontWeight: 700,
-                                                    background: '#ECFDF5',
-                                                    color: '#065F46',
-                                                    border: '1px solid #A7F3D0',
-                                                    padding: '2px 8px',
-                                                    borderRadius: '4px'
-                                                }}>
-                                                    Sincronizado com Celular
-                                                </span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRandomizeVariables(false)}
+                                                        style={{
+                                                            background: '#EFF6FF',
+                                                            border: '1px solid #BFDBFE',
+                                                            borderRadius: '4px',
+                                                            padding: '3px 8px',
+                                                            fontSize: '10.5px',
+                                                            fontWeight: 700,
+                                                            color: '#1D4ED8',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}
+                                                        title="Gera novo número de pedido aleatório rotativo de 11 dígitos"
+                                                    >
+                                                        <span>🎲 Rotacionar Número do Pedido</span>
+                                                    </button>
+                                                    <span style={{
+                                                        fontSize: '10.5px',
+                                                        fontWeight: 700,
+                                                        background: '#ECFDF5',
+                                                        color: '#065F46',
+                                                        border: '1px solid #A7F3D0',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '4px'
+                                                    }}>
+                                                        Sincronizado com Celular
+                                                    </span>
+                                                </div>
                                             </div>
 
                                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
@@ -4893,7 +4985,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                     if (formVariablePreset === '4' && vNum > 4) return null;
                                                     if (!formShowFifthVar && formVariablePreset !== '5' && vNum === 5) return null;
 
-                                                    const presetCfg = TEMPLATE_PRESETS[formVariablePreset === 'custom' ? '5' : (formVariablePreset as '2' | '4' | '5')];
+                                                    const presetCfg = TEMPLATE_PRESETS[formVariablePreset === 'custom' ? '5' : formVariablePreset];
                                                     const placeholder = (presetCfg && presetCfg.placeholders[vNum - 1]) || `Ex: Conteúdo da Variável {{${vNum}}}`;
 
                                                     return (
@@ -5647,10 +5739,10 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                         </span>
                                     </div>
 
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: '6px' }}>
                                         {[
+                                            { key: '4' as const, label: '4 Variáveis (Pedido)' },
                                             { key: '2' as const, label: '2 Variáveis' },
-                                            { key: '4' as const, label: '4 Variáveis' },
                                             { key: '5' as const, label: '5 Variáveis' },
                                             { key: 'custom' as const, label: 'Texto Aberto' }
                                         ].map(item => {
@@ -5687,7 +5779,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                             Texto da Mensagem (WhatsApp Copy)
                                         </label>
                                         <span style={{ fontSize: '10.5px', color: 'var(--primary-color)', fontWeight: 600 }}>
-                                            {editVariablePreset === 'custom' ? 'Modo Texto Aberto' : `Padrão ${editVariablePreset} Variáveis Ativo`}
+                                            {editVariablePreset === 'custom' ? 'Modo Texto Aberto' : (TEMPLATE_PRESETS[editVariablePreset]?.label || `${editVariablePreset} Variáveis`)}
                                         </span>
                                     </div>
                                     <textarea
@@ -5711,7 +5803,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                     flexDirection: 'column',
                                     gap: '8px'
                                 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
                                         <div>
                                             <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-main)', display: 'block' }}>
                                                 Editar Variáveis Individualmente:
@@ -5720,17 +5812,39 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                 Altere os campos para refletir na mensagem e no celular instantaneamente.
                                             </span>
                                         </div>
-                                        <span style={{
-                                            fontSize: '10px',
-                                            fontWeight: 700,
-                                            background: '#ECFDF5',
-                                            color: '#065F46',
-                                            border: '1px solid #A7F3D0',
-                                            padding: '2px 6px',
-                                            borderRadius: '4px'
-                                        }}>
-                                            Prévia ao Vivo
-                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRandomizeVariables(true)}
+                                                style={{
+                                                    background: '#EFF6FF',
+                                                    border: '1px solid #BFDBFE',
+                                                    borderRadius: '4px',
+                                                    padding: '2px 7px',
+                                                    fontSize: '10.5px',
+                                                    fontWeight: 700,
+                                                    color: '#1D4ED8',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                }}
+                                                title="Gera novo número de pedido aleatório rotativo de 11 dígitos"
+                                            >
+                                                <span>🎲 Rotacionar Número do Pedido</span>
+                                            </button>
+                                            <span style={{
+                                                fontSize: '10px',
+                                                fontWeight: 700,
+                                                background: '#ECFDF5',
+                                                color: '#065F46',
+                                                border: '1px solid #A7F3D0',
+                                                padding: '2px 6px',
+                                                borderRadius: '4px'
+                                            }}>
+                                                Prévia ao Vivo
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
@@ -5739,7 +5853,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                             if (editVariablePreset === '4' && vNum > 4) return null;
                                             if (!editShowFifthVar && editVariablePreset !== '5' && vNum === 5) return null;
 
-                                            const presetCfg = TEMPLATE_PRESETS[editVariablePreset === 'custom' ? '5' : (editVariablePreset as '2' | '4' | '5')];
+                                            const presetCfg = TEMPLATE_PRESETS[editVariablePreset === 'custom' ? '5' : editVariablePreset];
                                             const placeholder = (presetCfg && presetCfg.placeholders[vNum - 1]) || `Ex: Variável {{${vNum}}}`;
 
                                             return (

@@ -1,6 +1,37 @@
 import { InfobipAccountTemplate, PlaceholderMapping } from '../types';
 import { templateService, INITIAL_VERIFIED_TEMPLATES } from './templateService';
 
+/**
+ * Gera número de pedido rotativo/aleatório com exatamente 11 dígitos (ex: 34634574754)
+ */
+export function generateRandomOrderNumber(): string {
+    const prefix = '34';
+    const remaining = Math.floor(100000000 + Math.random() * 900000000).toString();
+    return `${prefix}${remaining}`;
+}
+
+/**
+ * Texto oficial do template 4V com caracteres espaçadores fiéis
+ */
+export const PRESET_4V_TEXT = `Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n{{1}}\n\nInformo que {{2}}\n\n{{3}}\n\n{{4}}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`;
+
+export function generate4VExamples(options?: { name?: string; orderNumber?: string }): string[] {
+    const name = options?.name || 'Geraldo';
+    const orderNum = options?.orderNumber || generateRandomOrderNumber();
+    return [
+        name,
+        `seu pedido de número ${orderNum} está próximo de sair para entrega`,
+        'Esperamos que goste!',
+        'Para rastrear seu pedido, clique abaixo.'
+    ];
+}
+
+// Aliases para compatibilidade reversa se necessário
+export const PRESET_4V_V1_TEXT = PRESET_4V_TEXT;
+export const PRESET_4V_V2_TEXT = PRESET_4V_TEXT;
+export const generateRandomProtocolNumber = generateRandomOrderNumber;
+export const generateRandomReceiptCode = generateRandomOrderNumber;
+
 export interface TemplateAnalysis {
     templateName: string;
     variablesCount: number;

@@ -37,6 +37,11 @@ import { api, LUIS_BASE } from '../services/api';
 import { SpreadsheetCleaner } from './SpreadsheetCleaner';
 import { MediaHostingManager } from './MediaHostingManager';
 import { rotatorStorage } from '../services/rotatorStorage';
+import {
+    generateRandomOrderNumber,
+    PRESET_4V_TEXT,
+    generate4VExamples
+} from '../services/templateHelper';
 
 interface TemplateCreatorWizardProps {
     onCreated?: (templateName: string) => void;
@@ -67,6 +72,9 @@ const PRESET_1_VAR = 'Olá, {{1}}\n\nConcluímos a análise da sua simulação e
 const PRESET_2_VARS = 'Olá, {{1}}.\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara revisar os dados relacionados a essa solicitação, utilize uma das opções abaixo.';
 const PRESET_3_VARS = 'Olá, {{1}}\n\nConcluímos a análise da sua simulação {{2}}\n\n{{3}}\n\nCaso não queira receber mais atualizações, envie SAIR';
 const DEFAULT_FOOTER = 'Digite "sair" para não receber mais mensagens';
+
+// 4V Preset
+const PRESET_4_VARS = PRESET_4V_TEXT;
 
 const LEANDRO_EXAMPLES_1 = ['Leandro'];
 const LEANDRO_EXAMPLES_2 = ['Leandro', '7164427'];
@@ -104,11 +112,17 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     const [headerType, setHeaderType] = useState<'NONE' | 'IMAGE' | 'VIDEO'>('IMAGE');
     const [mediaUrl, setMediaUrl] = useState('https://i.imgur.com/PSkg9mi.jpeg');
 
-    // Message Body & Variables
-    const [activePreset, setActivePreset] = useState<1 | 2 | 3>(1);
-    const [bodyText, setBodyText] = useState(PRESET_1_VAR);
-    const [variableExamples, setVariableExamples] = useState<{ [key: string]: string }>({
-        '1': 'Leandro'
+    // Message Body & Variables (Template 4V com número do pedido rotativo)
+    const [activePreset, setActivePreset] = useState<1 | 2 | 3 | 4>(4);
+    const [bodyText, setBodyText] = useState(PRESET_4_VARS);
+    const [variableExamples, setVariableExamples] = useState<{ [key: string]: string }>(() => {
+        const ex = generate4VExamples();
+        return {
+            '1': ex[0],
+            '2': ex[1],
+            '3': ex[2],
+            '4': ex[3]
+        };
     });
 
     // Footer & Buttons
@@ -214,8 +228,8 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         return unique.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
     }, [bodyText]);
 
-    // Apply Presets (1, 2, 3)
-    const handleApplyPreset = (varsCount: 1 | 2 | 3) => {
+    // Apply Presets (1, 2, 3, 4)
+    const handleApplyPreset = (varsCount: 1 | 2 | 3 | 4) => {
         setActivePreset(varsCount);
         if (varsCount === 1) {
             setBodyText(PRESET_1_VAR);
@@ -223,14 +237,35 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         } else if (varsCount === 2) {
             setBodyText(PRESET_2_VARS);
             setVariableExamples({ '1': LEANDRO_EXAMPLES_2[0], '2': LEANDRO_EXAMPLES_2[1] });
-        } else {
+        } else if (varsCount === 3) {
             setBodyText(PRESET_3_VARS);
             setVariableExamples({
                 '1': LEANDRO_EXAMPLES_3[0],
                 '2': LEANDRO_EXAMPLES_3[1],
                 '3': LEANDRO_EXAMPLES_3[2]
             });
+        } else if (varsCount === 4) {
+            setBodyText(PRESET_4_VARS);
+            const ex = generate4VExamples();
+            setVariableExamples({
+                '1': ex[0],
+                '2': ex[1],
+                '3': ex[2],
+                '4': ex[3]
+            });
         }
+    };
+
+    // Gera novos números aleatórios para o pedido (11 dígitos rotativos)
+    const handleRandomizeCodes = () => {
+        const orderNum = generateRandomOrderNumber();
+        setVariableExamples(prev => ({
+            ...prev,
+            '1': prev['1'] || 'Geraldo',
+            '2': `seu pedido de número ${orderNum} está próximo de sair para entrega`,
+            '3': prev['3'] || 'Esperamos que goste!',
+            '4': prev['4'] || 'Para rastrear seu pedido, clique abaixo.'
+        }));
     };
 
     // Build buttons array
@@ -265,16 +300,18 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         name: string,
         overrideHeaderType?: 'NONE' | 'IMAGE' | 'VIDEO',
         overrideMediaUrl?: string,
-        overrideButtons?: { type: 'URL' | 'QUICK_REPLY'; text: string; url?: string }[]
+        overrideButtons?: { type: 'URL' | 'QUICK_REPLY'; text: string; url?: string }[],
+        overrideExamples?: string[]
     ) => {
         const finalHeader = overrideHeaderType !== undefined ? overrideHeaderType : headerType;
         const finalMedia = overrideMediaUrl !== undefined ? overrideMediaUrl : mediaUrl;
         const finalButtons = overrideButtons !== undefined ? overrideButtons : effectiveButtons;
+        const finalExamples = overrideExamples !== undefined ? overrideExamples : bodyExamplesArray;
 
         const structure: any = {
             body: {
                 text: bodyText,
-                ...(bodyExamplesArray.length > 0 ? { examples: bodyExamplesArray } : {})
+                ...(finalExamples.length > 0 ? { examples: finalExamples } : {})
             }
         };
 
@@ -309,19 +346,21 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         name: string,
         overrideHeaderType?: 'NONE' | 'IMAGE' | 'VIDEO',
         overrideMediaUrl?: string,
-        overrideButtons?: { type: 'URL' | 'QUICK_REPLY'; text: string; url?: string }[]
+        overrideButtons?: { type: 'URL' | 'QUICK_REPLY'; text: string; url?: string }[],
+        overrideExamples?: string[]
     ) => {
         const finalHeader = overrideHeaderType !== undefined ? overrideHeaderType : headerType;
         const finalMedia = overrideMediaUrl !== undefined ? overrideMediaUrl : mediaUrl;
         const finalButtons = overrideButtons !== undefined ? overrideButtons : effectiveButtons;
+        const finalExamples = overrideExamples !== undefined ? overrideExamples : bodyExamplesArray;
 
         const components: any[] = [
             {
                 type: 'BODY',
                 text: bodyText,
-                ...(bodyExamplesArray.length > 0 ? {
+                ...(finalExamples.length > 0 ? {
                     example: {
-                        body_text: [bodyExamplesArray]
+                        body_text: [finalExamples]
                     }
                 } : {})
             }
@@ -850,11 +889,24 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                         });
                     }
 
+                    // Se estiver no preset 4V ou com 4 variáveis, gera número de pedido rotativo aleatório com 11 dígitos para CADA template
+                    let rowExamples = bodyExamplesArray;
+                    if (activePreset === 4 || detectedVariables.length >= 4) {
+                        const orderNum = generateRandomOrderNumber();
+                        rowExamples = [
+                            variableExamples['1'] || 'Geraldo',
+                            `seu pedido de número ${orderNum} está próximo de sair para entrega`,
+                            variableExamples['3'] || 'Esperamos que goste!',
+                            variableExamples['4'] || 'Para rastrear seu pedido, clique abaixo.'
+                        ];
+                    }
+
                     const payload = buildInfobipPayload(
                         fullTemplateName,
                         row.headerType,
                         row.mediaUrl,
-                        rowButtons
+                        rowButtons,
+                        rowExamples
                     );
 
                     const rowSender = (row.sender || globalSender || selectedSender || '').trim();
@@ -909,7 +961,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                 templateService.saveCached([...createdTemplatesToCache, ...currentCache.templates]);
             }
 
-            // Criar novos cards no Upload de Clientes para cada template gerado em massa
+            // Criar novos cards no Upload de Clientes para cada template gerado em massa com variáveis fiéis
             for (const camp of campaigns) {
                 for (const row of camp.rows) {
                     const fullTemplateName = `${camp.prefix}${row.suffix}`;
@@ -921,6 +973,10 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                         ? rowSender.slice(2, 4)
                         : (rowSender.slice(0, 2) || '11');
 
+                    // Buscar o template criado para usar exatamente as mesmas variáveis geradas
+                    const matchingTpl = createdTemplatesToCache.find(t => t.name === fullTemplateName);
+                    const cardVars = matchingTpl?.structure?.body?.examples || (bodyExamplesArray.length > 0 ? [...bodyExamplesArray] : ['']);
+
                     const adItem: SubmissionAd = {
                         id: `ad_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
                         ad_name: fullTemplateName,
@@ -928,7 +984,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                         message_mode: 'manual',
                         media_url: rowMedia,
                         ad_copy: bodyText,
-                        variables: bodyExamplesArray.length > 0 ? [...bodyExamplesArray] : [''],
+                        variables: cardVars,
                         button_link: rowBtnUrl,
                         sender_phone: rowSender,
                         sender_number: rowSender,
@@ -1268,7 +1324,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                             <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
                                                 Mensagem &amp; Presets de Variáveis
                                             </h3>
-                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                                 <button
                                                     type="button"
                                                     className={`badge ${activePreset === 1 ? 'badge-approved' : 'badge-neutral'}`}
@@ -1293,6 +1349,14 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                 >
                                                     Preset 3 Vars
                                                 </button>
+                                                <button
+                                                    type="button"
+                                                    className={`badge ${activePreset === 4 ? 'badge-approved' : 'badge-neutral'}`}
+                                                    onClick={() => handleApplyPreset(4)}
+                                                    style={{ cursor: 'pointer', fontWeight: activePreset === 4 ? 700 : 500 }}
+                                                >
+                                                    Preset 4 Vars (4V)
+                                                </button>
                                             </div>
                                         </div>
 
@@ -1312,9 +1376,32 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                         {/* Dynamic variable inputs */}
                                         {detectedVariables.length > 0 && (
                                             <div style={{ background: '#f9fafb', padding: '12px 14px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
-                                                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '8px' }}>
-                                                    Valores de Amostra ({detectedVariables.length} variáveis):
-                                                </span>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                                                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)' }}>
+                                                        Valores de Amostra ({detectedVariables.length} variáveis):
+                                                    </span>
+                                                    {(activePreset === 4 || detectedVariables.length >= 2) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleRandomizeCodes}
+                                                            className="badge badge-neutral"
+                                                            style={{
+                                                                cursor: 'pointer',
+                                                                background: '#eff6ff',
+                                                                color: '#1d4ed8',
+                                                                border: '1px solid #bfdbfe',
+                                                                padding: '4px 8px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px'
+                                                            }}
+                                                            title="Gera novo número de pedido aleatório rotativo de 11 dígitos"
+                                                        >
+                                                            <Sparkles size={12} />
+                                                            <span>🎲 Rotacionar Número do Pedido</span>
+                                                        </button>
+                                                    )}
+                                                </div>
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
                                                     {detectedVariables.map(v => (
                                                         <div key={v}>
@@ -1332,6 +1419,11 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                         </div>
                                                     ))}
                                                 </div>
+                                                {activePreset === 4 && (
+                                                    <div style={{ marginTop: '8px', padding: '6px 10px', background: '#ecfdf5', borderRadius: '4px', border: '1px solid #a7f3d0', fontSize: '11.5px', color: '#065f46' }}>
+                                                        ✨ <strong>Automação ativa:</strong> Ao criar ou disparar em massa, cada template receberá um número de pedido rotativo exclusivo de 11 dígitos.
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
 
@@ -1552,9 +1644,9 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                 {/* PRESETS E TEXTO CUSTOMIZADO NO BULK */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                             <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>
-                                                PRESETS LEANDRO:
+                                                PRESETS:
                                             </span>
                                             <button
                                                 type="button"
@@ -1579,6 +1671,23 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                 style={{ cursor: 'pointer' }}
                                             >
                                                 3 Vars
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleApplyPreset(4)}
+                                                className={`badge ${activePreset === 4 ? 'badge-approved' : 'badge-neutral'}`}
+                                                style={{ cursor: 'pointer', fontWeight: activePreset === 4 ? 700 : 500 }}
+                                            >
+                                                4V (Pedido)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleRandomizeCodes}
+                                                className="badge badge-neutral"
+                                                style={{ cursor: 'pointer', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}
+                                                title="Gera novo número de pedido aleatório rotativo de 11 dígitos"
+                                            >
+                                                🎲 Rotacionar Número do Pedido
                                             </button>
                                         </div>
 
