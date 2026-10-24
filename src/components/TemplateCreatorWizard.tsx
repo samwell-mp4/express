@@ -316,9 +316,10 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         };
 
         if (finalHeader !== 'NONE') {
+            const defaultMedia = finalHeader === 'VIDEO' ? 'https://fastdispatch.com.br/assets/sample-video.mp4' : 'https://i.imgur.com/PSkg9mi.jpeg';
             structure.header = {
                 format: finalHeader,
-                example: finalMedia || 'https://i.imgur.com/PSkg9mi.jpeg'
+                example: finalMedia || defaultMedia
             };
         }
 
@@ -367,11 +368,12 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         ];
 
         if (finalHeader !== 'NONE') {
+            const defaultMedia = finalHeader === 'VIDEO' ? 'https://fastdispatch.com.br/assets/sample-video.mp4' : 'https://i.imgur.com/PSkg9mi.jpeg';
             components.push({
                 type: 'HEADER',
                 format: finalHeader,
                 example: {
-                    header_handle: [finalMedia || 'https://i.imgur.com/PSkg9mi.jpeg']
+                    header_handle: [finalMedia || defaultMedia]
                 }
             });
         }
@@ -411,10 +413,16 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                 return { error: 'JSON com erro de sintaxe' };
             }
         }
+        const activeHeader = creationMode === 'BULK' ? globalHeaderType : headerType;
+        const activeMedia = creationMode === 'BULK' ? globalMediaUrl : mediaUrl;
+        const activeTplName = creationMode === 'BULK'
+            ? (campaigns[0] ? `${campaigns[0].prefix}001` : 'template_massa_001')
+            : templateName;
+
         return payloadViewFormat === 'INFOBIP'
-            ? buildInfobipPayload(templateName)
-            : buildMetaDirectPayload(templateName);
-    }, [payloadViewFormat, isEditingPayload, manualPayloadStr, templateName, headerType, mediaUrl, bodyText, bodyExamplesArray, footerText, effectiveButtons]);
+            ? buildInfobipPayload(activeTplName, activeHeader, activeMedia)
+            : buildMetaDirectPayload(activeTplName, activeHeader, activeMedia);
+    }, [payloadViewFormat, isEditingPayload, manualPayloadStr, templateName, headerType, mediaUrl, globalHeaderType, globalMediaUrl, creationMode, campaigns, bodyText, bodyExamplesArray, footerText, effectiveButtons]);
 
     const formattedPayloadString = useMemo(() => {
         return JSON.stringify(currentPayloadObject, null, 2);
@@ -660,12 +668,34 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         })));
     };
 
-    // 4. Set Global Media
-    const handleApplyGlobalMedia = (type: 'NONE' | 'IMAGE' | 'VIDEO') => {
+    // 4. Set Global Media (Imagem / Vídeo / Nenhuma)
+    const handleApplyGlobalMedia = (type: 'NONE' | 'IMAGE' | 'VIDEO', customUrl?: string) => {
         setGlobalHeaderType(type);
+        setHeaderType(type); // Mantém o estado individual e o preview ao vivo sincronizados
+
+        let targetUrl = customUrl !== undefined ? customUrl : globalMediaUrl;
+        if (type === 'VIDEO') {
+            if (!targetUrl || targetUrl.includes('imgur.com') || targetUrl.endsWith('.jpeg') || targetUrl.endsWith('.jpg') || targetUrl.endsWith('.png')) {
+                targetUrl = 'https://fastdispatch.com.br/assets/sample-video.mp4';
+            }
+        } else if (type === 'IMAGE') {
+            if (!targetUrl || targetUrl.endsWith('.mp4') || targetUrl.endsWith('.mov') || targetUrl.endsWith('.avi') || targetUrl.endsWith('.webm')) {
+                targetUrl = 'https://i.imgur.com/PSkg9mi.jpeg';
+            }
+        } else {
+            targetUrl = '';
+        }
+
+        setGlobalMediaUrl(targetUrl);
+        setMediaUrl(targetUrl);
+
         setCampaigns(prev => prev.map(c => ({
             ...c,
-            rows: c.rows.map(r => ({ ...r, headerType: type, mediaUrl: globalMediaUrl }))
+            rows: c.rows.map(r => ({
+                ...r,
+                headerType: type,
+                mediaUrl: targetUrl
+            }))
         })));
     };
 
@@ -1111,6 +1141,11 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                             setMediaUrl(url);
                             setGlobalMediaUrl(url);
                             setHeaderType(type);
+                            setGlobalHeaderType(type);
+                            setCampaigns(prev => prev.map(c => ({
+                                ...c,
+                                rows: c.rows.map(r => ({ ...r, headerType: type, mediaUrl: url }))
+                            })));
                             setActiveToolDrawer(null);
                         }}
                     />
@@ -1792,7 +1827,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                         </div>
                                     </div>
 
-                                    {/* Mídia Global */}
+                                    {/* Mídia Global (Imagem / Vídeo / Nenhuma) */}
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                                             <label style={{ margin: 0 }}>
@@ -1814,12 +1849,40 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                     type="button"
                                                     onClick={() => handleApplyGlobalMedia(t)}
                                                     className={`segmented-control-item ${globalHeaderType === t ? 'active' : ''}`}
-                                                    style={{ flex: 1, justifyContent: 'center', height: '30px', fontSize: '12px' }}
+                                                    style={{
+                                                        flex: 1,
+                                                        justifyContent: 'center',
+                                                        height: '30px',
+                                                        fontSize: '12px',
+                                                        fontWeight: globalHeaderType === t ? 700 : 500,
+                                                        background: globalHeaderType === t ? (t === 'VIDEO' ? '#ecfdf5' : t === 'IMAGE' ? '#eff6ff' : '#f3f4f6') : 'transparent',
+                                                        color: globalHeaderType === t ? (t === 'VIDEO' ? '#047857' : t === 'IMAGE' ? '#1d4ed8' : '#374151') : 'inherit'
+                                                    }}
                                                 >
-                                                    {t === 'IMAGE' ? 'Imagem' : t === 'VIDEO' ? 'Vídeo' : 'Nenhuma'}
+                                                    {t === 'IMAGE' ? '📷 Imagem' : t === 'VIDEO' ? '🎥 Vídeo' : '🚫 Nenhuma'}
                                                 </button>
                                             ))}
                                         </div>
+                                        {globalHeaderType !== 'NONE' && (
+                                            <div style={{ marginTop: '6px' }}>
+                                                <input
+                                                    type="text"
+                                                    className="input-base"
+                                                    value={globalMediaUrl}
+                                                    onChange={e => {
+                                                        const url = e.target.value;
+                                                        setGlobalMediaUrl(url);
+                                                        setMediaUrl(url);
+                                                        setCampaigns(prev => prev.map(c => ({
+                                                            ...c,
+                                                            rows: c.rows.map(r => ({ ...r, mediaUrl: url }))
+                                                        })));
+                                                    }}
+                                                    placeholder={globalHeaderType === 'VIDEO' ? 'URL do vídeo (ex: https://.../video.mp4)' : 'URL da imagem (ex: https://.../imagem.jpg)'}
+                                                    style={{ width: '100%', height: '32px', fontSize: '12px' }}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -2260,14 +2323,28 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                                     value={row.headerType}
                                                                     onChange={e => {
                                                                         const next = [...camp.rows];
-                                                                        next[rIdx].headerType = e.target.value as any;
+                                                                        const newType = e.target.value as 'NONE' | 'IMAGE' | 'VIDEO';
+                                                                        let rowUrl = next[rIdx].mediaUrl || globalMediaUrl;
+                                                                        if (newType === 'VIDEO') {
+                                                                            if (!rowUrl || rowUrl.includes('imgur.com') || rowUrl.endsWith('.jpeg') || rowUrl.endsWith('.jpg') || rowUrl.endsWith('.png')) {
+                                                                                rowUrl = 'https://fastdispatch.com.br/assets/sample-video.mp4';
+                                                                            }
+                                                                        } else if (newType === 'IMAGE') {
+                                                                            if (!rowUrl || rowUrl.endsWith('.mp4') || rowUrl.endsWith('.mov')) {
+                                                                                rowUrl = 'https://i.imgur.com/PSkg9mi.jpeg';
+                                                                            }
+                                                                        } else {
+                                                                            rowUrl = '';
+                                                                        }
+                                                                        next[rIdx].headerType = newType;
+                                                                        next[rIdx].mediaUrl = rowUrl;
                                                                         setCampaigns(campaigns.map(c => c.id === camp.id ? { ...c, rows: next } : c));
                                                                     }}
-                                                                    style={{ height: '28px', fontSize: '11.5px', padding: '0 4px' }}
+                                                                    style={{ height: '28px', fontSize: '11px', padding: '0 4px', width: '92px', fontWeight: 600 }}
                                                                 >
-                                                                    <option value="IMAGE">IMG</option>
-                                                                    <option value="VIDEO">VID</option>
-                                                                    <option value="NONE">SEM</option>
+                                                                    <option value="IMAGE">📷 Imagem</option>
+                                                                    <option value="VIDEO">🎥 Vídeo</option>
+                                                                    <option value="NONE">🚫 Nenhuma</option>
                                                                 </select>
                                                             </td>
 
@@ -2579,40 +2656,62 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                 gap: '6px'
                             }}>
                                 {/* Media Header Preview */}
-                                {headerType !== 'NONE' && (
-                                    <div style={{
-                                        borderRadius: '6px',
-                                        overflow: 'hidden',
-                                        background: '#0f172a',
-                                        height: '130px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#ffffff'
-                                    }}>
-                                        {headerType === 'IMAGE' && (
-                                            mediaUrl ? (
-                                                <img
-                                                    src={mediaUrl}
-                                                    alt="Preview Header"
-                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                    onError={e => { (e.target as HTMLElement).style.display = 'none'; }}
-                                                />
-                                            ) : (
-                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', opacity: 0.6 }}>
-                                                    <ImageIcon size={26} />
-                                                    <span style={{ fontSize: '11px' }}>Imagem do Cabeçalho</span>
+                                {(() => {
+                                    const activeHeader = creationMode === 'BULK' ? globalHeaderType : headerType;
+                                    const activeMedia = creationMode === 'BULK' ? globalMediaUrl : mediaUrl;
+
+                                    if (activeHeader === 'NONE') return null;
+
+                                    return (
+                                        <div style={{
+                                            borderRadius: '6px',
+                                            overflow: 'hidden',
+                                            background: '#0f172a',
+                                            height: '130px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#ffffff',
+                                            position: 'relative'
+                                        }}>
+                                            {activeHeader === 'IMAGE' && (
+                                                activeMedia ? (
+                                                    <img
+                                                        src={activeMedia}
+                                                        alt="Preview Header"
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                        onError={e => { (e.target as HTMLElement).style.display = 'none'; }}
+                                                    />
+                                                ) : (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', opacity: 0.6 }}>
+                                                        <ImageIcon size={26} />
+                                                        <span style={{ fontSize: '11px' }}>Imagem do Cabeçalho</span>
+                                                    </div>
+                                                )
+                                            )}
+                                            {activeHeader === 'VIDEO' && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', opacity: 0.9 }}>
+                                                    <div style={{
+                                                        width: '40px',
+                                                        height: '40px',
+                                                        borderRadius: '50%',
+                                                        background: 'rgba(16, 185, 129, 0.25)',
+                                                        border: '1.5px solid #10b981',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}>
+                                                        <Video size={20} color="#10b981" />
+                                                    </div>
+                                                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>Vídeo Demonstrativo</span>
+                                                    <span style={{ fontSize: '10px', color: '#94a3b8', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                        {activeMedia || 'video.mp4'}
+                                                    </span>
                                                 </div>
-                                            )
-                                        )}
-                                        {headerType === 'VIDEO' && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', opacity: 0.8 }}>
-                                                <Video size={28} color="#10b981" />
-                                                <span style={{ fontSize: '11px' }}>Vídeo Demonstrativo</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                            )}
+                                        </div>
+                                    );
+                                })()}
 
                                 {/* Body Text with Dynamic Variables Replaced */}
                                 <div style={{ fontSize: '13px', color: '#111b21', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
