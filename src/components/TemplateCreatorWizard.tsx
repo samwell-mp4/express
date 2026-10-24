@@ -316,7 +316,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         };
 
         if (finalHeader !== 'NONE') {
-            const defaultMedia = finalHeader === 'VIDEO' ? 'https://fastdispatch.com.br/assets/sample-video.mp4' : 'https://i.imgur.com/PSkg9mi.jpeg';
+            const defaultMedia = finalHeader === 'VIDEO' ? 'https://i.imgur.com/uE1VzrO.mp4' : 'https://i.imgur.com/PSkg9mi.jpeg';
             structure.header = {
                 format: finalHeader,
                 example: finalMedia || defaultMedia
@@ -368,7 +368,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         ];
 
         if (finalHeader !== 'NONE') {
-            const defaultMedia = finalHeader === 'VIDEO' ? 'https://fastdispatch.com.br/assets/sample-video.mp4' : 'https://i.imgur.com/PSkg9mi.jpeg';
+            const defaultMedia = finalHeader === 'VIDEO' ? 'https://i.imgur.com/uE1VzrO.mp4' : 'https://i.imgur.com/PSkg9mi.jpeg';
             components.push({
                 type: 'HEADER',
                 format: finalHeader,
@@ -676,7 +676,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         let targetUrl = customUrl !== undefined ? customUrl : globalMediaUrl;
         if (type === 'VIDEO') {
             if (!targetUrl || targetUrl.includes('imgur.com') || targetUrl.endsWith('.jpeg') || targetUrl.endsWith('.jpg') || targetUrl.endsWith('.png')) {
-                targetUrl = 'https://fastdispatch.com.br/assets/sample-video.mp4';
+                targetUrl = 'https://i.imgur.com/uE1VzrO.mp4';
             }
         } else if (type === 'IMAGE') {
             if (!targetUrl || targetUrl.endsWith('.mp4') || targetUrl.endsWith('.mov') || targetUrl.endsWith('.avi') || targetUrl.endsWith('.webm')) {
@@ -2327,7 +2327,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                                         let rowUrl = next[rIdx].mediaUrl || globalMediaUrl;
                                                                         if (newType === 'VIDEO') {
                                                                             if (!rowUrl || rowUrl.includes('imgur.com') || rowUrl.endsWith('.jpeg') || rowUrl.endsWith('.jpg') || rowUrl.endsWith('.png')) {
-                                                                                rowUrl = 'https://fastdispatch.com.br/assets/sample-video.mp4';
+                                                                                rowUrl = 'https://i.imgur.com/uE1VzrO.mp4';
                                                                             }
                                                                         } else if (newType === 'IMAGE') {
                                                                             if (!rowUrl || rowUrl.endsWith('.mp4') || rowUrl.endsWith('.mov')) {
