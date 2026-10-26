@@ -1,6 +1,6 @@
 import { InfobipAccountTemplate } from '../types';
 
-const STORAGE_KEY = 'plugesales_meta_templates_cache_v2';
+const STORAGE_KEY = 'plugesales_meta_templates_cache_v3';
 
 // Seed inicial verificado diretamente na API Infobip da BM do Luiz (últimos dias)
 export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
@@ -48,7 +48,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
         structure: {
             header: { format: 'IMAGE' },
             body: {
-                text: 'Olá, {{1}}.\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara revisar os dados relacionados a essa solicitação, utilize uma das opções abaixo.',
+                text: 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.',
                 examples: ['Leandro', '7164427']
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
@@ -76,7 +76,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
         structure: {
             header: { format: 'IMAGE' },
             body: {
-                text: 'Olá, {{1}}.\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara revisar os dados relacionados a essa solicitação, utilize uma das opções abaixo.',
+                text: 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.',
                 examples: ['Leandro', '7164427']
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
@@ -104,7 +104,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
         structure: {
             header: { format: 'IMAGE' },
             body: {
-                text: 'Olá, {{1}}.\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara revisar os dados relacionados a essa solicitação, utilize uma das opções abaixo.',
+                text: 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.',
                 examples: ['Leandro', '7164427']
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
@@ -132,7 +132,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
         structure: {
             header: { format: 'IMAGE' },
             body: {
-                text: 'Olá, {{1}}.\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara revisar os dados relacionados a essa solicitação, utilize uma das opções abaixo.',
+                text: 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.',
                 examples: ['Leandro', '7164427']
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
@@ -160,7 +160,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
         structure: {
             header: { format: 'IMAGE' },
             body: {
-                text: 'Olá, {{1}}.\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara revisar os dados relacionados a essa solicitação, utilize uma das opções abaixo.',
+                text: 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.',
                 examples: ['Leandro', '7164427']
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
@@ -344,19 +344,33 @@ export const templateService = {
      */
     getCached(): { templates: InfobipAccountTemplate[]; timestamp: string } {
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
+            let raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) {
+                raw = localStorage.getItem('plugesales_meta_templates_cache_v2');
+            }
             if (raw) {
                 const parsed = JSON.parse(raw);
                 if (parsed && Array.isArray(parsed.templates) && parsed.templates.length > 0) {
                     const existingNames = new Set(parsed.templates.map((t: any) => (t.name || '').trim().toLowerCase()));
                     let updated = false;
+
+                    const initMap = new Map(INITIAL_VERIFIED_TEMPLATES.map(t => [(t.name || '').trim().toLowerCase(), t]));
+                    for (const t of parsed.templates) {
+                        const nameKey = (t.name || '').trim().toLowerCase();
+                        const initialMatch = initMap.get(nameKey);
+                        if (initialMatch && initialMatch.structure?.body?.text && t.structure?.body?.text !== initialMatch.structure.body.text) {
+                            t.structure = { ...t.structure, body: { ...t.structure?.body, text: initialMatch.structure.body.text } };
+                            updated = true;
+                        }
+                    }
+
                     for (const initTpl of INITIAL_VERIFIED_TEMPLATES) {
                         if (!existingNames.has(initTpl.name.trim().toLowerCase())) {
                             parsed.templates.unshift(initTpl);
                             updated = true;
                         }
                     }
-                    if (updated) {
+                    if (updated || !localStorage.getItem(STORAGE_KEY)) {
                         this.saveCached(parsed.templates);
                     }
                     return parsed;

@@ -15,6 +15,11 @@ export function generateRandomOrderNumber(): string {
  */
 export const PRESET_4V_TEXT = `Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n{{1}}\n\nInformo que {{2}}\n\n{{3}}\n\n{{4}}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`;
 
+/**
+ * Texto oficial do template 2V padrão do sistema
+ */
+export const PRESET_2V_TEXT = 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.';
+
 export function generate4VExamples(options?: { name?: string; orderNumber?: string }): string[] {
     const name = options?.name || 'Geraldo';
     const orderNum = options?.orderNumber || generateRandomOrderNumber();
