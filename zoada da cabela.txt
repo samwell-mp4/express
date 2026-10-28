@@ -1,0 +1,48 @@
+{
+  "song_title": "Zoada da cabaça",
+  "duration": 81.64652,
+  "sync_ranges": [
+    {
+      "start": 4.5,
+      "end": 12,
+      "text": "Quando eu vejo a zoada da cabaça, me dá vontade de cantar",
+      "translation": "Quando eu vejo a zoada da cabaça"
+    },
+    {
+      "start": 12,
+      "end": 18,
+      "text": "Quando eu vejo a zoada da cabaça, me dá vontade de cantar",
+      "translation": "Quando eu vejo a zoada da cabaça, me dá vontade de cantar"
+    },
+    {
+      "start": 18,
+      "end": 32.95,
+      "text": "Mas eu canto é pra Tupã, pra Tupã me ajudar.(2x)",
+      "translation": "Mas eu canto é pra Tupã, pra Tupã me ajudar.(2x)"
+    },
+    {
+      "start": 33,
+      "end": 46,
+      "text": "Quando eu vejo a zoada da cabaça, me dá vontade de cantar",
+      "translation": "Quando eu vejo a zoada da cabaça, me dá vontade de cantar"
+    },
+    {
+      "start": 46,
+      "end": 61,
+      "text": "Mas eu canto é pra Tupã, pra Tupã me ajudar.(2x)",
+      "translation": "Mas eu canto é pra Tupã, pra Tupã me ajudar.(2x)"
+    },
+    {
+      "start": 61,
+      "end": 75,
+      "text": "Adeus lua nova, adeus lua cheia, (2x)",
+      "translation": "Adeus lua nova, adeus lua cheia, 2xAdeus lua nova, adeus lua cheia, (2x)"
+    },
+    {
+      "start": 75,
+      "end": 81,
+      "text": "Eu canto é pra Tupã, vou voltar pra minha Aldeia.",
+      "translation": ""
+    }
+  ]
+}

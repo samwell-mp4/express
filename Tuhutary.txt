@@ -1,0 +1,102 @@
+{
+  "song_title": "Tuhutary Paxixá",
+  "duration": 133.688896,
+  "sync_ranges": [
+    {
+      "start": 5.23,
+      "end": 8.2,
+      "text": "Tuhutary paxixá",
+      "translation": "Hoje vou cantar, dançar"
+    },
+    {
+      "start": 8.2,
+      "end": 12.05,
+      "text": "Suniatá hamiá",
+      "translation": "Com meus parentes"
+    },
+    {
+      "start": 12.05,
+      "end": 15.11,
+      "text": "Hû iõp Kanã taputary",
+      "translation": "Na terra, minha aldeia Pataxó"
+    },
+    {
+      "start": 15.11,
+      "end": 20,
+      "text": "Ui hahão Kanã pataxi pataxó",
+      "translation": "Quero ter o coração forte e guerreiro"
+    },
+    {
+      "start": 20,
+      "end": 24,
+      "text": "Tokere dxé io kawata",
+      "translation": "Alegre com muita paz, reunidos"
+    },
+    {
+      "start": 24,
+      "end": 28,
+      "text": "Tiba kamaywrá",
+      "translation": "Deus vem nos dar proteção (3X)"
+    },
+    {
+      "start": 28,
+      "end": 35,
+      "text": "Uhitué hu nitxi wekanã mukairá",
+      "translation": ""
+    },
+    {
+      "start": 35,
+      "end": 47.75,
+      "text": "Niamissu apôy hõtehô niamitãg (3X)",
+      "translation": ""
+    },
+    {
+      "start": 48.25,
+      "end": 51.22,
+      "text": "Tuhutary paxixá",
+      "translation": "Hoje vou cantar, dançar"
+    },
+    {
+      "start": 51.22,
+      "end": 55.07,
+      "text": "Suniatá hamiá",
+      "translation": "Com meus parentes"
+    },
+    {
+      "start": 55.07,
+      "end": 58.13,
+      "text": "Hû iõp Kanã taputary",
+      "translation": "Na terra, minha aldeia Pataxó"
+    },
+    {
+      "start": 58.13,
+      "end": 63.02,
+      "text": "Ui hahão Kanã pataxi pataxó",
+      "translation": "Quero ter o coração forte e guerreiro"
+    },
+    {
+      "start": 63.02,
+      "end": 67.02,
+      "text": "Tokere dxé io kawata",
+      "translation": "Alegre com muita paz, reunidos"
+    },
+    {
+      "start": 67.02,
+      "end": 71.02,
+      "text": "Tiba kamaywrá",
+      "translation": "Deus vem nos dar proteção (3X)"
+    },
+    {
+      "start": 71.02,
+      "end": 78.02,
+      "text": "Uhitué hu nitxi wekanã mukairá",
+      "translation": ""
+    },
+    {
+      "start": 78.02,
+      "end": 90.77,
+      "text": "Niamissu apôy hõtehô niamitãg (3X)",
+      "translation": ""
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "song_title": "Bahia, terra de São Salvador",
+  "duration": 40.75102,
+  "sync_ranges": [
+    {
+      "start": 3.5,
+      "end": 10,
+      "text": "Bahia terra de São Salvador (2x)",
+      "translation": "Bahia terra de São Salvador (2x)"
+    },
+    {
+      "start": 10,
+      "end": 13,
+      "text": "Nós viemos de uma tribo valente",
+      "translation": "Nós viemos de uma tribo valente"
+    },
+    {
+      "start": 13,
+      "end": 17,
+      "text": "Andamos para frente, voltamos para trás",
+      "translation": "Andamos para frente, voltamos para trás"
+    },
+    {
+      "start": 17,
+      "end": 24,
+      "text": "Nós somos índios queremos chegar (2x)",
+      "translation": "Nós somos índios queremos chegar (2x)"
+    },
+    {
+      "start": 24,
+      "end": 31,
+      "text": "Bahia terra de São Salvador (2x)",
+      "translation": "Bahia terra de São Salvador (2x)"
+    },
+    {
+      "start": 31,
+      "end": 33.78,
+      "text": "Nós viemos de uma tribo valente",
+      "translation": "Nós viemos de uma tribo valente"
+    },
+    {
+      "start": 33.78,
+      "end": 37.5,
+      "text": "Andamos para frente, voltamos para trás",
+      "translation": "Andamos para frente, voltamos para trás"
+    },
+    {
+      "start": 37.5,
+      "end": 40.75,
+      "text": "Nós somos índios queremos chegar (2x)",
+      "translation": "Nós somos índios queremos chegar (2x)"
+    }
+  ]
+}

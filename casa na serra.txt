@@ -1,0 +1,66 @@
+{
+  "song_title": "Casa na serra",
+  "duration": 90.557823,
+  "sync_ranges": [
+    {
+      "start": 4,
+      "end": 10,
+      "text": "Tem uma casa lá na serra que só tem pé de guiné (2x)",
+      "translation": "Tem uma casa lá na serra que só tem pé de guiné (2x)"
+    },
+    {
+      "start": 11,
+      "end": 17,
+      "text": "Ô quem é que mora lá é o pajé (2x)",
+      "translation": "Ô quem é que mora lá é o pajé (2x)"
+    },
+    {
+      "start": 17,
+      "end": 24,
+      "text": "Porque ele mora lá, porque nós moramos aqui (2x)",
+      "translation": "Porque ele mora lá, porque nós moramos aqui (2x)"
+    },
+    {
+      "start": 24,
+      "end": 31,
+      "text": "É benzendo nossa Aldeia para nada atrapalhar (2x)",
+      "translation": "É benzendo nossa Aldeia para nada atrapalhar (2x)"
+    },
+    {
+      "start": 31,
+      "end": 46,
+      "text": "Ô hena, hena hena heô (4x)",
+      "translation": "Ô hena, hena hena heô (4x)"
+    },
+    {
+      "start": 46,
+      "end": 53,
+      "text": "Tem uma casa lá na serra que só tem pé de guiné (2x)",
+      "translation": "Tem uma casa lá na serra que só tem pé de guiné (2x)"
+    },
+    {
+      "start": 53,
+      "end": 60,
+      "text": "Ô quem é que mora lá é o pajé (2x)",
+      "translation": "Ô quem é que mora lá é o pajé (2x)"
+    },
+    {
+      "start": 60,
+      "end": 67,
+      "text": "Porque ele mora lá, porque nós moramos aqui (2x)",
+      "translation": "Porque ele mora lá, porque nós moramos aqui (2x)"
+    },
+    {
+      "start": 67,
+      "end": 74,
+      "text": "É benzendo nossa Aldeia para nada atrapalhar (2x)",
+      "translation": "É benzendo nossa Aldeia para nada atrapalhar (2x)"
+    },
+    {
+      "start": 74,
+      "end": 90,
+      "text": "Ô hena, hena hena heô (4x)",
+      "translation": "Ô hena, hena hena heô (4x)"
+    }
+  ]
+}

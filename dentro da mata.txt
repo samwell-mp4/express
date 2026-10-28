@@ -1,0 +1,78 @@
+{
+  "song_title": "Tava lá dentro da mata",
+  "duration": 120.465125,
+  "sync_ranges": [
+    {
+      "start": 3,
+      "end": 7,
+      "text": "Tava la dentro da mata",
+      "translation": "Tava la dentro da mata"
+    },
+    {
+      "start": 7,
+      "end": 11,
+      "text": "Pra que mandou me chamar?",
+      "translation": "Pra que mandou me chamar?"
+    },
+    {
+      "start": 11,
+      "end": 14,
+      "text": "Tava la dentro da mata",
+      "translation": "Tava la dentro da mata"
+    },
+    {
+      "start": 15,
+      "end": 17,
+      "text": "Pra que mandou me chamar?",
+      "translation": "Pra que mandou me chamar?"
+    },
+    {
+      "start": 17,
+      "end": 20,
+      "text": "Eu sou índio guerreiro",
+      "translation": "Eu sou índio guerreiro"
+    },
+    {
+      "start": 21,
+      "end": 24,
+      "text": "índio guerreiro de Orubá",
+      "translation": "índio guerreiro de Orubá"
+    },
+    {
+      "start": 24,
+      "end": 29,
+      "text": "Eu sou índio guerreiro",
+      "translation": "Eu sou índio guerreiro"
+    },
+    {
+      "start": 29,
+      "end": 34,
+      "text": "índio guerreiro de Orubá",
+      "translation": "índio guerreiro de Orubá"
+    },
+    {
+      "start": 34,
+      "end": 46,
+      "text": "Hêa, hêa, hêá, hôa (4x)",
+      "translation": "Hêa, hêa, hêá, hôa (4x)"
+    },
+    {
+      "start": 46,
+      "end": 49,
+      "text": "Hêa hêa, heá (3x)",
+      "translation": "Hêa hêa, heá (3x)"
+    },
+    {
+      "start": 49,
+      "end": 53,
+      "text": "Hêá, hêa",
+      "translation": "Hêá, hêa"
+    },
+    {
+      "start": 53,
+      "end": 57,
+      "text": "Hêá, hêa (3x)",
+      "translation": "Hêá, hêa  (3x)"
+    }
+  ]
+}

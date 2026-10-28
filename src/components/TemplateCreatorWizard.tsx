@@ -69,7 +69,7 @@ export interface CampaignBatch {
 
 // Leandro standard presets
 const PRESET_1_VAR = 'Olá, {{1}}\n\nConcluímos a análise da sua simulação e o resultado está disponivel para verificar.\n\nCaso não queira receber mais atualizações, envie SAIR';
-const PRESET_2_VARS = 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.';
+const PRESET_2_VARS = 'Olá {{1}}\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.';
 const PRESET_3_VARS = 'Olá, {{1}}\n\nConcluímos a análise da sua simulação {{2}}\n\n{{3}}\n\nCaso não queira receber mais atualizações, envie SAIR';
 const DEFAULT_FOOTER = 'Digite "sair" para não receber mais mensagens';
 

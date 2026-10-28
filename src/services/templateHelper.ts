@@ -18,7 +18,7 @@ export const PRESET_4V_TEXT = `Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  
 /**
  * Texto oficial do template 2V padrão do sistema
  */
-export const PRESET_2V_TEXT = 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.';
+export const PRESET_2V_TEXT = 'Olá {{1}}\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.';
 
 export function generate4VExamples(options?: { name?: string; orderNumber?: string }): string[] {
     const name = options?.name || 'Geraldo';

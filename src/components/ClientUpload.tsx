@@ -492,7 +492,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
             const v5 = vArr[4] || '{{5}}';
 
             if (presetKey === '2') {
-                setEditAdCopy(`Olá, ${v1}.\n\nConsta uma ${v2} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.`);
+                setEditAdCopy(`Olá ${v1}\n\nRecebemos sua solicitação ${v2} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.`);
             } else if (presetKey === '4') {
                 setEditAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
             } else if (presetKey === '5') {
@@ -522,7 +522,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
             const v5 = vArr[4] || '{{5}}';
 
             if (presetKey === '2') {
-                setFormAdCopy(`Olá, ${v1}.\n\nConsta uma ${v2} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.`);
+                setFormAdCopy(`Olá ${v1}\n\nRecebemos sua solicitação ${v2} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.`);
             } else if (presetKey === '4') {
                 setFormAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
             } else if (presetKey === '5') {
@@ -574,7 +574,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                 const v5 = updated[4] || '{{5}}';
 
                 if (editVariablePreset === '2') {
-                    setEditAdCopy(`Olá, ${v1}.\n\nConsta uma ${v2} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.`);
+                    setEditAdCopy(`Olá ${v1}\n\nRecebemos sua solicitação ${v2} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.`);
                 } else if (editVariablePreset === '4') {
                     setEditAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
                 } else if (editVariablePreset === '5' || editShowFifthVar) {
@@ -595,7 +595,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                 const v5 = updated[4] || '{{5}}';
 
                 if (formVariablePreset === '2') {
-                    setFormAdCopy(`Olá, ${v1}.\n\nConsta uma ${v2} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.`);
+                    setFormAdCopy(`Olá ${v1}\n\nRecebemos sua solicitação ${v2} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.`);
                 } else if (formVariablePreset === '4') {
                     setFormAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
                 } else if (formVariablePreset === '5' || formShowFifthVar) {

@@ -1,0 +1,66 @@
+{
+  "song_title": "Txihí mirawê",
+  "duration": 65.085671,
+  "sync_ranges": [
+    {
+      "start": 4,
+      "end": 8.52,
+      "text": "Txihí mirawê (2x)",
+      "translation": "Antepassado (2X)"
+    },
+    {
+      "start": 8.52,
+      "end": 12.24,
+      "text": "Wãkhomãk upú heruê",
+      "translation": "Antepassado, antepassado"
+    },
+    {
+      "start": 12.24,
+      "end": 16,
+      "text": "Txihí mirawê txihí mirawê",
+      "translation": "Antepassado,Antepassado"
+    },
+    {
+      "start": 16,
+      "end": 20,
+      "text": "Wãkhomãk upú heruwê",
+      "translation": "Wãkhomãk upú heruwê"
+    },
+    {
+      "start": 20,
+      "end": 35,
+      "text": "Waê, waê, waê, waê torotê uĩ pakhê (2x)",
+      "translation": "Waê, waê, waê, waê nossa terra sagrada"
+    },
+    {
+      "start": 35,
+      "end": 39,
+      "text": "Txihí mirawê txihí mirawê",
+      "translation": "Txihí mirawê txihí mirawê (2x)"
+    },
+    {
+      "start": 39,
+      "end": 42,
+      "text": "Wãkhomãk u͂pú heruwê",
+      "translation": "Wãkhomãk u͂pú heruwê"
+    },
+    {
+      "start": 42,
+      "end": 45,
+      "text": "Txihí mirawê txihí mirawê",
+      "translation": "Txihí mirawê txihí mirawê (2x)"
+    },
+    {
+      "start": 45,
+      "end": 48,
+      "text": "Wãkhomãk u͂pú heruwê",
+      "translation": "Wãkhomãk u͂pú heruwê"
+    },
+    {
+      "start": 48,
+      "end": 64,
+      "text": "Waê, waê, waê, waê torotê uĩ pakhê (2x)",
+      "translation": "Waê, waê, waê, waê torotê uĩ pakhê (2x)"
+    }
+  ]
+}

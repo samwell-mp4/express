@@ -1,0 +1,48 @@
+{
+  "song_title": "Kanã Pataxí Petoĩ",
+  "duration": 53.361393,
+  "sync_ranges": [
+    {
+      "start": 6,
+      "end": 12,
+      "text": "Kanã pataxí petoĩ",
+      "translation": "Nossa aldeia Pataxó"
+    },
+    {
+      "start": 12,
+      "end": 19,
+      "text": "Baixutxê nãahã pokaiaré",
+      "translation": "Caminha firme com força"
+    },
+    {
+      "start": 19,
+      "end": 22.29,
+      "text": "Ahnã petoĩ puhuy",
+      "translation": "Nossa aldeia sagrada"
+    },
+    {
+      "start": 22.29,
+      "end": 27.47,
+      "text": "Ahnã petoĩ akuã",
+      "translation": "Nossa aldeia guerreira"
+    },
+    {
+      "start": 27.47,
+      "end": 34.37,
+      "text": "Ahnã petoĩ sara dxahá txóp haré",
+      "translation": "Nossa aldeia canta e dança em festa"
+    },
+    {
+      "start": 34.37,
+      "end": 48,
+      "text": "Kahab'txê siratã(2x)",
+      "translation": "Alegres, unidos"
+    },
+    {
+      "start": 48,
+      "end": 53.27,
+      "text": "Dxahá umip apóy umip mayõ",
+      "translation": "Hoje e sempre, todos juntos"
+    }
+  ]
+}

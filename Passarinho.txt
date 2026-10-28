@@ -1,0 +1,72 @@
+{
+  "song_title": "Passarinho tá cantando",
+  "duration": 54.056054,
+  "sync_ranges": [
+    {
+      "start": 3,
+      "end": 10,
+      "text": "Passarinho tá cantando oh, passarinho tá cantando",
+      "translation": "Passarinho tá cantando oh, passarinho tá cantando"
+    },
+    {
+      "start": 10,
+      "end": 16,
+      "text": "Passarinho tá cantando oh, passarinho tá cantando",
+      "translation": "Passarinho tá cantando oh, passarinho tá cantando"
+    },
+    {
+      "start": 16,
+      "end": 18,
+      "text": "Com seu canto bonito",
+      "translation": "Com seu canto bonito"
+    },
+    {
+      "start": 18,
+      "end": 23,
+      "text": "oh lê lê vai voando no ar oh lá lá",
+      "translation": "lê lê vai voando no ar oh lá lá"
+    },
+    {
+      "start": 23,
+      "end": 26,
+      "text": "Chama rá, rá, rá oh lê lê",
+      "translation": "Chama rá, rá, rá oh lê lê"
+    },
+    {
+      "start": 26,
+      "end": 30,
+      "text": "Chama rá, rá, rá oh lá lá",
+      "translation": "Chama rá, rá, rá oh lá lá"
+    },
+    {
+      "start": 30,
+      "end": 43,
+      "text": "Passarinho tá cantando oh, passarinho tá cantando(2x)",
+      "translation": "Passarinho tá cantando oh, passarinho tá cantando"
+    },
+    {
+      "start": 43,
+      "end": 45,
+      "text": "Com seu canto bonito",
+      "translation": "Com seu canto bonito"
+    },
+    {
+      "start": 45,
+      "end": 49,
+      "text": "oh lê lê vai voando no ar oh lá lá",
+      "translation": "lê lê vai voando no ar oh lá lá"
+    },
+    {
+      "start": 49,
+      "end": 52,
+      "text": "Chama rá, rá, rá oh lê lê",
+      "translation": "Chama rá, rá, rá oh lê lê"
+    },
+    {
+      "start": 52,
+      "end": 54.056054,
+      "text": "Chama rá, rá, rá oh lá lá",
+      "translation": "Chama rá, rá, rá oh lá lá"
+    }
+  ]
+}

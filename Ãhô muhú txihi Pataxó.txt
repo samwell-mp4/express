@@ -1,0 +1,90 @@
+{
+  "song_title": "Ãhô muhú txihi Pataxó",
+  "duration": 77.067029,
+  "sync_ranges": [
+    {
+      "start": 4,
+      "end": 14,
+      "text": "Ãhô muhú txihi Pataxó",
+      "translation": "Não amoleça"
+    },
+    {
+      "start": 14,
+      "end": 15.8,
+      "text": "Kamayurá",
+      "translation": "Não durma índio Pataxó corajoso"
+    },
+    {
+      "start": 15.8,
+      "end": 18,
+      "text": "Patxutxá takap akuã",
+      "translation": "Furar com lança e flecha"
+    },
+    {
+      "start": 18,
+      "end": 23,
+      "text": "Patxitxa mikay dxihi Mukueme",
+      "translation": "Cortar com facão não-índio mau"
+    },
+    {
+      "start": 23,
+      "end": 26,
+      "text": "Txuhap muká penaô",
+      "translation": "Heruê eiê, heruê eiê, eiê"
+    },
+    {
+      "start": 26,
+      "end": 29,
+      "text": "Henuhé ãhô hõ",
+      "translation": "Heruê"
+    },
+    {
+      "start": 29,
+      "end": 41.32,
+      "text": "Heruê eiê, heruê eiê, eiê Heruê (2x)",
+      "translation": ""
+    },
+    {
+      "start": 41.82,
+      "end": 48,
+      "text": "Ãhô muhú txihi Pataxó",
+      "translation": "Não amoleça"
+    },
+    {
+      "start": 48,
+      "end": 50,
+      "text": "Kamayurá",
+      "translation": "Não durma índio Pataxó corajoso"
+    },
+    {
+      "start": 50,
+      "end": 53,
+      "text": "Patxutxá takap akuã",
+      "translation": "Furar com lança e flecha"
+    },
+    {
+      "start": 53,
+      "end": 56.95,
+      "text": "Patxitxa mikay dxihi Mukueme",
+      "translation": "Cortar com facão não-índio mau"
+    },
+    {
+      "start": 56.95,
+      "end": 60,
+      "text": "Txuhap muká penaô",
+      "translation": "Heruê eiê, heruê eiê, eiê"
+    },
+    {
+      "start": 60,
+      "end": 63,
+      "text": "Henuhé ãhô hõ",
+      "translation": "Heruê"
+    },
+    {
+      "start": 63,
+      "end": 77,
+      "text": "Heruê eiê, heruê eiê, eiê Heruê (2x)",
+      "translation": ""
+    }
+  ]
+}

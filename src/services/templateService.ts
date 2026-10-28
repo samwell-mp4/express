@@ -48,7 +48,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
         structure: {
             header: { format: 'IMAGE' },
             body: {
-                text: 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.',
+                text: 'Olá {{1}}\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.',
                 examples: ['Leandro', '7164427']
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
@@ -76,7 +76,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
         structure: {
             header: { format: 'IMAGE' },
             body: {
-                text: 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.',
+                text: 'Olá {{1}}\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.',
                 examples: ['Leandro', '7164427']
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
@@ -104,7 +104,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
         structure: {
             header: { format: 'IMAGE' },
             body: {
-                text: 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.',
+                text: 'Olá {{1}}\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.',
                 examples: ['Leandro', '7164427']
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
@@ -132,7 +132,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
         structure: {
             header: { format: 'IMAGE' },
             body: {
-                text: 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.',
+                text: 'Olá {{1}}\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.',
                 examples: ['Leandro', '7164427']
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
@@ -160,7 +160,7 @@ export const INITIAL_VERIFIED_TEMPLATES: InfobipAccountTemplate[] = [
         structure: {
             header: { format: 'IMAGE' },
             body: {
-                text: 'Olá, {{1}}.\n\nConsta uma {{2}} precisamos confirmar informações para dar continuidade ao atendimento.\n\nPara consultar essa solicitação, utilize uma das opções abaixo.',
+                text: 'Olá {{1}}\n\nRecebemos sua solicitação {{2}} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.',
                 examples: ['Leandro', '7164427']
             },
             footer: { text: 'Digite "sair" para não receber mais mensagens' },
