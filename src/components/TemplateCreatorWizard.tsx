@@ -40,8 +40,15 @@ import { rotatorStorage } from '../services/rotatorStorage';
 import {
     generateRandomOrderNumber,
     PRESET_4V_TEXT,
-    generate4VExamples
+    PRESET_4V_RIFA_TEXT,
+    PRESET_4V_CORBAN_TEXT,
+    PRESET_4V_TESTE_TEXT,
+    generate4VExamples,
+    generate4VCorbanExamples,
+    generate4VTesteExamples
 } from '../services/templateHelper';
+
+export type ActivePresetType = 1 | 2 | 3 | 4 | '4_corban' | '4_teste';
 
 interface TemplateCreatorWizardProps {
     onCreated?: (templateName: string) => void;
@@ -112,8 +119,8 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
     const [headerType, setHeaderType] = useState<'NONE' | 'IMAGE' | 'VIDEO'>('IMAGE');
     const [mediaUrl, setMediaUrl] = useState('https://i.imgur.com/PSkg9mi.jpeg');
 
-    // Message Body & Variables (Template 4V com número do pedido rotativo)
-    const [activePreset, setActivePreset] = useState<1 | 2 | 3 | 4>(4);
+    // Message Body & Variables (Template 4V com presets rápidos)
+    const [activePreset, setActivePreset] = useState<ActivePresetType>(4);
     const [bodyText, setBodyText] = useState(PRESET_4_VARS);
     const [variableExamples, setVariableExamples] = useState<{ [key: string]: string }>(() => {
         const ex = generate4VExamples();
@@ -228,25 +235,43 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
         return unique.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
     }, [bodyText]);
 
-    // Apply Presets (1, 2, 3, 4)
-    const handleApplyPreset = (varsCount: 1 | 2 | 3 | 4) => {
-        setActivePreset(varsCount);
-        if (varsCount === 1) {
+    // Apply Presets (1, 2, 3, 4, 4_corban, 4_teste)
+    const handleApplyPreset = (presetKey: ActivePresetType) => {
+        setActivePreset(presetKey);
+        if (presetKey === 1) {
             setBodyText(PRESET_1_VAR);
             setVariableExamples({ '1': LEANDRO_EXAMPLES_1[0] });
-        } else if (varsCount === 2) {
+        } else if (presetKey === 2) {
             setBodyText(PRESET_2_VARS);
             setVariableExamples({ '1': LEANDRO_EXAMPLES_2[0], '2': LEANDRO_EXAMPLES_2[1] });
-        } else if (varsCount === 3) {
+        } else if (presetKey === 3) {
             setBodyText(PRESET_3_VARS);
             setVariableExamples({
                 '1': LEANDRO_EXAMPLES_3[0],
                 '2': LEANDRO_EXAMPLES_3[1],
                 '3': LEANDRO_EXAMPLES_3[2]
             });
-        } else if (varsCount === 4) {
+        } else if (presetKey === 4) {
             setBodyText(PRESET_4_VARS);
             const ex = generate4VExamples();
+            setVariableExamples({
+                '1': ex[0],
+                '2': ex[1],
+                '3': ex[2],
+                '4': ex[3]
+            });
+        } else if (presetKey === '4_corban') {
+            setBodyText(PRESET_4V_CORBAN_TEXT);
+            const ex = generate4VCorbanExamples();
+            setVariableExamples({
+                '1': ex[0],
+                '2': ex[1],
+                '3': ex[2],
+                '4': ex[3]
+            });
+        } else if (presetKey === '4_teste') {
+            setBodyText(PRESET_4V_TESTE_TEXT);
+            const ex = generate4VTesteExamples();
             setVariableExamples({
                 '1': ex[0],
                 '2': ex[1],
@@ -919,9 +944,31 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                         });
                     }
 
-                    // Se estiver no preset 4V ou com 4 variáveis, gera número de pedido rotativo aleatório com 11 dígitos para CADA template
+                    // Se estiver no preset 4V ou com 4 variáveis, configura os exemplos adequados para cada modelo
                     let rowExamples = bodyExamplesArray;
-                    if (activePreset === 4 || detectedVariables.length >= 4) {
+                    if (activePreset === 4) {
+                        const orderNum = generateRandomOrderNumber();
+                        rowExamples = [
+                            variableExamples['1'] || 'Geraldo',
+                            `seu pedido de número ${orderNum} está próximo de sair para entrega`,
+                            variableExamples['3'] || 'Esperamos que goste!',
+                            variableExamples['4'] || 'Para rastrear seu pedido, clique abaixo.'
+                        ];
+                    } else if (activePreset === '4_corban') {
+                        rowExamples = [
+                            variableExamples['1'] || 'Geraldo',
+                            variableExamples['2'] || 'sua proposta foi aprovada com sucesso',
+                            variableExamples['3'] || 'Os valores já estão disponíveis para liberação imediata.',
+                            variableExamples['4'] || 'Para verificar os detalhes do seu contrato, clique no botão abaixo.'
+                        ];
+                    } else if (activePreset === '4_teste') {
+                        rowExamples = [
+                            variableExamples['1'] || 'Geraldo',
+                            variableExamples['2'] || 'sua consulta está agendada para amanhã às 14:00',
+                            variableExamples['3'] || 'Por favor chegue com 15 minutos de antecedência.',
+                            variableExamples['4'] || 'Caso precise remarcar, responda ou utilize o botão abaixo.'
+                        ];
+                    } else if (detectedVariables.length >= 4 && activePreset !== 1 && activePreset !== 2 && activePreset !== 3) {
                         const orderNum = generateRandomOrderNumber();
                         rowExamples = [
                             variableExamples['1'] || 'Geraldo',
@@ -1390,7 +1437,23 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                     onClick={() => handleApplyPreset(4)}
                                                     style={{ cursor: 'pointer', fontWeight: activePreset === 4 ? 700 : 500 }}
                                                 >
-                                                    Preset 4 Vars (4V)
+                                                    4V (Rifa)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={`badge ${activePreset === '4_corban' ? 'badge-approved' : 'badge-neutral'}`}
+                                                    onClick={() => handleApplyPreset('4_corban')}
+                                                    style={{ cursor: 'pointer', fontWeight: activePreset === '4_corban' ? 700 : 500 }}
+                                                >
+                                                    4V (Corban)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={`badge ${activePreset === '4_teste' ? 'badge-approved' : 'badge-neutral'}`}
+                                                    onClick={() => handleApplyPreset('4_teste')}
+                                                    style={{ cursor: 'pointer', fontWeight: activePreset === '4_teste' ? 700 : 500 }}
+                                                >
+                                                    4v (teste)
                                                 </button>
                                             </div>
                                         </div>
@@ -1415,7 +1478,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                     <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)' }}>
                                                         Valores de Amostra ({detectedVariables.length} variáveis):
                                                     </span>
-                                                    {(activePreset === 4 || detectedVariables.length >= 2) && (
+                                                    {activePreset === 4 && (
                                                         <button
                                                             type="button"
                                                             onClick={handleRandomizeCodes}
@@ -1713,17 +1776,35 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
                                                 className={`badge ${activePreset === 4 ? 'badge-approved' : 'badge-neutral'}`}
                                                 style={{ cursor: 'pointer', fontWeight: activePreset === 4 ? 700 : 500 }}
                                             >
-                                                4V (Pedido)
+                                                4V (Rifa)
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={handleRandomizeCodes}
-                                                className="badge badge-neutral"
-                                                style={{ cursor: 'pointer', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}
-                                                title="Gera novo número de pedido aleatório rotativo de 11 dígitos"
+                                                onClick={() => handleApplyPreset('4_corban')}
+                                                className={`badge ${activePreset === '4_corban' ? 'badge-approved' : 'badge-neutral'}`}
+                                                style={{ cursor: 'pointer', fontWeight: activePreset === '4_corban' ? 700 : 500 }}
                                             >
-                                                🎲 Rotacionar Número do Pedido
+                                                4V (Corban)
                                             </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleApplyPreset('4_teste')}
+                                                className={`badge ${activePreset === '4_teste' ? 'badge-approved' : 'badge-neutral'}`}
+                                                style={{ cursor: 'pointer', fontWeight: activePreset === '4_teste' ? 700 : 500 }}
+                                            >
+                                                4v (teste)
+                                            </button>
+                                            {activePreset === 4 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRandomizeCodes}
+                                                    className="badge badge-neutral"
+                                                    style={{ cursor: 'pointer', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}
+                                                    title="Gera novo número de pedido aleatório rotativo de 11 dígitos"
+                                                >
+                                                    🎲 Rotacionar Número do Pedido
+                                                </button>
+                                            )}
                                         </div>
 
                                         <button

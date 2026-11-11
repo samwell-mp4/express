@@ -55,13 +55,22 @@ import { ParsedContact, ClientSubmission, SubmissionAd, RotatorTarget } from '..
 import { excelService, SpreadsheetAnalysis } from '../services/excelService';
 import { clientSubmissionStorage } from '../services/clientSubmissionStorage';
 import { rotatorStorage } from '../services/rotatorStorage';
-import { generateRandomOrderNumber, PRESET_4V_TEXT, PRESET_2V_TEXT } from '../services/templateHelper';
+import {
+    generateRandomOrderNumber,
+    PRESET_4V_TEXT,
+    PRESET_4V_RIFA_TEXT,
+    PRESET_4V_CORBAN_TEXT,
+    PRESET_4V_TESTE_TEXT,
+    PRESET_2V_TEXT
+} from '../services/templateHelper';
 
 interface ClientUploadProps {
     onSendToDispatch: (contacts: ParsedContact[], headers: string[], clientName: string) => void;
 }
 
-const TEMPLATE_PRESETS: Record<'2' | '4' | '5', {
+export type ClientVariablePresetKey = '2' | '4' | '4_corban' | '4_teste' | '5' | 'custom';
+
+const TEMPLATE_PRESETS: Record<'2' | '4' | '4_corban' | '4_teste' | '5', {
     label: string;
     variablesCount: number;
     showFifth: boolean;
@@ -80,7 +89,7 @@ const TEMPLATE_PRESETS: Record<'2' | '4' | '5', {
         ]
     },
     '4': {
-        label: '4 Variáveis (Pedido)',
+        label: '4V (Rifa)',
         variablesCount: 4,
         showFifth: false,
         defaultText: PRESET_4V_TEXT,
@@ -95,6 +104,42 @@ const TEMPLATE_PRESETS: Record<'2' | '4' | '5', {
             'seu pedido de número 34634574754 está próximo de sair para entrega',
             'Esperamos que goste!',
             'Para rastrear seu pedido, clique abaixo.'
+        ]
+    },
+    '4_corban': {
+        label: '4V (Corban)',
+        variablesCount: 4,
+        showFifth: false,
+        defaultText: PRESET_4V_CORBAN_TEXT,
+        placeholders: [
+            'Ex: Geraldo ({{1}})',
+            'Ex: sua proposta de crédito foi aprovada ({{2}})',
+            'Ex: Detalhes da proposta / liberação ({{3}})',
+            'Ex: Instruções de confirmação / contrato ({{4}})'
+        ],
+        defaultVariables: [
+            'Geraldo',
+            'sua proposta de crédito foi aprovada com sucesso',
+            'Os valores já estão disponíveis para liberação imediata.',
+            'Para verificar os detalhes do seu contrato, clique no botão abaixo.'
+        ]
+    },
+    '4_teste': {
+        label: '4v (teste)',
+        variablesCount: 4,
+        showFifth: false,
+        defaultText: PRESET_4V_TESTE_TEXT,
+        placeholders: [
+            'Ex: Geraldo ({{1}})',
+            'Ex: compromisso ou consulta agendada ({{2}})',
+            'Ex: Orientações de comparecimento ({{3}})',
+            'Ex: Instruções para confirmar ou reagendar ({{4}})'
+        ],
+        defaultVariables: [
+            'Geraldo',
+            'sua consulta está agendada para amanhã às 14:00',
+            'Por favor chegue com 15 minutos de antecedência.',
+            'Caso precise remarcar, responda ou utilize o botão abaixo.'
         ]
     },
     '5': {
@@ -341,8 +386,8 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     const [formMediaUrl, setFormMediaUrl] = useState('');
     const [formButtonLink, setFormButtonLink] = useState('');
 
-    // Variable Presets (2 / 4 / 5 or custom) & Individual Variable Inputs
-    const [formVariablePreset, setFormVariablePreset] = useState<'2' | '4' | '5' | 'custom'>('4');
+    // Variable Presets (2 / 4 / 4_corban / 4_teste / 5 or custom) & Individual Variable Inputs
+    const [formVariablePreset, setFormVariablePreset] = useState<ClientVariablePresetKey>('4');
     const [formVariables, setFormVariables] = useState<string[]>(() => [
         'Geraldo',
         `seu pedido de número ${generateRandomOrderNumber()} está próximo de sair para entrega`,
@@ -381,7 +426,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     const [isSavingEdit, setIsSavingEdit] = useState(false);
 
     // Variable Presets & Inputs for Edit
-    const [editVariablePreset, setEditVariablePreset] = useState<'2' | '4' | '5' | 'custom'>('4');
+    const [editVariablePreset, setEditVariablePreset] = useState<ClientVariablePresetKey>('4');
     const [editVariables, setEditVariables] = useState<string[]>(['', '', '', '', '']);
     const [editShowFifthVar, setEditShowFifthVar] = useState(false);
     const [editAdCopy, setEditAdCopy] = useState('');
@@ -459,8 +504,8 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
         }
     };
 
-    // Helper: select variable presets (2, 4, 5 variables or custom)
-    const handleSelectPreset = (presetKey: '2' | '4' | '5' | 'custom', isEdit = false) => {
+    // Helper: select variable presets (2, 4, 4_corban, 4_teste, 5 variables or custom)
+    const handleSelectPreset = (presetKey: ClientVariablePresetKey, isEdit = false) => {
         if (presetKey === 'custom') {
             if (isEdit) setEditVariablePreset('custom');
             else setFormVariablePreset('custom');
@@ -483,6 +528,24 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                     ''
                 ];
                 setEditVariables(vArr);
+            } else if (presetKey === '4_corban') {
+                vArr = [
+                    vArr[0] && vArr[0] !== '{{1}}' ? vArr[0] : 'Geraldo',
+                    vArr[1] && vArr[1] !== '{{2}}' && !vArr[1].includes('pedido de número') ? vArr[1] : 'sua proposta de crédito foi aprovada com sucesso',
+                    vArr[2] && vArr[2] !== '{{3}}' && vArr[2] !== 'Esperamos que goste!' ? vArr[2] : 'Os valores já estão disponíveis para liberação imediata.',
+                    vArr[3] && vArr[3] !== '{{4}}' && !vArr[3].includes('rastrear seu pedido') ? vArr[3] : 'Para verificar os detalhes do seu contrato, clique no botão abaixo.',
+                    ''
+                ];
+                setEditVariables(vArr);
+            } else if (presetKey === '4_teste') {
+                vArr = [
+                    vArr[0] && vArr[0] !== '{{1}}' ? vArr[0] : 'Geraldo',
+                    vArr[1] && vArr[1] !== '{{2}}' && !vArr[1].includes('pedido de número') ? vArr[1] : 'sua consulta está agendada para amanhã às 14:00',
+                    vArr[2] && vArr[2] !== '{{3}}' && vArr[2] !== 'Esperamos que goste!' ? vArr[2] : 'Por favor chegue com 15 minutos de antecedência.',
+                    vArr[3] && vArr[3] !== '{{4}}' && !vArr[3].includes('rastrear seu pedido') ? vArr[3] : 'Caso precise remarcar, responda ou utilize o botão abaixo.',
+                    ''
+                ];
+                setEditVariables(vArr);
             }
 
             const v1 = vArr[0] || '{{1}}';
@@ -495,6 +558,10 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                 setEditAdCopy(`Olá ${v1}\n\nRecebemos sua solicitação ${v2} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.`);
             } else if (presetKey === '4') {
                 setEditAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
+            } else if (presetKey === '4_corban') {
+                setEditAdCopy(`Análise Concluída!\n\nOlá ${v1}, tudo bem?\n\nInformo a você que, ${v2}\n\n${v3}\n\n${v4}\n\nObrigado.`);
+            } else if (presetKey === '4_teste') {
+                setEditAdCopy(`Você tem um compromisso próximo!\n\nOlá! ${v1}\n\n${v2}\n\n${v3}\n\n${v4}\n\nObrigado.`);
             } else if (presetKey === '5') {
                 setEditAdCopy(`Olá ${v1}, tudo bem?\n\nEstamos passando por aqui para informar que ${v2}.\n\nMais detalhes: ${v3}\n\nObservação importante: ${v4}\n\nPara ${v5}, clique no botão abaixo 👇`);
             }
@@ -513,6 +580,24 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                     ''
                 ];
                 setFormVariables(vArr);
+            } else if (presetKey === '4_corban') {
+                vArr = [
+                    vArr[0] && vArr[0] !== '{{1}}' ? vArr[0] : 'Geraldo',
+                    vArr[1] && vArr[1] !== '{{2}}' && !vArr[1].includes('pedido de número') ? vArr[1] : 'sua proposta de crédito foi aprovada com sucesso',
+                    vArr[2] && vArr[2] !== '{{3}}' && vArr[2] !== 'Esperamos que goste!' ? vArr[2] : 'Os valores já estão disponíveis para liberação imediata.',
+                    vArr[3] && vArr[3] !== '{{4}}' && !vArr[3].includes('rastrear seu pedido') ? vArr[3] : 'Para verificar os detalhes do seu contrato, clique no botão abaixo.',
+                    ''
+                ];
+                setFormVariables(vArr);
+            } else if (presetKey === '4_teste') {
+                vArr = [
+                    vArr[0] && vArr[0] !== '{{1}}' ? vArr[0] : 'Geraldo',
+                    vArr[1] && vArr[1] !== '{{2}}' && !vArr[1].includes('pedido de número') ? vArr[1] : 'sua consulta está agendada para amanhã às 14:00',
+                    vArr[2] && vArr[2] !== '{{3}}' && vArr[2] !== 'Esperamos que goste!' ? vArr[2] : 'Por favor chegue com 15 minutos de antecedência.',
+                    vArr[3] && vArr[3] !== '{{4}}' && !vArr[3].includes('rastrear seu pedido') ? vArr[3] : 'Caso precise remarcar, responda ou utilize o botão abaixo.',
+                    ''
+                ];
+                setFormVariables(vArr);
             }
 
             const v1 = vArr[0] || '{{1}}';
@@ -525,6 +610,10 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                 setFormAdCopy(`Olá ${v1}\n\nRecebemos sua solicitação ${v2} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.`);
             } else if (presetKey === '4') {
                 setFormAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
+            } else if (presetKey === '4_corban') {
+                setFormAdCopy(`Análise Concluída!\n\nOlá ${v1}, tudo bem?\n\nInformo a você que, ${v2}\n\n${v3}\n\n${v4}\n\nObrigado.`);
+            } else if (presetKey === '4_teste') {
+                setFormAdCopy(`Você tem um compromisso próximo!\n\nOlá! ${v1}\n\n${v2}\n\n${v3}\n\n${v4}\n\nObrigado.`);
             } else if (presetKey === '5') {
                 setFormAdCopy(`Olá ${v1}, tudo bem?\n\nEstamos passando por aqui para informar que ${v2}.\n\nMais detalhes: ${v3}\n\nObservação importante: ${v4}\n\nPara ${v5}, clique no botão abaixo 👇`);
             }
@@ -577,6 +666,10 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                     setEditAdCopy(`Olá ${v1}\n\nRecebemos sua solicitação ${v2} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.`);
                 } else if (editVariablePreset === '4') {
                     setEditAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
+                } else if (editVariablePreset === '4_corban') {
+                    setEditAdCopy(`Análise Concluída!\n\nOlá ${v1}, tudo bem?\n\nInformo a você que, ${v2}\n\n${v3}\n\n${v4}\n\nObrigado.`);
+                } else if (editVariablePreset === '4_teste') {
+                    setEditAdCopy(`Você tem um compromisso próximo!\n\nOlá! ${v1}\n\n${v2}\n\n${v3}\n\n${v4}\n\nObrigado.`);
                 } else if (editVariablePreset === '5' || editShowFifthVar) {
                     setEditAdCopy(`Olá ${v1}, tudo bem?\n\nEstamos passando por aqui para informar que ${v2}.\n\nMais detalhes: ${v3}\n\nObservação importante: ${v4}\n\nPara ${v5}, clique no botão abaixo 👇`);
                 }
@@ -598,6 +691,10 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                     setFormAdCopy(`Olá ${v1}\n\nRecebemos sua solicitação ${v2} e precisamos confirmar algumas informações para dar continuidade ao atendimento.\n\nPara seguir com essa solicitação, utilize uma das opções abaixo.`);
                 } else if (formVariablePreset === '4') {
                     setFormAdCopy(`Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n${v1}\n\nInformo que ${v2}\n\n${v3}\n\n${v4}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`);
+                } else if (formVariablePreset === '4_corban') {
+                    setFormAdCopy(`Análise Concluída!\n\nOlá ${v1}, tudo bem?\n\nInformo a você que, ${v2}\n\n${v3}\n\n${v4}\n\nObrigado.`);
+                } else if (formVariablePreset === '4_teste') {
+                    setFormAdCopy(`Você tem um compromisso próximo!\n\nOlá! ${v1}\n\n${v2}\n\n${v3}\n\n${v4}\n\nObrigado.`);
                 } else if (formVariablePreset === '5' || formShowFifthVar) {
                     setFormAdCopy(`Olá ${v1}, tudo bem?\n\nEstamos passando por aqui para informar que ${v2}.\n\nMais detalhes: ${v3}\n\nObservação importante: ${v4}\n\nPara ${v5}, clique no botão abaixo 👇`);
                 }
@@ -918,6 +1015,8 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
 
         // Detect preset
         if (sub.ad_copy?.includes('{{5}}')) setEditVariablePreset('5');
+        else if (sub.ad_copy?.includes('Análise Concluída!') || sub.ad_copy?.toLowerCase().includes('corban')) setEditVariablePreset('4_corban');
+        else if (sub.ad_copy?.includes('Você tem um compromisso próximo!')) setEditVariablePreset('4_teste');
         else if (sub.ad_copy?.includes('{{3}}') || sub.ad_copy?.includes('{{4}}')) setEditVariablePreset('4');
         else if (sub.ad_copy?.includes('{{1}}') || sub.ad_copy?.includes('{{2}}')) setEditVariablePreset('2');
         else setEditVariablePreset('custom');
@@ -4865,7 +4964,9 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
 
                                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
                                                 {[
-                                                    { key: '4' as const, label: '4 Variáveis (Pedido)' },
+                                                    { key: '4' as const, label: '4V (Rifa)' },
+                                                    { key: '4_corban' as const, label: '4V (Corban)' },
+                                                    { key: '4_teste' as const, label: '4v (teste)' },
                                                     { key: '2' as const, label: '2 Variáveis' },
                                                     { key: '5' as const, label: '5 Variáveis' },
                                                     { key: 'custom' as const, label: 'Texto Aberto' }
@@ -4945,26 +5046,28 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                                     </span>
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRandomizeVariables(false)}
-                                                        style={{
-                                                            background: '#EFF6FF',
-                                                            border: '1px solid #BFDBFE',
-                                                            borderRadius: '4px',
-                                                            padding: '3px 8px',
-                                                            fontSize: '10.5px',
-                                                            fontWeight: 700,
-                                                            color: '#1D4ED8',
-                                                            cursor: 'pointer',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '4px'
-                                                        }}
-                                                        title="Gera novo número de pedido aleatório rotativo de 11 dígitos"
-                                                    >
-                                                        <span>🎲 Rotacionar Número do Pedido</span>
-                                                    </button>
+                                                    {formVariablePreset === '4' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRandomizeVariables(false)}
+                                                            style={{
+                                                                background: '#EFF6FF',
+                                                                border: '1px solid #BFDBFE',
+                                                                borderRadius: '4px',
+                                                                padding: '3px 8px',
+                                                                fontSize: '10.5px',
+                                                                fontWeight: 700,
+                                                                color: '#1D4ED8',
+                                                                cursor: 'pointer',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px'
+                                                            }}
+                                                            title="Gera novo número de pedido aleatório rotativo de 11 dígitos"
+                                                        >
+                                                            <span>🎲 Rotacionar Número do Pedido</span>
+                                                        </button>
+                                                    )}
                                                     <span style={{
                                                         fontSize: '10.5px',
                                                         fontWeight: 700,
@@ -4982,7 +5085,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                                                 {[1, 2, 3, 4, 5].map(vNum => {
                                                     if (formVariablePreset === '2' && vNum > 2) return null;
-                                                    if (formVariablePreset === '4' && vNum > 4) return null;
+                                                    if ((formVariablePreset === '4' || formVariablePreset === '4_corban' || formVariablePreset === '4_teste') && vNum > 4) return null;
                                                     if (!formShowFifthVar && formVariablePreset !== '5' && vNum === 5) return null;
 
                                                     const presetCfg = TEMPLATE_PRESETS[formVariablePreset === 'custom' ? '5' : formVariablePreset];
@@ -5741,7 +5844,9 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
 
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: '6px' }}>
                                         {[
-                                            { key: '4' as const, label: '4 Variáveis (Pedido)' },
+                                            { key: '4' as const, label: '4V (Rifa)' },
+                                            { key: '4_corban' as const, label: '4V (Corban)' },
+                                            { key: '4_teste' as const, label: '4v (teste)' },
                                             { key: '2' as const, label: '2 Variáveis' },
                                             { key: '5' as const, label: '5 Variáveis' },
                                             { key: 'custom' as const, label: 'Texto Aberto' }
@@ -5813,26 +5918,28 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                             </span>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRandomizeVariables(true)}
-                                                style={{
-                                                    background: '#EFF6FF',
-                                                    border: '1px solid #BFDBFE',
-                                                    borderRadius: '4px',
-                                                    padding: '2px 7px',
-                                                    fontSize: '10.5px',
-                                                    fontWeight: 700,
-                                                    color: '#1D4ED8',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px'
-                                                }}
-                                                title="Gera novo número de pedido aleatório rotativo de 11 dígitos"
-                                            >
-                                                <span>🎲 Rotacionar Número do Pedido</span>
-                                            </button>
+                                            {editVariablePreset === '4' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRandomizeVariables(true)}
+                                                    style={{
+                                                        background: '#EFF6FF',
+                                                        border: '1px solid #BFDBFE',
+                                                        borderRadius: '4px',
+                                                        padding: '2px 7px',
+                                                        fontSize: '10.5px',
+                                                        fontWeight: 700,
+                                                        color: '#1D4ED8',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px'
+                                                    }}
+                                                    title="Gera novo número de pedido aleatório rotativo de 11 dígitos"
+                                                >
+                                                    <span>🎲 Rotacionar Número do Pedido</span>
+                                                </button>
+                                            )}
                                             <span style={{
                                                 fontSize: '10px',
                                                 fontWeight: 700,
@@ -5850,7 +5957,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                                         {[1, 2, 3, 4, 5].map(vNum => {
                                             if (editVariablePreset === '2' && vNum > 2) return null;
-                                            if (editVariablePreset === '4' && vNum > 4) return null;
+                                            if ((editVariablePreset === '4' || editVariablePreset === '4_corban' || editVariablePreset === '4_teste') && vNum > 4) return null;
                                             if (!editShowFifthVar && editVariablePreset !== '5' && vNum === 5) return null;
 
                                             const presetCfg = TEMPLATE_PRESETS[editVariablePreset === 'custom' ? '5' : editVariablePreset];

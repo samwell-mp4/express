@@ -11,9 +11,20 @@ export function generateRandomOrderNumber(): string {
 }
 
 /**
- * Texto oficial do template 4V com caracteres espaçadores fiéis
+ * Texto oficial do template 4V Rifa (antigo Pedido) com caracteres espaçadores fiéis
  */
 export const PRESET_4V_TEXT = `Pedido confirmado!\n ݀  ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\n{{1}}\n\nInformo que {{2}}\n\n{{3}}\n\n{{4}}\n ݀  ݀  ݀  ݀  ݀  ݀  ݀ \n\nObrigado.`;
+export const PRESET_4V_RIFA_TEXT = PRESET_4V_TEXT;
+
+/**
+ * Texto oficial do modelo 4V (Corban)
+ */
+export const PRESET_4V_CORBAN_TEXT = `Análise Concluída!\n\nOlá {{1}}, tudo bem?\n\nInformo a você que, {{2}}\n\n{{3}}\n\n{{4}}\n\nObrigado.`;
+
+/**
+ * Texto oficial do modelo 4v (teste)
+ */
+export const PRESET_4V_TESTE_TEXT = `Você tem um compromisso próximo!\n\nOlá! {{1}}\n\n{{2}}\n\n{{3}}\n\n{{4}}\n\nObrigado.`;
 
 /**
  * Texto oficial do template 2V padrão do sistema
@@ -28,6 +39,26 @@ export function generate4VExamples(options?: { name?: string; orderNumber?: stri
         `seu pedido de número ${orderNum} está próximo de sair para entrega`,
         'Esperamos que goste!',
         'Para rastrear seu pedido, clique abaixo.'
+    ];
+}
+
+export function generate4VCorbanExamples(options?: { name?: string }): string[] {
+    const name = options?.name || 'Geraldo';
+    return [
+        name,
+        'sua proposta de crédito foi aprovada com sucesso',
+        'Os valores já estão disponíveis para liberação imediata.',
+        'Para verificar os detalhes do seu contrato, clique no botão abaixo.'
+    ];
+}
+
+export function generate4VTesteExamples(options?: { name?: string }): string[] {
+    const name = options?.name || 'Geraldo';
+    return [
+        name,
+        'sua consulta está agendada para amanhã às 14:00',
+        'Por favor chegue com 15 minutos de antecedência.',
+        'Caso precise remarcar, responda ou utilize o botão abaixo.'
     ];
 }
 
