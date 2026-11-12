@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     UploadCloud,
     FileSpreadsheet,
@@ -287,6 +287,11 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     const [onlyUpcomingFilter, setOnlyUpcomingFilter] = useState(false);
     const [originFilter, setOriginFilter] = useState<'ALL' | 'MANUAL' | 'TEMPLATE_CREATOR'>('ALL');
     const [layoutMode, setLayoutMode] = useState<'grid' | 'list'>('grid');
+
+    // Pagination State (Otimização contra travamento e alto uso de memória)
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(12);
+    const isSyncingRef = useRef(false);
 
     // Templates Modal & Real-time Meta Status State
     const [selectedTemplatesSubmission, setSelectedTemplatesSubmission] = useState<ClientSubmission | null>(null);
@@ -1128,14 +1133,6 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     // -------------------------------------------------------------
     // BULK SELECTION & OPERATIONS
     // -------------------------------------------------------------
-    const toggleSelectAll = () => {
-        if (selectedIds.length === filteredSubmissions.length && filteredSubmissions.length > 0) {
-            setSelectedIds([]);
-        } else {
-            setSelectedIds(filteredSubmissions.map(s => s.id));
-        }
-    };
-
     const toggleSelectSubmission = (id: number | string) => {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
@@ -1874,17 +1871,22 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     }, [selectedTemplatesSubmission]);
 
     // -------------------------------------------------------------
-    // REAL-TIME GLOBAL TEMPLATES SYNC FOR ALL CARDS
+    // REAL-TIME GLOBAL TEMPLATES SYNC OTIMIZADO
     // -------------------------------------------------------------
     const syncAllSubmissionsTemplates = useCallback(async () => {
         if (!submissions || submissions.length === 0) return;
+        if (isSyncingRef.current) return;
+        if (typeof document !== 'undefined' && document.hidden) return;
+
+        isSyncingRef.current = true;
         try {
             const senders = new Set<string>();
-            submissions.forEach(s => {
+            // Pega remetentes prioritários para não sobrecarregar com dezenas de conexões
+            submissions.slice(0, 24).forEach(s => {
                 const clean = (s.sender_phone || s.sender_number || '').replace(/\D/g, '');
                 if (clean) senders.add(clean);
             });
-            const sendersQuery = Array.from(senders).join(',');
+            const sendersQuery = Array.from(senders).slice(0, 5).join(',');
             const res = await fetch(`/api/meta-templates?force=true${sendersQuery ? `&knownSenders=${sendersQuery}` : ''}`);
             let apiTemplates: any[] = [];
             if (res.ok) {
@@ -1894,22 +1896,9 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                 }
             }
 
-            if (senders.size > 0) {
-                await Promise.all(Array.from(senders).map(async (sender) => {
-                    try {
-                        const sRes = await fetch(`/infobip-proxy/whatsapp/2/senders/${sender}/templates`);
-                        if (sRes.ok) {
-                            const sData = await sRes.json();
-                            if (sData.templates && Array.isArray(sData.templates)) {
-                                apiTemplates = [...sData.templates, ...apiTemplates];
-                            }
-                        }
-                    } catch {}
-                }));
-            }
-
             const nowStr = new Date().toLocaleTimeString('pt-BR');
             setTemplateLiveStatuses(prev => {
+                let hasChanges = false;
                 const next = { ...prev };
                 apiTemplates.forEach((t: any) => {
                     const info = {
@@ -1922,39 +1911,28 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                         language: t.language
                     };
                     if (t.name) {
-                        next[t.name] = info;
-                        next[t.name.toLowerCase().trim()] = info;
+                        const existing = next[t.name];
+                        if (!existing || existing.status !== info.status) {
+                            next[t.name] = info;
+                            next[t.name.toLowerCase().trim()] = info;
+                            hasChanges = true;
+                        }
                     }
                 });
 
-                submissions.forEach(sub => {
-                    const tplList = getSubmissionTemplatesList(sub);
-                    tplList.forEach(tpl => {
-                        const k1 = tpl.name;
-                        const k2 = tpl.name.toLowerCase().trim();
-                        if (!next[k1] && !next[k2]) {
-                            next[k1] = {
-                                status: (sub.status === 'GERADO' || sub.origin === 'TEMPLATE_CREATOR') ? 'PENDENTE_META' : (sub.status || 'PENDING'),
-                                lastChecked: nowStr,
-                                createdAt: sub.timestamp || sub.created_at,
-                                lastUpdatedAt: sub.timestamp || sub.created_at
-                            };
-                            next[k2] = next[k1];
-                        }
-                    });
-                });
-
-                return next;
+                return hasChanges ? next : prev;
             });
         } catch (e) {
             console.warn('[syncAllSubmissionsTemplates] Erro:', e);
+        } finally {
+            isSyncingRef.current = false;
         }
     }, [submissions]);
 
-    // Polling global a cada 15s para atualizar o status dos templates de todos os cards
+    // Polling controlado a cada 60s (evita travamentos e re-renders desnecessários)
     useEffect(() => {
         syncAllSubmissionsTemplates();
-        const interval = setInterval(syncAllSubmissionsTemplates, 15000);
+        const interval = setInterval(syncAllSubmissionsTemplates, 60000);
         return () => clearInterval(interval);
     }, [syncAllSubmissionsTemplates]);
 
@@ -2038,35 +2016,59 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
     };
 
     // -------------------------------------------------------------
-    // SMART FILTERING ENGINE
+    // SMART FILTERING & PAGINATION ENGINE (ALTA PERFORMANCE)
     // -------------------------------------------------------------
-    const filteredSubmissions = submissions.filter(s => {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesSearch = !q ||
-            (s.campaign_name || '').toLowerCase().includes(q) ||
-            (s.profile_name || '').toLowerCase().includes(q) ||
-            (s.client_name || '').toLowerCase().includes(q) ||
-            (s.ddd || '').includes(q) ||
-            (s.ad_copy || '').toLowerCase().includes(q);
+    const filteredSubmissions = useMemo(() => {
+        return submissions.filter(s => {
+            const q = searchQuery.toLowerCase().trim();
+            const matchesSearch = !q ||
+                (s.campaign_name || '').toLowerCase().includes(q) ||
+                (s.profile_name || '').toLowerCase().includes(q) ||
+                (s.client_name || '').toLowerCase().includes(q) ||
+                (s.ddd || '').includes(q) ||
+                (s.ad_copy || '').toLowerCase().includes(q);
 
-        const matchesStatus = statusFilter === 'ALL' || s.status === statusFilter;
-        const matchesType = typeFilter === 'ALL' || s.template_type === typeFilter;
-        const matchesDdd = dddFilter === 'ALL' || s.ddd === dddFilter;
-        const matchesOrigin = originFilter === 'ALL' ||
-            (originFilter === 'TEMPLATE_CREATOR' && s.origin === 'TEMPLATE_CREATOR') ||
-            (originFilter === 'MANUAL' && s.origin !== 'TEMPLATE_CREATOR');
+            const matchesStatus = statusFilter === 'ALL' || s.status === statusFilter;
+            const matchesType = typeFilter === 'ALL' || s.template_type === typeFilter;
+            const matchesDdd = dddFilter === 'ALL' || s.ddd === dddFilter;
+            const matchesOrigin = originFilter === 'ALL' ||
+                (originFilter === 'TEMPLATE_CREATOR' && s.origin === 'TEMPLATE_CREATOR') ||
+                (originFilter === 'MANUAL' && s.origin !== 'TEMPLATE_CREATOR');
 
-        // Date range
-        const dispatchTime = s.dispatch_date ? new Date(s.dispatch_date).getTime() : (s.timestamp ? new Date(s.timestamp).getTime() : 0);
-        const matchesStart = !startDateFilter || dispatchTime >= new Date(startDateFilter + 'T00:00:00').getTime();
-        const matchesEnd = !endDateFilter || dispatchTime <= new Date(endDateFilter + 'T23:59:59').getTime();
+            const dispatchTime = s.dispatch_date ? new Date(s.dispatch_date).getTime() : (s.timestamp ? new Date(s.timestamp).getTime() : 0);
+            const matchesStart = !startDateFilter || dispatchTime >= new Date(startDateFilter + 'T00:00:00').getTime();
+            const matchesEnd = !endDateFilter || dispatchTime <= new Date(endDateFilter + 'T23:59:59').getTime();
 
-        // Upcoming only
-        const isUpcoming = s.dispatch_date ? new Date(s.dispatch_date).getTime() > Date.now() : false;
-        const matchesUpcoming = !onlyUpcomingFilter || isUpcoming;
+            const isUpcoming = s.dispatch_date ? new Date(s.dispatch_date).getTime() > Date.now() : false;
+            const matchesUpcoming = !onlyUpcomingFilter || isUpcoming;
 
-        return matchesSearch && matchesStatus && matchesType && matchesDdd && matchesOrigin && matchesStart && matchesEnd && matchesUpcoming;
-    });
+            return matchesSearch && matchesStatus && matchesType && matchesDdd && matchesOrigin && matchesStart && matchesEnd && matchesUpcoming;
+        });
+    }, [submissions, searchQuery, statusFilter, typeFilter, dddFilter, originFilter, startDateFilter, endDateFilter, onlyUpcomingFilter]);
+
+    // Reseta para a página 1 ao alterar qualquer filtro
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, statusFilter, typeFilter, dddFilter, originFilter, startDateFilter, endDateFilter, onlyUpcomingFilter, pageSize]);
+
+    const totalSubmissions = filteredSubmissions.length;
+    const totalPages = Math.max(1, Math.ceil(totalSubmissions / pageSize));
+    const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+    const paginatedSubmissions = useMemo(() => {
+        const start = (safeCurrentPage - 1) * pageSize;
+        return filteredSubmissions.slice(start, start + pageSize);
+    }, [filteredSubmissions, safeCurrentPage, pageSize]);
+
+    const isAllPageSelected = paginatedSubmissions.length > 0 && paginatedSubmissions.every(s => selectedIds.includes(s.id));
+    const toggleSelectAll = () => {
+        const pageIds = paginatedSubmissions.map(s => s.id);
+        if (isAllPageSelected) {
+            setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])));
+        }
+    };
 
     const hasActiveFilters = statusFilter !== 'ALL' || typeFilter !== 'ALL' || dddFilter !== 'ALL' || originFilter !== 'ALL' || startDateFilter || endDateFilter || onlyUpcomingFilter || searchQuery.trim() !== '';
 
@@ -2079,6 +2081,144 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
         setStartDateFilter('');
         setEndDateFilter('');
         setOnlyUpcomingFilter(false);
+        setCurrentPage(1);
+    };
+
+    // Helper de Barra de Paginação Reutilizável
+    const renderPaginationBar = () => {
+        if (totalSubmissions === 0) return null;
+        const startItem = (safeCurrentPage - 1) * pageSize + 1;
+        const endItem = Math.min(safeCurrentPage * pageSize, totalSubmissions);
+
+        const getPageNumbers = () => {
+            if (totalPages <= 7) {
+                return Array.from({ length: totalPages }, (_, i) => i + 1);
+            }
+            if (safeCurrentPage <= 4) {
+                return [1, 2, 3, 4, 5, '...', totalPages];
+            }
+            if (safeCurrentPage >= totalPages - 3) {
+                return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+            }
+            return [1, '...', safeCurrentPage - 1, safeCurrentPage, safeCurrentPage + 1, '...', totalPages];
+        };
+
+        return (
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+                padding: '12px 18px',
+                background: '#FFFFFF',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '8px',
+                marginTop: '14px',
+                boxShadow: 'var(--shadow-subtle)'
+            }}>
+                <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                    Exibindo <strong>{startItem}</strong> a <strong>{endItem}</strong> de <strong>{totalSubmissions}</strong> campanhas
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <button
+                        type="button"
+                        disabled={safeCurrentPage === 1}
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        style={{
+                            height: '32px',
+                            padding: '0 10px',
+                            borderRadius: '6px',
+                            border: '1px solid #D1D5DB',
+                            background: safeCurrentPage === 1 ? '#F8FAFC' : '#FFFFFF',
+                            color: safeCurrentPage === 1 ? '#94A3B8' : '#334155',
+                            cursor: safeCurrentPage === 1 ? 'not-allowed' : 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                        }}
+                    >
+                        <ChevronLeft size={14} /> Anterior
+                    </button>
+
+                    {getPageNumbers().map((p, idx) => (
+                        typeof p === 'number' ? (
+                            <button
+                                key={p}
+                                type="button"
+                                onClick={() => setCurrentPage(p)}
+                                style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '6px',
+                                    border: `1px solid ${safeCurrentPage === p ? 'var(--primary-color)' : '#D1D5DB'}`,
+                                    background: safeCurrentPage === p ? 'var(--primary-color)' : '#FFFFFF',
+                                    color: safeCurrentPage === p ? '#FFFFFF' : '#334155',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: safeCurrentPage === p ? 700 : 500,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                {p}
+                            </button>
+                        ) : (
+                            <span key={`dots-${idx}`} style={{ padding: '0 4px', color: '#94A3B8', fontSize: '12px' }}>...</span>
+                        )
+                    ))}
+
+                    <button
+                        type="button"
+                        disabled={safeCurrentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        style={{
+                            height: '32px',
+                            padding: '0 10px',
+                            borderRadius: '6px',
+                            border: '1px solid #D1D5DB',
+                            background: safeCurrentPage === totalPages ? '#F8FAFC' : '#FFFFFF',
+                            color: safeCurrentPage === totalPages ? '#94A3B8' : '#334155',
+                            cursor: safeCurrentPage === totalPages ? 'not-allowed' : 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                        }}
+                    >
+                        Próxima <ChevronRight size={14} />
+                    </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Campanhas por página:</span>
+                    <select
+                        value={pageSize}
+                        onChange={(e) => setPageSize(Number(e.target.value))}
+                        style={{
+                            height: '30px',
+                            padding: '0 8px',
+                            borderRadius: '6px',
+                            border: '1px solid #CBD5E1',
+                            fontSize: '12px',
+                            background: '#FFFFFF',
+                            color: '#1E293B',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <option value={12}>12 por página</option>
+                        <option value={24}>24 por página</option>
+                        <option value={48}>48 por página</option>
+                        <option value={96}>96 por página</option>
+                    </select>
+                </div>
+            </div>
+        );
     };
 
     const activeQuickContacts = getFilteredQuickContacts();
@@ -2389,20 +2529,62 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                         gap: '5px'
                                     }}
                                 >
-                                    {selectedIds.length === filteredSubmissions.length && filteredSubmissions.length > 0 ? (
+                                    {isAllPageSelected ? (
                                         <>
-                                            <CheckSquare size={13} color="var(--primary-color)" /> Desmarcar Todos
+                                            <CheckSquare size={13} color="var(--primary-color)" /> Desmarcar Página
                                         </>
                                     ) : (
                                         <>
-                                            <Square size={13} /> Selecionar Todos
+                                            <Square size={13} /> Selecionar Página
                                         </>
                                     )}
                                 </button>
 
-                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                    Exibindo <strong>{filteredSubmissions.length}</strong> de {submissions.length}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                        Pág. <strong>{safeCurrentPage}</strong>/<strong>{totalPages}</strong> ({filteredSubmissions.length})
+                                    </span>
+                                    {totalPages > 1 && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                            <button
+                                                type="button"
+                                                disabled={safeCurrentPage === 1}
+                                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                style={{
+                                                    background: 'none',
+                                                    border: '1px solid #CBD5E1',
+                                                    borderRadius: '4px',
+                                                    padding: '2px 4px',
+                                                    cursor: safeCurrentPage === 1 ? 'not-allowed' : 'pointer',
+                                                    opacity: safeCurrentPage === 1 ? 0.4 : 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center'
+                                                }}
+                                                title="Página Anterior"
+                                            >
+                                                <ChevronLeft size={12} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={safeCurrentPage === totalPages}
+                                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                                style={{
+                                                    background: 'none',
+                                                    border: '1px solid #CBD5E1',
+                                                    borderRadius: '4px',
+                                                    padding: '2px 4px',
+                                                    cursor: safeCurrentPage === totalPages ? 'not-allowed' : 'pointer',
+                                                    opacity: safeCurrentPage === totalPages ? 0.4 : 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center'
+                                                }}
+                                                title="Próxima Página"
+                                            >
+                                                <ChevronRight size={12} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -2633,11 +2815,46 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                             boxShadow: 'var(--shadow-subtle)',
                             animation: 'fadeIn 0.2s ease-out'
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <CheckSquare size={16} color="#166534" />
-                                <span style={{ fontSize: '13px', fontWeight: 700, color: '#166534' }}>
-                                    {selectedIds.length} {selectedIds.length === 1 ? 'campanha selecionada' : 'campanhas selecionadas'}
-                                </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <CheckSquare size={16} color="#166534" />
+                                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#166534' }}>
+                                        {selectedIds.length} {selectedIds.length === 1 ? 'campanha selecionada' : 'campanhas selecionadas'}
+                                    </span>
+                                </div>
+                                {selectedIds.length < totalSubmissions && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedIds(filteredSubmissions.map(s => s.id))}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: '#15803D',
+                                            fontSize: '12px',
+                                            fontWeight: 600,
+                                            textDecoration: 'underline',
+                                            cursor: 'pointer',
+                                            padding: '0 4px'
+                                        }}
+                                    >
+                                        Selecionar todas as {totalSubmissions}
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedIds([])}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#DC2626',
+                                        fontSize: '12px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        padding: '0 4px'
+                                    }}
+                                >
+                                    Limpar seleção
+                                </button>
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -2772,7 +2989,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                             gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))',
                             gap: '14px'
                         }}>
-                            {filteredSubmissions.map(sub => {
+                            {paginatedSubmissions.map(sub => {
                                 const statusCfg = STATUS_CONFIG[sub.status] || STATUS_CONFIG['PENDENTE'];
                                 const leadsCount = sub.validCount || (sub.contacts ? sub.contacts.length : 0);
                                 const hasScheduledDate = !!sub.dispatch_date;
@@ -3358,7 +3575,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                             <th style={{ padding: '10px 14px', width: '36px' }}>
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedIds.length === filteredSubmissions.length && filteredSubmissions.length > 0}
+                                                    checked={isAllPageSelected}
                                                     onChange={toggleSelectAll}
                                                     style={{ accentColor: 'var(--primary-color)', cursor: 'pointer' }}
                                                 />
@@ -3374,7 +3591,7 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filteredSubmissions.map(sub => {
+                                        {paginatedSubmissions.map(sub => {
                                             const isChecked = selectedIds.includes(sub.id);
                                             const statusCfg = STATUS_CONFIG[sub.status] || STATUS_CONFIG['PENDENTE'];
                                             const leadsCount = sub.validCount || (sub.contacts ? sub.contacts.length : 0);
@@ -3661,6 +3878,9 @@ export const ClientUpload: React.FC<ClientUploadProps> = ({ onSendToDispatch }) 
                             </div>
                         </div>
                     )}
+
+                    {/* Barra de Paginação */}
+                    {renderPaginationBar()}
                 </div>
             )}
 
