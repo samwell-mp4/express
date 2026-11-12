@@ -13,10 +13,15 @@ import {
     InfobipActiveSender
 } from '../types';
 import { mediaStorage } from './mediaStorage';
+import { safeStorage } from './safeStorage';
 
 // Credenciais e endpoints de API mantidos estritamente no Server-Side (SECURITY-FIRST)
 export const INFOBIP_BASE = '';
 export const LUIS_BASE = '';
+
+export function getStoredAuthToken(): string | null {
+    return safeStorage.getItem('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null);
+}
 
 export const TRIAGE_WEBHOOK_URL = 'https://plug-sales-dispatch-app-n8n-2.hx8235.easypanel.host/webhook/a2d2ee02-2bdf-4f5c-a1b6-a0cd43b128ed';
 
@@ -205,8 +210,12 @@ export const api = {
             });
             const data = await res.json();
             if (data.success && data.token) {
-                localStorage.setItem('auth_token', data.token);
-                if (data.user) localStorage.setItem('auth_user', JSON.stringify(data.user));
+                try {
+                    safeStorage.setItem('auth_token', data.token);
+                    if (data.user) safeStorage.setItem('auth_user', JSON.stringify(data.user));
+                } catch (sErr) {
+                    console.warn('[Auth] Storage save fallback:', sErr);
+                }
             }
             return data;
         } catch (err: any) {
@@ -224,8 +233,12 @@ export const api = {
             });
             const data = await res.json();
             if (data.success && data.token) {
-                localStorage.setItem('auth_token', data.token);
-                if (data.user) localStorage.setItem('auth_user', JSON.stringify(data.user));
+                try {
+                    safeStorage.setItem('auth_token', data.token);
+                    if (data.user) safeStorage.setItem('auth_user', JSON.stringify(data.user));
+                } catch (sErr) {
+                    console.warn('[Auth] Storage save fallback:', sErr);
+                }
             }
             return data;
         } catch (err: any) {
@@ -236,7 +249,7 @@ export const api = {
     // Configuração do autenticador
     async setupMfa(): Promise<{ success: boolean; qrCodeDataUrl?: string; secret?: string; backupCodes?: string[]; error?: string }> {
         try {
-            const token = localStorage.getItem('auth_token');
+            const token = getStoredAuthToken();
             const res = await fetch('/api/auth/mfa/setup', {
                 method: 'POST',
                 headers: { 
@@ -253,7 +266,7 @@ export const api = {
     // Confirmar e ativar 2FA
     async confirmMfa(code: string): Promise<{ success: boolean; message?: string; error?: string }> {
         try {
-            const token = localStorage.getItem('auth_token');
+            const token = getStoredAuthToken();
             const res = await fetch('/api/auth/mfa/confirm', {
                 method: 'POST',
                 headers: { 
@@ -271,7 +284,7 @@ export const api = {
     // Desativar 2FA
     async disableMfa(password: string, code: string): Promise<{ success: boolean; message?: string; error?: string }> {
         try {
-            const token = localStorage.getItem('auth_token');
+            const token = getStoredAuthToken();
             const res = await fetch('/api/auth/mfa/disable', {
                 method: 'POST',
                 headers: { 
@@ -299,7 +312,7 @@ export const api = {
     // Validação da integridade dos registros
     async verifyAuditChain(): Promise<any> {
         try {
-            const token = localStorage.getItem('auth_token');
+            const token = getStoredAuthToken();
             const res = await fetch('/api/security/audit-chain/verify', {
                 headers: {
                     'Authorization': token ? `Bearer ${token}` : ''
@@ -314,7 +327,7 @@ export const api = {
     // Consultar histórico de ações
     async getAuditLogs(limit: number = 100): Promise<any> {
         try {
-            const token = localStorage.getItem('auth_token');
+            const token = getStoredAuthToken();
             const res = await fetch(`/api/security/audit-logs?limit=${limit}`, {
                 headers: {
                     'Authorization': token ? `Bearer ${token}` : ''
@@ -438,7 +451,7 @@ export const api = {
 
     // 5. Enqueue messages into Redis queue (Credenciais aplicadas com segurança no server-side)
     async enqueueMessages(messages: InfobipQueueMessage[]): Promise<{ success: boolean; count: number; error?: string }> {
-        const token = localStorage.getItem('auth_token');
+        const token = getStoredAuthToken();
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -766,7 +779,7 @@ export const api = {
             clean = 'https://' + clean;
         }
 
-        const token = localStorage.getItem('auth_token');
+        const token = getStoredAuthToken();
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
@@ -796,7 +809,7 @@ export const api = {
 
     // 10. Upload media (images, videos, documents) with safe permanent storage
     async uploadMedia(file: File): Promise<{ success: boolean; url: string; originalName: string; size: number; id?: string }> {
-        const token = localStorage.getItem('auth_token');
+        const token = getStoredAuthToken();
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;

@@ -90,47 +90,77 @@ function pruneLocalStorageToFreeQuota(): boolean {
     if (typeof localStorage === 'undefined') return false;
     let freedSomething = false;
 
+    // Chaves vitais de autenticação que NUNCA devem ser excluídas
+    const PROTECTED_KEYS = new Set([
+        'auth_token',
+        'auth_user',
+        'pns_user',
+        'fast_dispatch_session_revoked_2026_11_12_v1'
+    ]);
+
     try {
-        // 1. Limpa ou reduz drasticamente o histórico temporário de disparos (express_live_dispatch_records)
+        // 1. Limpa histórico temporário pesado de disparos (salva no IndexedDB antes)
         const dispatchRaw = localStorage.getItem('express_live_dispatch_records');
         if (dispatchRaw) {
-            try {
-                const parsed = JSON.parse(dispatchRaw);
-                if (Array.isArray(parsed) && parsed.length > 50) {
-                    // Salva cópia completa no IndexedDB antes de podar o localStorage
-                    idbSet('express_live_dispatch_records', dispatchRaw);
-                    // Deixa só 50 mais recentes no localStorage
-                    localStorage.setItem('express_live_dispatch_records', JSON.stringify(parsed.slice(0, 50)));
-                    freedSomething = true;
-                    console.log('[SafeStorage] Reduzido express_live_dispatch_records de', parsed.length, 'para 50 itens.');
-                } else if (parsed.length > 0) {
-                    idbSet('express_live_dispatch_records', dispatchRaw);
-                    localStorage.removeItem('express_live_dispatch_records');
-                    freedSomething = true;
-                }
-            } catch {
-                localStorage.removeItem('express_live_dispatch_records');
-                freedSomething = true;
-            }
+            idbSet('express_live_dispatch_records', dispatchRaw);
+            localStorage.removeItem('express_live_dispatch_records');
+            freedSomething = true;
+            console.log('[SafeStorage] Migrado express_live_dispatch_records para IndexedDB.');
         }
 
-        // 2. Se ainda precisar, migra e limpa submissões com contatos pesados
+        // 2. Submissões com planilhas de contatos gigantes (salva tudo no IndexedDB)
         const submissionsRaw = localStorage.getItem('plugesales_client_submissions_v1');
-        if (submissionsRaw && submissionsRaw.length > 1000000) {
+        if (submissionsRaw) {
             idbSet('plugesales_client_submissions_v1', submissionsRaw);
             try {
                 const subs = JSON.parse(submissionsRaw);
                 if (Array.isArray(subs)) {
-                    // Remove array de contatos gigantes para economizar MBs no localStorage
-                    const slim = subs.map((s: any) => ({
-                        ...s,
-                        contacts: (s.contacts && s.contacts.length > 20) ? s.contacts.slice(0, 20) : s.contacts
-                    }));
+                    // Mantém versão slim no localStorage sem os arrays brutos de contatos
+                    const slim = subs.slice(0, 15).map((s: any) => {
+                        const { contacts, ...rest } = s;
+                        return { ...rest, validCount: s.validCount || (contacts ? contacts.length : 0) };
+                    });
                     localStorage.setItem('plugesales_client_submissions_v1', JSON.stringify(slim));
-                    freedSomething = true;
-                    console.log('[SafeStorage] Reduzido tamanho de plugesales_client_submissions_v1.');
+                } else {
+                    localStorage.removeItem('plugesales_client_submissions_v1');
                 }
-            } catch {}
+            } catch {
+                localStorage.removeItem('plugesales_client_submissions_v1');
+            }
+            freedSomething = true;
+            console.log('[SafeStorage] Migrado plugesales_client_submissions_v1 para IndexedDB.');
+        }
+
+        // 3. Mídias em base64 (salva no IndexedDB e remove do localStorage)
+        const mediaRaw = localStorage.getItem('plugesales_media_items_v1');
+        if (mediaRaw) {
+            idbSet('plugesales_media_items_v1', mediaRaw);
+            localStorage.removeItem('plugesales_media_items_v1');
+            freedSomething = true;
+            console.log('[SafeStorage] Migrado plugesales_media_items_v1 para IndexedDB.');
+        }
+
+        // 4. Analisa todas as chaves restantes no localStorage e remove as mais pesadas não essenciais
+        const nonProtectedEntries: Array<{ key: string; size: number }> = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && !PROTECTED_KEYS.has(k)) {
+                const val = localStorage.getItem(k) || '';
+                nonProtectedEntries.push({ key: k, size: val.length });
+            }
+        }
+
+        nonProtectedEntries.sort((a, b) => b.size - a.size);
+        for (const entry of nonProtectedEntries) {
+            if (entry.size > 20000) { // maiores que ~20KB
+                const val = localStorage.getItem(entry.key);
+                if (val) {
+                    idbSet(entry.key, val);
+                    localStorage.removeItem(entry.key);
+                    freedSomething = true;
+                    console.log(`[SafeStorage] Chave pesada '${entry.key}' (${Math.round(entry.size / 1024)} KB) migrada para IndexedDB.`);
+                }
+            }
         }
     } catch (e) {
         console.warn('[SafeStorage] Erro ao tentar podar localStorage:', e);
@@ -143,7 +173,7 @@ function pruneLocalStorageToFreeQuota(): boolean {
 export function initSafeStorage() {
     if (typeof window === 'undefined') return;
 
-    // Checagem proativa no boot da página: se o localStorage já estiver quase no limite (> 3MB), faz a poda agora
+    // Checagem proativa no boot da página: se o localStorage tiver > 1.5MB, faz poda preventiva
     try {
         let totalBytes = 0;
         for (let i = 0; i < localStorage.length; i++) {
@@ -153,9 +183,8 @@ export function initSafeStorage() {
                 totalBytes += k.length + v.length;
             }
         }
-        // Se ultrapassar 2.5MB (~2.5 milhões de caracteres UTF-16)
-        if (totalBytes > 2500000) {
-            console.log('[SafeStorage] Total em localStorage alto (' + Math.round(totalBytes / 1024) + ' KB). Executando auto-prune proativo...');
+        if (totalBytes > 1500000) {
+            console.log('[SafeStorage] Total em localStorage alto (' + Math.round(totalBytes / 1024) + ' KB). Executando poda proativa...');
             pruneLocalStorageToFreeQuota();
         }
     } catch {}
@@ -202,6 +231,15 @@ export const safeStorage = {
                 }
             } catch {}
         }
+        if (typeof sessionStorage !== 'undefined') {
+            try {
+                const sessionVal = sessionStorage.getItem(key);
+                if (sessionVal !== null) {
+                    memoryCache.set(key, sessionVal);
+                    return sessionVal;
+                }
+            } catch {}
+        }
         return null;
     },
 
@@ -226,7 +264,14 @@ export const safeStorage = {
         // 2. Sempre persiste em IndexedDB (onde NÃO há o limite de 5MB)
         idbSet(key, value);
 
-        // 3. Tenta salvar no localStorage com recuperação de cota
+        // 3. Persiste em sessionStorage como camada redundante
+        if (typeof sessionStorage !== 'undefined') {
+            try {
+                sessionStorage.setItem(key, value);
+            } catch {}
+        }
+
+        // 4. Tenta salvar no localStorage com recuperação automática de cota
         if (typeof localStorage !== 'undefined') {
             try {
                 localStorage.setItem(key, value);
@@ -253,8 +298,8 @@ export const safeStorage = {
                         console.log(`[SafeStorage] Chave '${key}' salva com sucesso no localStorage após liberação de espaço.`);
                     } catch (retryErr) {
                         // Se o próprio valor for maior que a cota total do localStorage, não tem problema:
-                        // O dado JÁ está 100% gravado no IndexedDB e na memória!
-                        console.warn(`[SafeStorage] Chave '${key}' mantida com sucesso no IndexedDB e Memória (tamanho excede localStorage total).`);
+                        // O dado JÁ está 100% gravado no IndexedDB, sessionStorage e na memória!
+                        console.warn(`[SafeStorage] Chave '${key}' mantida com sucesso no IndexedDB, sessionStorage e Memória.`);
                     }
                 } else {
                     console.warn(`[SafeStorage] Erro ao gravar chave '${key}' no localStorage:`, err);

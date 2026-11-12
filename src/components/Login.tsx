@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
+import { safeStorage } from '../services/safeStorage';
 import { Lock, Mail, ShieldAlert, ArrowRight, Zap, KeyRound, ArrowLeft } from 'lucide-react';
 
 interface LoginProps {
@@ -23,6 +24,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         setIsLoading(true);
 
         try {
+            // Garante espaço livre no navegador antes de tentar autenticar
+            safeStorage.forceFreeQuota();
+
             const res = await api.login(email, password);
             if (res.success) {
                 if (res.requireMfa && res.mfaToken) {
@@ -52,6 +56,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
         setIsLoading(true);
         try {
+            // Garante espaço livre no navegador antes de validar segundo fator
+            safeStorage.forceFreeQuota();
+
             const res = await api.verifyMfa(mfaToken, mfaCode.trim());
             if (res.success && res.token) {
                 onLoginSuccess(res.token, res.user);

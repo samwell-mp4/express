@@ -1681,7 +1681,8 @@ const server = http.createServer(async (req, res) => {
   // 2. ENDPOINTS DE AUTENTICAÇÃO (JWT & BCRYPT)
   // -------------------------------------------------------------
   if (pathname === '/api/auth/login' && req.method === 'POST') {
-    if (!checkRateLimit(clientIp, 15, 60000)) {
+    // Permite alta concorrência para equipes grandes compartilhando o mesmo IP (120 req/min)
+    if (!checkRateLimit(clientIp, 120, 60000)) {
       return sendError('Muitas tentativas de login. Aguarde 1 minuto.', 429);
     }
 
@@ -1757,7 +1758,8 @@ const server = http.createServer(async (req, res) => {
   // -------------------------------------------------------------
   // Validação do código MFA durante o Login
   if (pathname === '/api/auth/mfa/verify' && req.method === 'POST') {
-    if (!checkRateLimit(clientIp, 10, 60000)) {
+    // Permite alta concorrência para equipes grandes compartilhando o mesmo IP (120 req/min)
+    if (!checkRateLimit(clientIp, 120, 60000)) {
       return sendError('Muitas tentativas de validação MFA. Aguarde 1 minuto.', 429);
     }
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Zap, Smartphone, Activity, Layers, UploadCloud, PlusCircle, FileSpreadsheet, Image as ImageIcon, Link as LinkIcon, User, LogOut, UserPlus, Send, Settings } from 'lucide-react';
 import { RedisQueueStatus, AppTab } from '../types';
+import { safeStorage } from '../services/safeStorage';
 
 interface SidebarProps {
     activeTab: AppTab;
@@ -27,7 +28,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // Current user profile state
     const [user] = useState<{ name: string; email: string }>(() => {
         try {
-            const raw = localStorage.getItem('auth_user') || localStorage.getItem('pns_user');
+            const raw = safeStorage.getItem('auth_user') || (typeof localStorage !== 'undefined' ? (localStorage.getItem('auth_user') || localStorage.getItem('pns_user')) : null);
             if (raw) {
                 const parsed = JSON.parse(raw);
                 return {
@@ -44,9 +45,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const handleLogout = () => {
         if (!window.confirm('Deseja realmente sair da sua conta?')) return;
-        localStorage.removeItem('auth_user');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('pns_user');
+        safeStorage.removeItem('auth_user');
+        safeStorage.removeItem('auth_token');
+        safeStorage.removeItem('pns_user');
+        try {
+            localStorage.removeItem('auth_user');
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('pns_user');
+        } catch {}
         if (window.location.pathname.startsWith('/')) {
             window.location.href = '/login';
         } else {

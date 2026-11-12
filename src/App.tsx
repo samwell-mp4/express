@@ -29,12 +29,17 @@ import { SecurityComplianceModal } from './components/SecurityComplianceModal';
 // Invalidação global forçada de todas as sessões anteriores (Logout geral)
 const SESSION_REVOCATION_KEY = 'fast_dispatch_session_revoked_2026_11_12_v1';
 if (typeof window !== 'undefined') {
-    if (!localStorage.getItem(SESSION_REVOCATION_KEY)) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
-        localStorage.removeItem('pns_user');
-        localStorage.setItem(SESSION_REVOCATION_KEY, 'true');
-    }
+    try {
+        if (!localStorage.getItem(SESSION_REVOCATION_KEY)) {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+            localStorage.removeItem('pns_user');
+            safeStorage.removeItem('auth_token');
+            safeStorage.removeItem('auth_user');
+            safeStorage.removeItem('pns_user');
+            localStorage.setItem(SESSION_REVOCATION_KEY, 'true');
+        }
+    } catch {}
 }
 
 const isLocalhost = typeof window !== 'undefined' && (
@@ -46,7 +51,7 @@ const isLocalhost = typeof window !== 'undefined' && (
 export const App: React.FC = () => {
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
         if (isLocalhost) return true;
-        return !!localStorage.getItem('auth_token');
+        return !!(safeStorage.getItem('auth_token') || (typeof localStorage !== 'undefined' && localStorage.getItem('auth_token')));
     });
 
     useEffect(() => {
