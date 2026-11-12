@@ -229,8 +229,8 @@ const REDIS_URL = process.env.REDIS_URL || `redis://:${encodeURIComponent(REDIS_
 const DEFAULT_PG_URL = 'postgres://fast_plug:Samuca82465!@plug_sales_dispatch_app_fast_plug_postgress:5432/fast_plug?sslmode=disable';
 const DATABASE_URL = process.env.DATABASE_URL || DEFAULT_PG_URL;
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'fastplug_security_jwt_master_2026_x89q';
+// JWT Secret com invalidação forçada de todas as sessões anteriores (Force Global Logout)
+const JWT_SECRET = process.env.JWT_SECRET || 'fastplug_jwt_master_revoked_sessions_2026_k98z';
 
 // Rate Limiter em memória para prevenção de ataques de força bruta
 const rateLimitMap = new Map();

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
-import { Lock, Mail, ShieldAlert, ArrowRight, Zap, KeyRound, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, ShieldAlert, ArrowRight, Zap, KeyRound, ArrowLeft } from 'lucide-react';
 
 interface LoginProps {
     onLoginSuccess: (token: string, user: any) => void;
@@ -12,7 +12,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    // Estado do fluxo MFA (Padrão 8.2)
+    // Estado do fluxo de verificação em duas etapas
     const [step, setStep] = useState<'credentials' | 'mfa'>('credentials');
     const [mfaToken, setMfaToken] = useState('');
     const [mfaCode, setMfaCode] = useState('');
@@ -26,7 +26,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             const res = await api.login(email, password);
             if (res.success) {
                 if (res.requireMfa && res.mfaToken) {
-                    // Padrão 8.2: Desafio MFA exigido
                     setMfaToken(res.mfaToken);
                     setStep('mfa');
                     setMfaCode('');
@@ -57,10 +56,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             if (res.success && res.token) {
                 onLoginSuccess(res.token, res.user);
             } else {
-                setError(res.error || 'Código autenticador incorreto ou expirado.');
+                setError(res.error || 'Código incorreto ou expirado.');
             }
         } catch (err: any) {
-            setError(err.message || 'Falha na validação do segundo fator.');
+            setError(err.message || 'Falha na validação do código.');
         } finally {
             setIsLoading(false);
         }
@@ -106,8 +105,8 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     </div>
                     <p style={{ color: '#94a3b8', margin: 0, fontSize: '15px', fontWeight: 500 }}>
                         {step === 'credentials' 
-                            ? 'Acesso Restrito ao Sistema Administrativo'
-                            : 'Autenticação Multifator (Padrão 8.2 MFA)'}
+                            ? 'Acesso Restrito ao Painel'
+                            : 'Verificação em Duas Etapas'}
                     </p>
                 </div>
 
@@ -126,7 +125,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <form onSubmit={handleSubmitCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
                         <div>
                             <label style={{ display: 'block', color: '#cbd5e1', fontSize: '13px', marginBottom: '8px', fontWeight: 600, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-                                Login (Admin)
+                                Usuário
                             </label>
                             <div style={{ position: 'relative' }}>
                                 <div style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', display: 'flex' }}>
@@ -136,7 +135,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                                     type="text"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="Insira seu login"
+                                    placeholder="Insira seu identificador"
                                     required
                                     style={{
                                         width: '100%', padding: '14px 16px 14px 44px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -185,7 +184,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                                 boxShadow: '0 4px 14px 0 rgba(172, 248, 0, 0.39)'
                             }}
                         >
-                            {isLoading ? 'Verificando credenciais...' : (
+                            {isLoading ? 'Verificando...' : (
                                 <>Avançar <ArrowRight size={18} strokeWidth={2.5} /></>
                             )}
                         </button>
@@ -205,13 +204,13 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                                 <KeyRound size={20} />
                             </div>
                             <div style={{ color: '#cbd5e1', fontSize: '13px', lineHeight: '1.4' }}>
-                                Digite o código de <strong>6 dígitos</strong> do seu aplicativo autenticador (Google Authenticator ou Microsoft Authenticator).
+                                Digite o código de <strong>6 dígitos</strong> do seu aplicativo autenticador.
                             </div>
                         </div>
 
                         <div>
                             <label style={{ display: 'block', color: '#cbd5e1', fontSize: '13px', marginBottom: '8px', fontWeight: 600, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-                                Código Autenticador (TOTP)
+                                Código de Verificação
                             </label>
                             <input
                                 type="text"
@@ -242,8 +241,8 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                                 boxShadow: '0 4px 14px 0 rgba(172, 248, 0, 0.39)'
                             }}
                         >
-                            {isLoading ? 'Validando 2º fator...' : (
-                                <>Validar & Entrar <ShieldCheck size={18} strokeWidth={2.5} /></>
+                            {isLoading ? 'Validando...' : (
+                                <>Entrar <ArrowRight size={18} strokeWidth={2.5} /></>
                             )}
                         </button>
 
@@ -267,12 +266,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         </button>
                     </form>
                 )}
-
-                <div style={{ marginTop: '28px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontSize: '12px', fontWeight: 600, background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '100px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                        <ShieldAlert size={14} /> Padrão 8.2: TLS 1.3 • AES-256 • MFA • Logs Imutáveis
-                    </div>
-                </div>
             </div>
         </div>
     );

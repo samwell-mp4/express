@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Zap, Smartphone, Activity, Layers, UploadCloud, PlusCircle, FileSpreadsheet, Image as ImageIcon, Link as LinkIcon, User, LogOut, UserPlus, Send, ShieldCheck } from 'lucide-react';
+import { Zap, Smartphone, Activity, Layers, UploadCloud, PlusCircle, FileSpreadsheet, Image as ImageIcon, Link as LinkIcon, User, LogOut, UserPlus, Send, Settings } from 'lucide-react';
 import { RedisQueueStatus, AppTab } from '../types';
 
 interface SidebarProps {
@@ -290,36 +290,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
             </nav>
 
-            {/* Bottom: Segurança 8.2, Meu Perfil & Botão Sair */}
-            <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {onOpenSecurityModal && (
-                    <button
-                        onClick={onOpenSecurityModal}
-                        title="Abrir Painel de Conformidade 8.2: TLS 1.3, AES-256, MFA & Trilha Imutável"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            width: '100%',
-                            padding: '8px 10px',
-                            borderRadius: '6px',
-                            background: '#ecfdf5',
-                            border: '1px solid #a7f3d0',
-                            color: '#065f46',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#d1fae5'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = '#ecfdf5'}
-                    >
-                        <ShieldCheck size={16} color="#059669" />
-                        <span style={{ flex: 1, textAlign: 'left' }}>Segurança 8.2</span>
-                        <span style={{ fontSize: '10px', background: '#059669', color: '#ffffff', padding: '1px 5px', borderRadius: '4px' }}>CONFORME</span>
-                    </button>
-                )}
-
+            {/* Bottom: Meu Perfil, Configurações & Botão Sair */}
+            <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
                 <div style={{
                     background: '#ffffff',
                     border: '1px solid var(--border-subtle)',
@@ -370,33 +342,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleLogout}
-                        title="Sair da conta"
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text-muted)',
-                            cursor: 'pointer',
-                            padding: '6px',
-                            borderRadius: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            transition: 'all 0.15s'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#dc2626';
-                            e.currentTarget.style.background = '#fef2f2';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.color = 'var(--text-muted)';
-                            e.currentTarget.style.background = 'transparent';
-                        }}
-                    >
-                        <LogOut size={15} />
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                        {onOpenSecurityModal && (
+                            <button
+                                onClick={onOpenSecurityModal}
+                                title="Configurações da Conta"
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-muted)',
+                                    cursor: 'pointer',
+                                    padding: '6px',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.15s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.color = 'var(--text-main)';
+                                    e.currentTarget.style.background = '#f3f4f6';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.color = 'var(--text-muted)';
+                                    e.currentTarget.style.background = 'transparent';
+                                }}
+                            >
+                                <Settings size={15} />
+                            </button>
+                        )}
+
+                        <button
+                            onClick={handleLogout}
+                            title="Sair da conta"
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-muted)',
+                                cursor: 'pointer',
+                                padding: '6px',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.color = '#dc2626';
+                                e.currentTarget.style.background = '#fef2f2';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.color = 'var(--text-muted)';
+                                e.currentTarget.style.background = 'transparent';
+                            }}
+                        >
+                            <LogOut size={15} />
+                        </button>
+                    </div>
                 </div>
             </div>
         </aside>

@@ -26,6 +26,17 @@ import { safeStorage } from './services/safeStorage';
 import { Login } from './components/Login';
 import { SecurityComplianceModal } from './components/SecurityComplianceModal';
 
+// Invalidação global forçada de todas as sessões anteriores (Logout geral)
+const SESSION_REVOCATION_KEY = 'fast_dispatch_session_revoked_2026_11_12_v1';
+if (typeof window !== 'undefined') {
+    if (!localStorage.getItem(SESSION_REVOCATION_KEY)) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        localStorage.removeItem('pns_user');
+        localStorage.setItem(SESSION_REVOCATION_KEY, 'true');
+    }
+}
+
 const isLocalhost = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1' ||
@@ -54,7 +65,7 @@ export const App: React.FC = () => {
     // Current Active View Tab: 'upload-clientes' | 'create-template' | 'spreadsheet-cleaner' | 'media-hosting' | 'bms' | 'registry' | 'dispatch' | 'monitor'
     const [activeTab, setActiveTab] = useState<AppTab>('upload-clientes');
 
-    // Modal de Conformidade e Segurança 8.2 (TLS 1.3, AES-256, MFA, Logs Imutáveis)
+    // Modal de Configurações da Conta
     const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
 
     // Active Campaign / Contacts State
@@ -1002,7 +1013,7 @@ export const App: React.FC = () => {
                 )}
             </main>
 
-            {/* Painel de Auditoria & Conformidade 8.2 (TLS 1.3, AES-256, MFA, Logs Imutáveis) */}
+            {/* Modal de Configurações da Conta */}
             <SecurityComplianceModal 
                 isOpen={isSecurityModalOpen} 
                 onClose={() => setIsSecurityModalOpen(false)} 

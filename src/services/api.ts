@@ -195,7 +195,7 @@ export function parseInfobipErrorDiagnostic(payload: any, fallbackMessage = 'Err
 }
 
 export const api = {
-    // Autenticação (Login Admin com suporte ao Padrão 8.2 MFA)
+    // Autenticação (Login com suporte a 2FA)
     async login(email: string, password: string): Promise<{ success: boolean; token?: string; user?: any; error?: string; requireMfa?: boolean; mfaToken?: string }> {
         try {
             const res = await fetch('/api/auth/login', {
@@ -214,7 +214,7 @@ export const api = {
         }
     },
 
-    // Padrão 8.2: Verificação do código MFA no Login
+    // Verificação do segundo fator no Login
     async verifyMfa(mfaToken: string, code: string): Promise<{ success: boolean; token?: string; user?: any; error?: string }> {
         try {
             const res = await fetch('/api/auth/mfa/verify', {
@@ -233,7 +233,7 @@ export const api = {
         }
     },
 
-    // Padrão 8.2: Iniciar configuração do MFA para o usuário logado
+    // Configuração do autenticador
     async setupMfa(): Promise<{ success: boolean; qrCodeDataUrl?: string; secret?: string; backupCodes?: string[]; error?: string }> {
         try {
             const token = localStorage.getItem('auth_token');
@@ -250,7 +250,7 @@ export const api = {
         }
     },
 
-    // Padrão 8.2: Confirmar código e ativar MFA
+    // Confirmar e ativar 2FA
     async confirmMfa(code: string): Promise<{ success: boolean; message?: string; error?: string }> {
         try {
             const token = localStorage.getItem('auth_token');
@@ -268,7 +268,7 @@ export const api = {
         }
     },
 
-    // Padrão 8.2: Desativar MFA
+    // Desativar 2FA
     async disableMfa(password: string, code: string): Promise<{ success: boolean; message?: string; error?: string }> {
         try {
             const token = localStorage.getItem('auth_token');
@@ -286,7 +286,7 @@ export const api = {
         }
     },
 
-    // Padrão 8.2: Obter Declaração e Status de Conformidade
+    // Obter dados de conformidade
     async getSecurityCompliance(): Promise<any> {
         try {
             const res = await fetch('/api/security/compliance');
@@ -296,7 +296,7 @@ export const api = {
         }
     },
 
-    // Padrão 8.2: Validação Criptográfica da Trilha de Auditoria Imutável
+    // Validação da integridade dos registros
     async verifyAuditChain(): Promise<any> {
         try {
             const token = localStorage.getItem('auth_token');
@@ -311,7 +311,7 @@ export const api = {
         }
     },
 
-    // Padrão 8.2: Consultar logs de auditoria
+    // Consultar histórico de ações
     async getAuditLogs(limit: number = 100): Promise<any> {
         try {
             const token = localStorage.getItem('auth_token');

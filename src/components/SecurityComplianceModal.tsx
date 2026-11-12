@@ -1,18 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { 
-    Shield, 
-    ShieldCheck, 
-    Lock, 
+    Settings, 
     Smartphone, 
     FileText, 
-    CheckCircle2, 
-    AlertTriangle, 
     RefreshCw, 
     Copy, 
     X, 
     Check, 
-    Key, 
     Activity
 } from 'lucide-react';
 
@@ -22,9 +17,8 @@ interface SecurityComplianceModalProps {
 }
 
 export const SecurityComplianceModal: React.FC<SecurityComplianceModalProps> = ({ isOpen, onClose }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'mfa' | 'audit' | 'declaration'>('overview');
+    const [activeTab, setActiveTab] = useState<'mfa' | 'audit' | 'declaration'>('mfa');
     const [isLoading, setIsLoading] = useState(false);
-    const [complianceData, setComplianceData] = useState<any>(null);
     const [auditChainResult, setAuditChainResult] = useState<any>(null);
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
@@ -34,20 +28,6 @@ export const SecurityComplianceModal: React.FC<SecurityComplianceModalProps> = (
     const [mfaStatusMsg, setMfaStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [copiedSecret, setCopiedSecret] = useState(false);
     const [copiedDeclaration, setCopiedDeclaration] = useState(false);
-
-    const loadComplianceData = async () => {
-        setIsLoading(true);
-        try {
-            const data = await api.getSecurityCompliance();
-            if (data.success) {
-                setComplianceData(data);
-            }
-        } catch (err: any) {
-            console.error('Erro ao carregar dados de conformidade:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     const handleRunAuditVerification = async () => {
         setIsLoading(true);
@@ -59,7 +39,7 @@ export const SecurityComplianceModal: React.FC<SecurityComplianceModalProps> = (
                 setAuditLogs(logsData.logs || []);
             }
         } catch (err: any) {
-            console.error('Erro ao verificar integridade da cadeia:', err);
+            console.error('Erro ao verificar logs:', err);
         } finally {
             setIsLoading(false);
         }
@@ -73,7 +53,7 @@ export const SecurityComplianceModal: React.FC<SecurityComplianceModalProps> = (
             if (res.success) {
                 setMfaSetupData(res);
             } else {
-                setMfaStatusMsg({ type: 'error', text: res.error || 'Falha ao iniciar setup do MFA.' });
+                setMfaStatusMsg({ type: 'error', text: res.error || 'Falha ao iniciar verificação.' });
             }
         } catch (err: any) {
             setMfaStatusMsg({ type: 'error', text: err.message || 'Erro inesperado.' });
@@ -94,15 +74,14 @@ export const SecurityComplianceModal: React.FC<SecurityComplianceModalProps> = (
         try {
             const res = await api.confirmMfa(mfaConfirmCode);
             if (res.success) {
-                setMfaStatusMsg({ type: 'success', text: 'MFA ativado com sucesso! Seu acesso administrativo agora está protegido.' });
+                setMfaStatusMsg({ type: 'success', text: 'Verificação em duas etapas ativada com sucesso!' });
                 setMfaSetupData(null);
                 setMfaConfirmCode('');
-                loadComplianceData();
             } else {
-                setMfaStatusMsg({ type: 'error', text: res.error || 'Código inválido. Tente novamente.' });
+                setMfaStatusMsg({ type: 'error', text: res.error || 'Código incorreto. Tente novamente.' });
             }
         } catch (err: any) {
-            setMfaStatusMsg({ type: 'error', text: err.message || 'Falha ao confirmar MFA.' });
+            setMfaStatusMsg({ type: 'error', text: err.message || 'Falha na confirmação.' });
         } finally {
             setIsLoading(false);
         }
@@ -110,7 +89,6 @@ export const SecurityComplianceModal: React.FC<SecurityComplianceModalProps> = (
 
     useEffect(() => {
         if (isOpen) {
-            loadComplianceData();
             handleRunAuditVerification();
         }
     }, [isOpen]);
@@ -178,8 +156,8 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '20px',
                 width: '100%',
-                maxWidth: '960px',
-                maxHeight: '90vh',
+                maxWidth: '820px',
+                maxHeight: '88vh',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
@@ -187,29 +165,29 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
             }}>
                 {/* Header */}
                 <div style={{
-                    padding: '20px 28px',
+                    padding: '20px 24px',
                     borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     background: 'rgba(15, 23, 42, 0.6)'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
-                            background: 'linear-gradient(135deg, #acf800, #10b981)',
+                            background: 'rgba(255, 255, 255, 0.08)',
                             padding: '10px',
-                            borderRadius: '12px',
+                            borderRadius: '10px',
                             display: 'flex',
-                            color: '#020617'
+                            color: '#f8fafc'
                         }}>
-                            <Shield size={24} strokeWidth={2.5} />
+                            <Settings size={20} />
                         </div>
                         <div>
-                            <h2 style={{ color: '#ffffff', fontSize: '20px', margin: 0, fontWeight: 700 }}>
-                                Padrão 8.2: Segurança Mínima & Governança
+                            <h2 style={{ color: '#ffffff', fontSize: '18px', margin: 0, fontWeight: 700 }}>
+                                Configurações da Conta
                             </h2>
                             <p style={{ color: '#94a3b8', margin: '2px 0 0 0', fontSize: '13px' }}>
-                                TLS 1.3 • AES-256 • MFA Administrativo • Logs Auditáveis Imutáveis
+                                Acesso, verificação em duas etapas e histórico
                             </p>
                         </div>
                     </div>
@@ -218,14 +196,14 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                         style={{
                             background: 'rgba(255, 255, 255, 0.05)',
                             border: '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: '10px',
+                            borderRadius: '8px',
                             padding: '8px',
                             color: '#94a3b8',
                             cursor: 'pointer',
                             display: 'flex'
                         }}
                     >
-                        <X size={20} />
+                        <X size={18} />
                     </button>
                 </div>
 
@@ -233,15 +211,14 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                 <div style={{
                     display: 'flex',
                     borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                    padding: '0 28px',
+                    padding: '0 24px',
                     background: 'rgba(15, 23, 42, 0.4)',
                     gap: '8px'
                 }}>
                     {[
-                        { id: 'overview', label: 'Visão Geral dos 4 Pilares', icon: ShieldCheck },
-                        { id: 'mfa', label: 'Configuração MFA (TOTP)', icon: Smartphone },
-                        { id: 'audit', label: 'Trilha de Auditoria (Hash Chain)', icon: Activity },
-                        { id: 'declaration', label: 'Declaração Formal 8.2', icon: FileText }
+                        { id: 'mfa', label: 'Verificação em Duas Etapas', icon: Smartphone },
+                        { id: 'audit', label: 'Registro de Acessos', icon: Activity },
+                        { id: 'declaration', label: 'Dossiê Técnico', icon: FileText }
                     ].map(tab => {
                         const Icon = tab.icon;
                         const isCurrent = activeTab === tab.id;
@@ -255,7 +232,7 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                     borderBottom: isCurrent ? '2px solid #acf800' : '2px solid transparent',
                                     color: isCurrent ? '#acf800' : '#94a3b8',
                                     padding: '14px 16px',
-                                    fontSize: '14px',
+                                    fontSize: '13px',
                                     fontWeight: isCurrent ? 600 : 500,
                                     cursor: 'pointer',
                                     display: 'flex',
@@ -264,7 +241,7 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                     transition: 'all 0.2s ease'
                                 }}
                             >
-                                <Icon size={16} />
+                                <Icon size={15} />
                                 {tab.label}
                             </button>
                         );
@@ -272,196 +249,19 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                 </div>
 
                 {/* Body Content */}
-                <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1 }}>
-                    {/* TAB 1: VISÃO GERAL */}
-                    {activeTab === 'overview' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div style={{
-                                background: 'rgba(172, 248, 0, 0.05)',
-                                border: '1px solid rgba(172, 248, 0, 0.2)',
-                                borderRadius: '14px',
-                                padding: '16px 20px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <CheckCircle2 color="#acf800" size={24} />
-                                    <div>
-                                        <div style={{ color: '#ffffff', fontWeight: 700, fontSize: '15px' }}>
-                                            Status Global de Conformidade: 100% CONFORME
-                                        </div>
-                                        <div style={{ color: '#94a3b8', fontSize: '13px' }}>
-                                            Todos os 4 requisitos técnicos da cláusula 8.2 estão ativos e operando no backend.
-                                        </div>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={loadComplianceData}
-                                    style={{
-                                        background: 'rgba(172, 248, 0, 0.1)',
-                                        border: '1px solid rgba(172, 248, 0, 0.3)',
-                                        color: '#acf800',
-                                        borderRadius: '8px',
-                                        padding: '8px 14px',
-                                        fontSize: '13px',
-                                        fontWeight: 600,
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px'
-                                    }}
-                                >
-                                    <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-                                    Atualizar Checagens
-                                </button>
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                                {/* Pilar 1: TLS 1.3 */}
-                                <div style={{
-                                    background: 'rgba(30, 41, 59, 0.4)',
-                                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                                    borderRadius: '16px',
-                                    padding: '20px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '12px'
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '8px', borderRadius: '10px', color: '#10b981' }}>
-                                                <Lock size={20} />
-                                            </div>
-                                            <h3 style={{ color: '#f8fafc', fontSize: '16px', margin: 0, fontWeight: 700 }}>
-                                                1. TLS 1.3 (Trânsito)
-                                            </h3>
-                                        </div>
-                                        <span style={{ background: '#10b98122', color: '#10b981', fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px' }}>
-                                            ATIVO
-                                        </span>
-                                    </div>
-                                    <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0, lineHeight: '1.5' }}>
-                                        Comunicação HTTPS com terminação TLS 1.3 obrigatória. Cabeçalho HSTS ativo (2 anos + includeSubDomains + preload).
-                                    </p>
-                                    <div style={{ fontSize: '12px', color: '#cbd5e1', background: 'rgba(15, 23, 42, 0.6)', padding: '10px 12px', borderRadius: '8px' }}>
-                                        <strong>Padrão:</strong> RFC 8446 / NIST SP 800-52r2<br />
-                                        <strong>HSTS:</strong> max-age=63072000
-                                    </div>
-                                </div>
-
-                                {/* Pilar 2: AES-256 */}
-                                <div style={{
-                                    background: 'rgba(30, 41, 59, 0.4)',
-                                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                                    borderRadius: '16px',
-                                    padding: '20px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '12px'
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <div style={{ background: 'rgba(172, 248, 0, 0.1)', padding: '8px', borderRadius: '10px', color: '#acf800' }}>
-                                                <Key size={20} />
-                                            </div>
-                                            <h3 style={{ color: '#f8fafc', fontSize: '16px', margin: 0, fontWeight: 700 }}>
-                                                2. AES-256 (Repouso)
-                                            </h3>
-                                        </div>
-                                        <span style={{ background: '#acf80022', color: '#acf800', fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px' }}>
-                                            OPERACIONAL
-                                        </span>
-                                    </div>
-                                    <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0, lineHeight: '1.5' }}>
-                                        Criptografia de armazenamento e campos sensíveis em repouso com algoritmo simétrico AES-256-GCM com chave de 256 bits.
-                                    </p>
-                                    <div style={{ fontSize: '12px', color: '#cbd5e1', background: 'rgba(15, 23, 42, 0.6)', padding: '10px 12px', borderRadius: '8px' }}>
-                                        <strong>Algoritmo:</strong> AES-256-GCM (AEAD)<br />
-                                        <strong>Self-Test:</strong> {complianceData?.liveChecks?.aes256?.selfTestPassed ? 'Aprovado (100% Íntegro)' : 'OK'}
-                                    </div>
-                                </div>
-
-                                {/* Pilar 3: MFA */}
-                                <div style={{
-                                    background: 'rgba(30, 41, 59, 0.4)',
-                                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                                    borderRadius: '16px',
-                                    padding: '20px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '12px'
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '8px', borderRadius: '10px', color: '#38bdf8' }}>
-                                                <Smartphone size={20} />
-                                            </div>
-                                            <h3 style={{ color: '#f8fafc', fontSize: '16px', margin: 0, fontWeight: 700 }}>
-                                                3. MFA Administrativo
-                                            </h3>
-                                        </div>
-                                        <span style={{ background: '#38bdf822', color: '#38bdf8', fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px' }}>
-                                            DISPONÍVEL
-                                        </span>
-                                    </div>
-                                    <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0, lineHeight: '1.5' }}>
-                                        Segundo fator via TOTP (RFC 6238) para contas administrativas, compatível com Google Authenticator e Microsoft Authenticator.
-                                    </p>
-                                    <div style={{ fontSize: '12px', color: '#cbd5e1', background: 'rgba(15, 23, 42, 0.6)', padding: '10px 12px', borderRadius: '8px' }}>
-                                        <strong>Protocolo:</strong> RFC 6238 TOTP (30s / 6 dígitos)<br />
-                                        <strong>Admins com MFA:</strong> {complianceData?.liveChecks?.mfa?.adminsWithMfa || 0} configurado(s)
-                                    </div>
-                                </div>
-
-                                {/* Pilar 4: Logs Imutáveis */}
-                                <div style={{
-                                    background: 'rgba(30, 41, 59, 0.4)',
-                                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                                    borderRadius: '16px',
-                                    padding: '20px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '12px'
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <div style={{ background: 'rgba(234, 179, 8, 0.1)', padding: '8px', borderRadius: '10px', color: '#eab308' }}>
-                                                <Activity size={20} />
-                                            </div>
-                                            <h3 style={{ color: '#f8fafc', fontSize: '16px', margin: 0, fontWeight: 700 }}>
-                                                4. Logs Imutáveis
-                                            </h3>
-                                        </div>
-                                        <span style={{ background: '#eab30822', color: '#eab308', fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px' }}>
-                                            ENCADEADO
-                                        </span>
-                                    </div>
-                                    <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0, lineHeight: '1.5' }}>
-                                        Trilha de auditoria append-only bloqueada contra alteração e deleção via trigger PostgreSQL + Hash Chain SHA-256.
-                                    </p>
-                                    <div style={{ fontSize: '12px', color: '#cbd5e1', background: 'rgba(15, 23, 42, 0.6)', padding: '10px 12px', borderRadius: '8px' }}>
-                                        <strong>Trigger Anti-Tampering:</strong> Ativo<br />
-                                        <strong>Integridade Criptográfica:</strong> 100% Íntegra
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* TAB 2: CONFIGURAÇÃO MFA */}
+                <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+                    {/* TAB 1: CONFIGURAÇÃO 2FA */}
                     {activeTab === 'mfa' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div style={{ color: '#94a3b8', fontSize: '14px', lineHeight: '1.6' }}>
-                                O Padrão 8.2 exige que todos os acessos administrativos utilizem Autenticação Multifator (MFA). 
-                                Configure seu aplicativo autenticador (Google Authenticator, Microsoft Authenticator ou Authy) abaixo.
+                            <div style={{ color: '#94a3b8', fontSize: '13px', lineHeight: '1.5' }}>
+                                Adicione uma camada extra de proteção à sua conta exigindo um código gerado pelo aplicativo autenticador do seu smartphone (Google Authenticator ou Microsoft Authenticator).
                             </div>
 
                             {mfaStatusMsg && (
                                 <div style={{
-                                    padding: '14px 18px',
-                                    borderRadius: '12px',
-                                    fontSize: '14px',
+                                    padding: '12px 16px',
+                                    borderRadius: '10px',
+                                    fontSize: '13px',
                                     fontWeight: 500,
                                     background: mfaStatusMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                                     color: mfaStatusMsg.type === 'success' ? '#6ee7b7' : '#fca5a5',
@@ -475,22 +275,22 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                 <div style={{
                                     background: 'rgba(30, 41, 59, 0.4)',
                                     border: '1px solid rgba(255, 255, 255, 0.08)',
-                                    borderRadius: '16px',
+                                    borderRadius: '14px',
                                     padding: '28px',
                                     textAlign: 'center',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     alignItems: 'center',
-                                    gap: '16px'
+                                    gap: '14px'
                                 }}>
-                                    <div style={{ background: 'rgba(172, 248, 0, 0.1)', padding: '16px', borderRadius: '100px', color: '#acf800' }}>
-                                        <Smartphone size={36} />
+                                    <div style={{ background: 'rgba(172, 248, 0, 0.1)', padding: '14px', borderRadius: '100px', color: '#acf800' }}>
+                                        <Smartphone size={32} />
                                     </div>
-                                    <h3 style={{ color: '#ffffff', margin: 0, fontSize: '18px', fontWeight: 700 }}>
-                                        Gerar Credencial de 2º Fator (TOTP)
+                                    <h3 style={{ color: '#ffffff', margin: 0, fontSize: '17px', fontWeight: 600 }}>
+                                        Vincular Aplicativo Autenticador
                                     </h3>
-                                    <p style={{ color: '#94a3b8', fontSize: '14px', maxWidth: '480px', margin: 0 }}>
-                                        Ao clicar abaixo, um QR Code seguro será gerado e a chave mestra será criptografada com AES-256 no banco de dados.
+                                    <p style={{ color: '#94a3b8', fontSize: '13px', maxWidth: '440px', margin: 0 }}>
+                                        Gere um código QR para ler no Google Authenticator ou Microsoft Authenticator do seu dispositivo.
                                     </p>
                                     <button
                                         onClick={handleStartMfaSetup}
@@ -498,44 +298,44 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                         style={{
                                             background: 'linear-gradient(135deg, #acf800, #10b981)',
                                             color: '#020617',
-                                            padding: '14px 28px',
-                                            borderRadius: '12px',
+                                            padding: '12px 24px',
+                                            borderRadius: '10px',
                                             border: 'none',
-                                            fontSize: '15px',
+                                            fontSize: '14px',
                                             fontWeight: 700,
                                             cursor: 'pointer',
-                                            marginTop: '8px'
+                                            marginTop: '6px'
                                         }}
                                     >
-                                        {isLoading ? 'Gerando chave segura...' : 'Configurar Autenticador Agora'}
+                                        {isLoading ? 'Gerando...' : 'Iniciar Configuração'}
                                     </button>
                                 </div>
                             ) : (
                                 <div style={{
                                     background: 'rgba(30, 41, 59, 0.4)',
                                     border: '1px solid rgba(255, 255, 255, 0.08)',
-                                    borderRadius: '16px',
-                                    padding: '28px',
+                                    borderRadius: '14px',
+                                    padding: '24px',
                                     display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                                    gap: '28px',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                                    gap: '24px',
                                     alignItems: 'center'
                                 }}>
                                     {/* QR Code */}
-                                    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                                        <div style={{ background: '#ffffff', padding: '12px', borderRadius: '16px', display: 'inline-block' }}>
-                                            <img src={mfaSetupData.qrCodeDataUrl} alt="MFA QR Code" style={{ width: '200px', height: '200px', display: 'block' }} />
+                                    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ background: '#ffffff', padding: '10px', borderRadius: '14px', display: 'inline-block' }}>
+                                            <img src={mfaSetupData.qrCodeDataUrl} alt="QR Code" style={{ width: '180px', height: '180px', display: 'block' }} />
                                         </div>
                                         <div style={{ color: '#94a3b8', fontSize: '12px' }}>
-                                            Aponte a câmera do seu aplicativo autenticador
+                                            Escaneie com seu aplicativo autenticador
                                         </div>
                                     </div>
 
-                                    {/* Chave Manual e Confirmação */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                                    {/* Chave e Confirmação */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                         <div>
                                             <label style={{ display: 'block', color: '#cbd5e1', fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>
-                                                CHAVE SECRETA MANUAL (BASE32):
+                                                CHAVE MANUAL:
                                             </label>
                                             <div style={{ display: 'flex', gap: '8px' }}>
                                                 <input
@@ -545,11 +345,11 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                                         flex: 1,
                                                         background: 'rgba(15, 23, 42, 0.6)',
                                                         border: '1px solid rgba(255, 255, 255, 0.1)',
-                                                        padding: '10px 14px',
+                                                        padding: '10px 12px',
                                                         borderRadius: '8px',
                                                         color: '#acf800',
                                                         fontFamily: 'monospace',
-                                                        fontSize: '13px'
+                                                        fontSize: '12px'
                                                     }}
                                                 />
                                                 <button
@@ -564,23 +364,23 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                                         background: 'rgba(255, 255, 255, 0.08)',
                                                         border: '1px solid rgba(255, 255, 255, 0.1)',
                                                         borderRadius: '8px',
-                                                        padding: '10px 14px',
+                                                        padding: '10px 12px',
                                                         color: '#f8fafc',
                                                         cursor: 'pointer',
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: '6px'
+                                                        gap: '4px'
                                                     }}
                                                 >
-                                                    {copiedSecret ? <Check size={16} color="#10b981" /> : <Copy size={16} />}
+                                                    {copiedSecret ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
                                                 </button>
                                             </div>
                                         </div>
 
-                                        <form onSubmit={handleConfirmMfa} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                        <form onSubmit={handleConfirmMfa} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                             <div>
                                                 <label style={{ display: 'block', color: '#cbd5e1', fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>
-                                                    DIGITE O CÓDIGO DE 6 DÍGITOS PARA CONFIRMAR:
+                                                    CÓDIGO DE 6 DÍGITOS GERADO:
                                                 </label>
                                                 <input
                                                     type="text"
@@ -591,14 +391,14 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                                     required
                                                     style={{
                                                         width: '100%',
-                                                        padding: '12px 16px',
+                                                        padding: '12px 14px',
                                                         background: 'rgba(15, 23, 42, 0.8)',
                                                         border: '1px solid rgba(172, 248, 0, 0.4)',
                                                         borderRadius: '10px',
                                                         color: '#acf800',
-                                                        fontSize: '20px',
+                                                        fontSize: '18px',
                                                         fontWeight: 700,
-                                                        letterSpacing: '6px',
+                                                        letterSpacing: '5px',
                                                         textAlign: 'center',
                                                         boxSizing: 'border-box'
                                                     }}
@@ -619,7 +419,7 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                                     cursor: 'pointer'
                                                 }}
                                             >
-                                                {isLoading ? 'Validando...' : 'Confirmar & Ativar MFA'}
+                                                {isLoading ? 'Verificando...' : 'Confirmar & Ativar'}
                                             </button>
                                         </form>
                                     </div>
@@ -628,27 +428,12 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                         </div>
                     )}
 
-                    {/* TAB 3: TRILHA DE AUDITORIA */}
+                    {/* TAB 2: REGISTRO DE ACESSOS */}
                     {activeTab === 'audit' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div style={{
-                                background: auditChainResult?.chainIntegrity?.valid ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
-                                border: `1px solid ${auditChainResult?.chainIntegrity?.valid ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                                borderRadius: '14px',
-                                padding: '16px 20px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between'
-                            }}>
-                                <div>
-                                    <div style={{ color: '#ffffff', fontWeight: 700, fontSize: '15px' }}>
-                                        {auditChainResult?.chainIntegrity?.valid 
-                                            ? '✅ Integridade Criptográfica Comprovada: Zero Adulteração' 
-                                            : '⚠️ Alerta de Integridade na Cadeia de Logs'}
-                                    </div>
-                                    <div style={{ color: '#94a3b8', fontSize: '13px', marginTop: '2px' }}>
-                                        Total de {auditChainResult?.totalRecords || 0} registros encadeados por SHA-256 no banco de dados.
-                                    </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ color: '#94a3b8', fontSize: '13px' }}>
+                                    Histórico cronológico de atividades e eventos da conta.
                                 </div>
                                 <button
                                     onClick={handleRunAuditVerification}
@@ -657,8 +442,8 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                         border: '1px solid rgba(255, 255, 255, 0.15)',
                                         color: '#f8fafc',
                                         borderRadius: '8px',
-                                        padding: '8px 14px',
-                                        fontSize: '13px',
+                                        padding: '6px 12px',
+                                        fontSize: '12px',
                                         fontWeight: 600,
                                         cursor: 'pointer',
                                         display: 'flex',
@@ -666,48 +451,47 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                         gap: '6px'
                                     }}
                                 >
-                                    <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-                                    Revalidar Cadeia
+                                    <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
+                                    Atualizar
                                 </button>
                             </div>
 
                             <div style={{
                                 background: 'rgba(15, 23, 42, 0.6)',
                                 border: '1px solid rgba(255, 255, 255, 0.08)',
-                                borderRadius: '12px',
+                                borderRadius: '10px',
                                 overflow: 'hidden'
                             }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
                                     <thead>
                                         <tr style={{ background: 'rgba(30, 41, 59, 0.6)', color: '#94a3b8', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                                            <th style={{ padding: '12px 16px' }}>Data / Hora</th>
-                                            <th style={{ padding: '12px 16px' }}>Usuário / Ação</th>
-                                            <th style={{ padding: '12px 16px' }}>Recurso</th>
-                                            <th style={{ padding: '12px 16px' }}>Hash SHA-256 (Encadeado)</th>
+                                            <th style={{ padding: '10px 14px' }}>Data / Hora</th>
+                                            <th style={{ padding: '10px 14px' }}>Autor</th>
+                                            <th style={{ padding: '10px 14px' }}>Ação</th>
+                                            <th style={{ padding: '10px 14px' }}>Referência</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {auditLogs.length === 0 ? (
                                             <tr>
-                                                <td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
-                                                    Nenhum log gravado ainda ou carregando registros...
+                                                <td colSpan={4} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
+                                                    Nenhum evento registrado ainda.
                                                 </td>
                                             </tr>
                                         ) : (
                                             auditLogs.map((log: any) => (
                                                 <tr key={log.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', color: '#cbd5e1' }}>
-                                                    <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                                                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
                                                         {new Date(log.timestamp).toLocaleString('pt-BR')}
                                                     </td>
-                                                    <td style={{ padding: '12px 16px' }}>
-                                                        <span style={{ color: '#acf800', fontWeight: 600 }}>{log.author || 'Sistema'}</span>
-                                                        <div style={{ color: '#94a3b8', fontSize: '11px' }}>{log.action}</div>
+                                                    <td style={{ padding: '10px 14px', color: '#acf800' }}>
+                                                        {log.author || 'Sistema'}
                                                     </td>
-                                                    <td style={{ padding: '12px 16px', color: '#38bdf8' }}>
+                                                    <td style={{ padding: '10px 14px' }}>
+                                                        {log.action}
+                                                    </td>
+                                                    <td style={{ padding: '10px 14px', color: '#94a3b8' }}>
                                                         {log.resource}
-                                                    </td>
-                                                    <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#a5f3fc' }}>
-                                                        {log.current_hash ? log.current_hash.substring(0, 16) + '...' : 'GENESIS'}
                                                     </td>
                                                 </tr>
                                             ))
@@ -718,12 +502,12 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                         </div>
                     )}
 
-                    {/* TAB 4: DECLARAÇÃO FORMAL */}
+                    {/* TAB 3: DOSSIÊ TÉCNICO (GUARDADO PARA AUDITORIA SEM EXPOSIÇÃO PÚBLICA) */}
                     {activeTab === 'declaration' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ color: '#94a3b8', fontSize: '13px' }}>
-                                    Copie o texto formal abaixo para anexar ao seu dossiê de homologação ou enviar ao auditor:
+                                    Documento formal para fins de auditoria técnica:
                                 </div>
                                 <button
                                     onClick={() => {
@@ -736,8 +520,8 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                         color: '#020617',
                                         border: 'none',
                                         borderRadius: '8px',
-                                        padding: '8px 16px',
-                                        fontSize: '13px',
+                                        padding: '8px 14px',
+                                        fontSize: '12px',
                                         fontWeight: 700,
                                         cursor: 'pointer',
                                         display: 'flex',
@@ -745,8 +529,8 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                         gap: '6px'
                                     }}
                                 >
-                                    {copiedDeclaration ? <Check size={16} /> : <Copy size={16} />}
-                                    {copiedDeclaration ? 'Copiado!' : 'Copiar Declaração'}
+                                    {copiedDeclaration ? <Check size={14} /> : <Copy size={14} />}
+                                    {copiedDeclaration ? 'Copiado!' : 'Copiar Texto'}
                                 </button>
                             </div>
 
@@ -755,14 +539,14 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
                                 value={formalDeclarationText}
                                 style={{
                                     width: '100%',
-                                    height: '360px',
+                                    height: '340px',
                                     background: 'rgba(15, 23, 42, 0.9)',
                                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    borderRadius: '12px',
-                                    padding: '16px',
+                                    borderRadius: '10px',
+                                    padding: '14px',
                                     color: '#cbd5e1',
                                     fontFamily: 'monospace',
-                                    fontSize: '12px',
+                                    fontSize: '11px',
                                     lineHeight: '1.6',
                                     outline: 'none',
                                     resize: 'none',
@@ -778,4 +562,3 @@ Declaração gerada eletronicamente pelo Sistema de Governança e Segurança Fas
 };
 
 export default SecurityComplianceModal;
-
