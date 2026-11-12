@@ -195,8 +195,8 @@ export function parseInfobipErrorDiagnostic(payload: any, fallbackMessage = 'Err
 }
 
 export const api = {
-    // Autenticação (Login Admin)
-    async login(email: string, password: string): Promise<{ success: boolean; token?: string; user?: any; error?: string }> {
+    // Autenticação (Login Admin com suporte ao Padrão 8.2 MFA)
+    async login(email: string, password: string): Promise<{ success: boolean; token?: string; user?: any; error?: string; requireMfa?: boolean; mfaToken?: string }> {
         try {
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
@@ -209,6 +209,118 @@ export const api = {
                 if (data.user) localStorage.setItem('auth_user', JSON.stringify(data.user));
             }
             return data;
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    },
+
+    // Padrão 8.2: Verificação do código MFA no Login
+    async verifyMfa(mfaToken: string, code: string): Promise<{ success: boolean; token?: string; user?: any; error?: string }> {
+        try {
+            const res = await fetch('/api/auth/mfa/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mfaToken, code })
+            });
+            const data = await res.json();
+            if (data.success && data.token) {
+                localStorage.setItem('auth_token', data.token);
+                if (data.user) localStorage.setItem('auth_user', JSON.stringify(data.user));
+            }
+            return data;
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    },
+
+    // Padrão 8.2: Iniciar configuração do MFA para o usuário logado
+    async setupMfa(): Promise<{ success: boolean; qrCodeDataUrl?: string; secret?: string; backupCodes?: string[]; error?: string }> {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch('/api/auth/mfa/setup', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                }
+            });
+            return await res.json();
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    },
+
+    // Padrão 8.2: Confirmar código e ativar MFA
+    async confirmMfa(code: string): Promise<{ success: boolean; message?: string; error?: string }> {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch('/api/auth/mfa/confirm', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify({ code })
+            });
+            return await res.json();
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    },
+
+    // Padrão 8.2: Desativar MFA
+    async disableMfa(password: string, code: string): Promise<{ success: boolean; message?: string; error?: string }> {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch('/api/auth/mfa/disable', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify({ password, code })
+            });
+            return await res.json();
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    },
+
+    // Padrão 8.2: Obter Declaração e Status de Conformidade
+    async getSecurityCompliance(): Promise<any> {
+        try {
+            const res = await fetch('/api/security/compliance');
+            return await res.json();
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    },
+
+    // Padrão 8.2: Validação Criptográfica da Trilha de Auditoria Imutável
+    async verifyAuditChain(): Promise<any> {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch('/api/security/audit-chain/verify', {
+                headers: {
+                    'Authorization': token ? `Bearer ${token}` : ''
+                }
+            });
+            return await res.json();
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    },
+
+    // Padrão 8.2: Consultar logs de auditoria
+    async getAuditLogs(limit: number = 100): Promise<any> {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch(`/api/security/audit-logs?limit=${limit}`, {
+                headers: {
+                    'Authorization': token ? `Bearer ${token}` : ''
+                }
+            });
+            return await res.json();
         } catch (err: any) {
             return { success: false, error: err.message };
         }

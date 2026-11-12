@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Zap, Smartphone, Activity, Layers, UploadCloud, PlusCircle, FileSpreadsheet, Image as ImageIcon, Link as LinkIcon, User, LogOut, UserPlus, Send } from 'lucide-react';
+import { Zap, Smartphone, Activity, Layers, UploadCloud, PlusCircle, FileSpreadsheet, Image as ImageIcon, Link as LinkIcon, User, LogOut, UserPlus, Send, ShieldCheck } from 'lucide-react';
 import { RedisQueueStatus, AppTab } from '../types';
 
 interface SidebarProps {
@@ -11,6 +11,7 @@ interface SidebarProps {
     wabaCount: number;
     bmCount?: number;
     templatesCount?: number;
+    onOpenSecurityModal?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -20,7 +21,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onRefreshRedis,
     contactCount,
     wabaCount,
-    bmCount = 0
+    bmCount = 0,
+    onOpenSecurityModal
 }) => {
     // Current user profile state
     const [user] = useState<{ name: string; email: string }>(() => {
@@ -288,8 +290,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
             </nav>
 
-            {/* Bottom: Meu Perfil & Botão Sair */}
-            <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
+            {/* Bottom: Segurança 8.2, Meu Perfil & Botão Sair */}
+            <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {onOpenSecurityModal && (
+                    <button
+                        onClick={onOpenSecurityModal}
+                        title="Abrir Painel de Conformidade 8.2: TLS 1.3, AES-256, MFA & Trilha Imutável"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            width: '100%',
+                            padding: '8px 10px',
+                            borderRadius: '6px',
+                            background: '#ecfdf5',
+                            border: '1px solid #a7f3d0',
+                            color: '#065f46',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#d1fae5'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#ecfdf5'}
+                    >
+                        <ShieldCheck size={16} color="#059669" />
+                        <span style={{ flex: 1, textAlign: 'left' }}>Segurança 8.2</span>
+                        <span style={{ fontSize: '10px', background: '#059669', color: '#ffffff', padding: '1px 5px', borderRadius: '4px' }}>CONFORME</span>
+                    </button>
+                )}
+
                 <div style={{
                     background: '#ffffff',
                     border: '1px solid var(--border-subtle)',

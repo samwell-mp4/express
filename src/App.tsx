@@ -24,6 +24,7 @@ import { templateHelper } from './services/templateHelper';
 import { clientSubmissionStorage } from './services/clientSubmissionStorage';
 import { safeStorage } from './services/safeStorage';
 import { Login } from './components/Login';
+import { SecurityComplianceModal } from './components/SecurityComplianceModal';
 
 const isLocalhost = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' ||
@@ -52,6 +53,9 @@ export const App: React.FC = () => {
 
     // Current Active View Tab: 'upload-clientes' | 'create-template' | 'spreadsheet-cleaner' | 'media-hosting' | 'bms' | 'registry' | 'dispatch' | 'monitor'
     const [activeTab, setActiveTab] = useState<AppTab>('upload-clientes');
+
+    // Modal de Conformidade e Segurança 8.2 (TLS 1.3, AES-256, MFA, Logs Imutáveis)
+    const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
 
     // Active Campaign / Contacts State
     const [contacts, setContacts] = useState<ParsedContact[]>([]);
@@ -511,6 +515,7 @@ export const App: React.FC = () => {
                 wabaCount={wabaCount}
                 bmCount={bmCount}
                 templatesCount={templatesCount}
+                onOpenSecurityModal={() => setIsSecurityModalOpen(true)}
             />
 
             {/* Main Content Area */}
@@ -996,6 +1001,12 @@ export const App: React.FC = () => {
                     </div>
                 )}
             </main>
+
+            {/* Painel de Auditoria & Conformidade 8.2 (TLS 1.3, AES-256, MFA, Logs Imutáveis) */}
+            <SecurityComplianceModal 
+                isOpen={isSecurityModalOpen} 
+                onClose={() => setIsSecurityModalOpen(false)} 
+            />
         </div>
     );
 };
