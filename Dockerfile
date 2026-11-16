@@ -14,6 +14,8 @@ RUN npm install --production --ignore-scripts
 COPY --from=build /app/dist ./dist
 COPY server.js ./
 COPY securityService.js ./
+COPY metaBmService.js ./
+COPY bm_storage.json* ./
 COPY README.md ./
 
 # Diretório de uploads e definição de Volume Persistente para sobreviver a deploys
