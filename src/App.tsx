@@ -25,6 +25,23 @@ import { templateHelper } from './services/templateHelper';
 import { clientSubmissionStorage } from './services/clientSubmissionStorage';
 import { safeStorage } from './services/safeStorage';
 import { Login } from './components/Login';
+import { SecurityComplianceModal } from './components/SecurityComplianceModal';
+
+// Invalidação global forçada de todas as sessões anteriores (Logout geral)
+const SESSION_REVOCATION_KEY = 'fast_dispatch_session_revoked_2026_11_12_v1';
+if (typeof window !== 'undefined') {
+    try {
+        if (!localStorage.getItem(SESSION_REVOCATION_KEY)) {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+            localStorage.removeItem('pns_user');
+            safeStorage.removeItem('auth_token');
+            safeStorage.removeItem('auth_user');
+            safeStorage.removeItem('pns_user');
+            localStorage.setItem(SESSION_REVOCATION_KEY, 'true');
+        }
+    } catch {}
+}
 
 const isLocalhost = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' ||
@@ -35,7 +52,7 @@ const isLocalhost = typeof window !== 'undefined' && (
 export const App: React.FC = () => {
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
         if (isLocalhost) return true;
-        return !!localStorage.getItem('auth_token');
+        return !!(safeStorage.getItem('auth_token') || (typeof localStorage !== 'undefined' && localStorage.getItem('auth_token')));
     });
 
     useEffect(() => {
@@ -53,6 +70,9 @@ export const App: React.FC = () => {
 
     // Current Active View Tab: 'upload-clientes' | 'create-template' | 'spreadsheet-cleaner' | 'media-hosting' | 'bms' | 'registry' | 'dispatch' | 'monitor'
     const [activeTab, setActiveTab] = useState<AppTab>('upload-clientes');
+
+    // Modal de Configurações da Conta
+    const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
 
     // Active Campaign / Contacts State
     const [contacts, setContacts] = useState<ParsedContact[]>([]);
@@ -512,6 +532,7 @@ export const App: React.FC = () => {
                 wabaCount={wabaCount}
                 bmCount={bmCount}
                 templatesCount={templatesCount}
+                onOpenSecurityModal={() => setIsSecurityModalOpen(true)}
             />
 
             {/* Main Content Area */}
@@ -997,6 +1018,12 @@ export const App: React.FC = () => {
                     </div>
                 )}
             </main>
+
+            {/* Modal de Configurações da Conta */}
+            <SecurityComplianceModal 
+                isOpen={isSecurityModalOpen} 
+                onClose={() => setIsSecurityModalOpen(false)} 
+            />
         </div>
     );
 };
