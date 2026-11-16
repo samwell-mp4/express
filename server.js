@@ -8,9 +8,7 @@ import { createClient } from 'redis';
 import pg from 'pg';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-<<<<<<< HEAD
 import { encryptToken, decryptToken, maskToken, testAndFetchBm, fetchWabaDetails, syncAllBms } from './metaBmService.js';
-=======
 import * as otplib from 'otplib';
 import QRCode from 'qrcode';
 
@@ -191,7 +189,6 @@ function getComplianceDeclaration() {
     ]
   };
 }
->>>>>>> 3d28ea6d82aa55a8be0a773fe04062f3032fb30e
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
