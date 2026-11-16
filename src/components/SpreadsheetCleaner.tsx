@@ -558,7 +558,7 @@ export const SpreadsheetCleaner: React.FC<SpreadsheetCleanerProps> = ({ isEmbedd
             </div>
 
             {/* Layout em Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 360px) minmax(0, 1fr)', gap: '20px', alignItems: 'start' }}>
+            <div className="spreadsheet-cleaner-grid">
                 
                 {/* Coluna 1: Parâmetros e Upload */}
                 <div style={{ background: '#ffffff', border: '1px solid #e5e5e5', borderRadius: '8px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>

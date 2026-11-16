@@ -165,21 +165,118 @@ label {
   width: calc(100% - 256px);
 }
 
-@media (max-width: 900px) {
+/* Mobile Header & Drawer Navigation (Hidden on Desktop) */
+.mobile-topbar {
+  display: none;
+}
+
+.mobile-hamburger-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.mobile-hamburger-btn:hover {
+  background: var(--bg-subtle);
+}
+
+.mobile-close-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-close-btn:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 54px;
+    padding: 0 16px;
+    background: #ffffff;
+    border-bottom: 1px solid var(--border-subtle);
+    position: sticky;
+    top: 0;
+    z-index: 99;
+    width: 100%;
+    box-shadow: var(--shadow-subtle);
+  }
+
+  .mobile-close-btn {
+    display: flex;
+  }
+
   .app-layout {
     flex-direction: column;
+    min-height: 100vh;
   }
+
+  /* Sidebar transforms into a smooth off-canvas drawer */
   .sidebar {
-    width: 100%;
-    position: relative;
-    border-right: none;
-    border-bottom: 1px solid var(--border-subtle);
-    padding: 12px 16px;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 280px;
+    max-width: 86vw;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: none;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border-right: 1px solid var(--border-subtle);
   }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 0 0 35px rgba(0, 0, 0, 0.3);
+  }
+
+  .sidebar-backdrop.active {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+    animation: fadeIn 0.2s ease;
+  }
+
   .main-content {
-    margin-left: 0;
-    width: 100%;
-    padding: 16px;
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding: 18px 20px !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 12px 10px !important;
   }
 }
 
@@ -519,3 +616,141 @@ select.form-input, select.form-select, select.input-base, select.bulk-row-input 
   background: var(--border-subtle);
   margin: 16px 0;
 }
+
+/* =========================================================
+   RESPONSIVE DESIGN SUITE (CELULAR & TABLET)
+   Garante 100% de usabilidade em todas as páginas e componentes
+   ========================================================= */
+
+/* Grid Auto Adaptativo para Cards */
+.grid-cols-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+/* Grids Específicos das Páginas */
+.template-wizard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 20px;
+  align-items: start;
+}
+
+.rotator-manager-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.spreadsheet-cleaner-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.dispatch-records-grid {
+  display: grid;
+  grid-template-columns: minmax(400px, 1.8fr) minmax(320px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.dispatch-estimates-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+/* Tabelas e Containers de Rolagem Touch */
+.bulk-table-container,
+.pbm-table-container,
+.table-responsive {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  width: 100% !important;
+  border-radius: var(--radius-md);
+  max-width: 100%;
+}
+
+.bulk-table,
+.pbm-table {
+  min-width: 580px;
+}
+
+/* Modais Universais no Mobile/Tablet */
+@media (max-width: 768px) {
+  /* Modais ocupam tela inteira ou 95vw com scroll interno */
+  [role="dialog"],
+  .modal-dialog,
+  .modal-container {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 92vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    margin: 10px auto !important;
+    padding: 14px !important;
+  }
+
+  /* Painéis e cards reduzem padding interno para maximizar área útil */
+  .glass-panel {
+    padding: 14px !important;
+  }
+
+  /* Grids de páginas colapsam para 1 coluna */
+  .template-wizard-grid,
+  .rotator-manager-grid,
+  .spreadsheet-cleaner-grid,
+  .dispatch-records-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .dispatch-estimates-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .grid-cols-auto {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Segmented control e abas passam a permitir scroll horizontal */
+  .segmented-control {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  /* Botões e inputs ganham altura tátil ideal (touch target) */
+  .btn-primary,
+  .btn-secondary,
+  .form-input,
+  .form-select {
+    touch-action: manipulation;
+  }
+
+  /* Textos longos e URLs não quebram o layout lateral */
+  code, pre {
+    word-break: break-all;
+  }
+}
+
+@media (max-width: 480px) {
+  .dispatch-estimates-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  h1 {
+    font-size: 19px !important;
+  }
+
+  h2 {
+    font-size: 16px !important;
+  }
+}
+

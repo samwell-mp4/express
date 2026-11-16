@@ -7,6 +7,7 @@ import { QueueConfirmModal } from './components/QueueConfirmModal';
 import { RedisMonitor } from './components/RedisMonitor';
 import { DispatchRecords } from './components/DispatchRecords';
 import { BmControl } from './components/BmControl';
+import { MonitoramentoBMs } from './components/MonitoramentoBMs';
 import { TemplateGallery } from './components/TemplateGallery';
 import { ClientUpload } from './components/ClientUpload';
 import { TemplateCreatorWizard } from './components/TemplateCreatorWizard';
@@ -557,9 +558,9 @@ export const App: React.FC = () => {
                     />
                 )}
 
-                {/* TAB 0: CONTROLE DE BMS (GOOGLE SHEETS) */}
+                {/* TAB: MONITORAMENTO DE BMS (META GRAPH API) */}
                 {activeTab === 'bms' && (
-                    <BmControl 
+                    <MonitoramentoBMs 
                         onSelectNumberForDispatch={handleSelectNumberForDispatch}
                         onSelectNumberForRegistry={handleSelectNumberForRegistry}
                     />
@@ -583,7 +584,7 @@ export const App: React.FC = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                               {/* Header Bar */}
                         <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px', borderRadius: '8px', border: '1px solid var(--border-subtle)', background: '#fff' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '320px', flex: 1 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 'min(100%, 280px)', flex: 1 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                         Campanha / Transmissão:

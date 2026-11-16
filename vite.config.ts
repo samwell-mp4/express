@@ -4,6 +4,7 @@ import https from 'https';
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import { testAndFetchBm, fetchWabaDetails, maskToken, encryptToken, decryptToken } from './metaBmService.js';
 
 const COLLABORATORS = [
   { name: 'Geraldo e Joyce', gid: '1891628336' },
@@ -241,7 +242,31 @@ function googleSheetsProxyPlugin(): Plugin {
         }
       });
 
-      // Endpoint para listar templates da Infobip (BM do Luiz oficial)
+      // Persistência local para BMs conectadas na Meta
+      const BM_STORAGE_FILE = path.join(import.meta.dirname, 'bm_storage.json');
+
+      function loadDevBmStorage(): any[] {
+        try {
+          if (fs.existsSync(BM_STORAGE_FILE)) {
+            const data = fs.readFileSync(BM_STORAGE_FILE, 'utf-8');
+            const parsed = JSON.parse(data);
+            if (Array.isArray(parsed)) return parsed;
+          }
+        } catch (e) {
+          console.warn('[BM Storage] Erro ao carregar bm_storage.json:', e);
+        }
+        return [];
+      }
+
+      function saveDevBmStorage(list: any[]): void {
+        try {
+          fs.writeFileSync(BM_STORAGE_FILE, JSON.stringify(list, null, 2), 'utf-8');
+        } catch (e) {
+          console.warn('[BM Storage] Erro ao salvar bm_storage.json:', e);
+        }
+      }
+
+      // Endpoint para listar templates da Infobip (BM do Luiz oficial) e BMs conectadas
       server.middlewares.use('/api/meta-templates', async (req, res) => {
         try {
           const urlObj = new URL(req.url || '', 'http://localhost');
@@ -430,6 +455,36 @@ function googleSheetsProxyPlugin(): Plugin {
             console.warn('[MetaTemplates] Erro ao carregar templates gerais da BM do Luiz:', accErr);
           }
 
+          // C. Incluir templates de todas as BMs conectadas na Meta
+          try {
+            const connectedBms = loadDevBmStorage();
+            connectedBms.forEach(c => {
+              (c.dados?.wabas || []).forEach((w: any) => {
+                const defaultSender = w.numeros?.[0]?.display_phone_number || '';
+                (w.templates || []).forEach((t: any) => {
+                  allTemplates.push({
+                    id: t.id || t.name,
+                    businessAccountId: w.id,
+                    name: t.name,
+                    language: t.language || 'pt_BR',
+                    status: t.status,
+                    category: t.category,
+                    structure: { body: { text: t.bodyText || '' } },
+                    components: t.components || [],
+                    createdAt: new Date().toISOString(),
+                    lastUpdatedAt: new Date().toISOString(),
+                    _account: c.nome || 'BM Conectada',
+                    _accountId: c.bm_id,
+                    _sender: defaultSender,
+                    _senderFormatted: defaultSender
+                  });
+                });
+              });
+            });
+          } catch (bmTplErr) {
+            console.warn('[MetaTemplates] Erro ao incorporar templates de BMs conectadas:', bmTplErr);
+          }
+
           // Ordenar por data decrescente (mais recentes primeiro)
           allTemplates.sort((a, b) => {
             const timeA = new Date(a.lastUpdatedAt || a.createdAt || 0).getTime();
@@ -530,13 +585,342 @@ function googleSheetsProxyPlugin(): Plugin {
         next();
       });
 
+      // Dev middleware for /api/dispatch/queue/status (evita erro 502 no Vite dev quando Redis/Backend não está ativo)
+      server.middlewares.use((req, res, next) => {
+        const rawUrl = req.url || '';
+        if (rawUrl.startsWith('/api/dispatch/queue/status')) {
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ queueLength: 0, isRunning: false, processed: 0 }));
+          return;
+        }
+        next();
+      });
+
+      // Dev middleware for /api/bm/* com integração REAL à Meta Graph API e persistência em bm_storage.json
+      const devAquecimento = [
+        { etapa: 'Conectada', meta_diaria: 50, o_que_fazer: 'Começar os primeiros envios, de forma gradual.' },
+        { etapa: 'Aquecendo', meta_diaria: 250, o_que_fazer: 'Manter envio diário, com qualidade verde, até o limite subir.' },
+        { etapa: 'Subindo limite', meta_diaria: 1000, o_que_fazer: 'Aumentar o volume aos poucos e vigiar a qualidade.' },
+        { etapa: 'Escalando', meta_diaria: 5000, o_que_fazer: 'Operação em alta escala com monitoramento contínuo.' },
+        { etapa: 'Matura', meta_diaria: 10000, o_que_fazer: 'BM estabelecida e estável para envios volumosos.' }
+      ];
+
+      server.middlewares.use((req, res, next) => {
+        const rawUrl = req.url || '';
+        if (rawUrl.startsWith('/api/bm/')) {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204;
+            res.end();
+            return;
+          }
+
+          if (rawUrl.startsWith('/api/bm/dados') && req.method === 'GET') {
+            const conexoes = loadDevBmStorage();
+            let totalNums = 0;
+            let totalWabas = 0;
+            let totalQualidadeBaixa = 0;
+            let totalTemplates = 0;
+            let totalTemplatesRejeitados = 0;
+            let msgs = 0;
+            let msgsEntregues = 0;
+            let wabasNotificadas = 0;
+
+            const alertas: any[] = [];
+
+            conexoes.forEach(c => {
+              const wabas = c.dados?.wabas || [];
+              totalWabas += wabas.length;
+              totalNums += c.dados?.totalNumeros || 0;
+              totalQualidadeBaixa += c.dados?.numerosQualidadeBaixa || 0;
+              totalTemplates += c.dados?.totalTemplates || 0;
+              totalTemplatesRejeitados += c.dados?.templatesRejeitados || 0;
+              msgs += c.dados?.msgs24hEnviadas || 0;
+              msgsEntregues += c.dados?.msgs24hEntregues || 0;
+              if (c.dados?.wabaNotificada) wabasNotificadas += 1;
+
+              wabas.forEach((w: any) => {
+                if (w.notificada) {
+                  alertas.push({
+                    id: `${c.bm_id}_${w.id}_res`,
+                    bm_id: c.bm_id,
+                    waba_id: w.id,
+                    tipo: 'waba_restrita',
+                    severidade: 'critico',
+                    titulo: `WABA ${w.name || w.id} com restrição na Meta`,
+                    mensagem: w.motivoNotificacao || 'A conta WABA possui notificação de revisão ou advertência na Meta.'
+                  });
+                }
+                (w.numeros || []).forEach((n: any) => {
+                  if (n.qualidadeBaixa) {
+                    alertas.push({
+                      id: `${c.bm_id}_${n.id}_qual`,
+                      bm_id: c.bm_id,
+                      waba_id: w.id,
+                      phone_number_id: n.id,
+                      tipo: 'qualidade_baixa',
+                      severidade: n.quality_rating === 'RED' ? 'critico' : 'aviso',
+                      titulo: `Qualidade baixa no número ${n.display_phone_number || n.id}`,
+                      mensagem: `Rating atual: ${n.quality_rating}. Limite: ${n.messaging_limit_tier || 'TIER_250'}. Evite disparos em massa até a qualidade recuperar.`
+                    });
+                  }
+                });
+              });
+            });
+
+            const payload = {
+              success: true,
+              conexoes,
+              aquecimentoConfig: devAquecimento,
+              alertas,
+              resumoGeral: {
+                totalBms: conexoes.length,
+                totalWabas,
+                totalNumeros: totalNums,
+                totalNumerosQualidadeBaixa: totalQualidadeBaixa,
+                totalTemplates,
+                totalTemplatesRejeitados,
+                totalMsgs24hEnviadas: msgs,
+                totalMsgs24hEntregues: msgsEntregues,
+                totalWabasNotificadas: wabasNotificadas
+              }
+            };
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify(payload));
+            return;
+          }
+
+          if (rawUrl.startsWith('/api/bm/conectar') && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', async () => {
+              try {
+                const parsed = JSON.parse(body || '{}');
+                const cleanBmId = String(parsed.bm_id || '').trim();
+                const cleanToken = String(parsed.token || '').trim();
+                const cleanNome = String(parsed.nome || '').trim() || (`BM ${cleanBmId}`);
+                const tipo = parsed.tipo || 'agencia';
+
+                if (!cleanBmId || !cleanToken) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                  res.end(JSON.stringify({
+                    success: false,
+                    error: 'ID da BM e Token do usuário do sistema são obrigatórios.'
+                  }));
+                  return;
+                }
+
+                // 1. VALIDAÇÃO REAL NA META GRAPH API (Se inválido, lança erro e REJEITA imediatamente)
+                let metaResult;
+                try {
+                  metaResult = await testAndFetchBm(cleanBmId, cleanToken);
+                } catch (metaErr: any) {
+                  console.error('[BM Connect] Erro na validação da Meta:', metaErr.message);
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                  res.end(JSON.stringify({
+                    success: false,
+                    error: metaErr.message || 'Falha ao autenticar com a Meta Graph API. Verifique o ID e o Token.'
+                  }));
+                  return;
+                }
+
+                const { bm: metaBm, wabas } = metaResult;
+
+                // 2. Coletar telefones e templates de cada WABA em paralelo
+                const wabasFull: any[] = await Promise.all(
+                  wabas.map(async (w: any) => {
+                    try {
+                      const details = await fetchWabaDetails(w.id, cleanToken);
+                      return {
+                        ...w,
+                        ...details
+                      };
+                    } catch (wErr: any) {
+                      console.warn(`[BM Connect] Aviso ao buscar WABA ${w.id}:`, wErr.message);
+                      return w;
+                    }
+                  })
+                );
+
+                // 3. Cálculos agregados reais
+                const totalNumeros = wabasFull.reduce((acc, w) => acc + (w.numeros?.length || 0), 0);
+                const numerosQualidadeBaixa = wabasFull.reduce((acc, w) => acc + (w.numeros?.filter((n: any) => n.qualidadeBaixa)?.length || 0), 0);
+                const totalTemplates = wabasFull.reduce((acc, w) => acc + (w.templates?.length || 0), 0);
+                const templatesRejeitados = wabasFull.reduce((acc, w) => acc + (w.templates?.filter((t: any) => t.status === 'REJECTED')?.length || 0), 0);
+                const msgs24hEnviadas = wabasFull.reduce((acc, w) => acc + (w.msgs24h?.enviadas || 0), 0);
+                const msgs24hEntregues = wabasFull.reduce((acc, w) => acc + (w.msgs24h?.entregues || 0), 0);
+                const wabaNotificada = wabasFull.some(w => w.notificada);
+
+                let etapaAquecimento = 'Conectada';
+                if (totalNumeros === 0) {
+                  etapaAquecimento = 'Conta sem número';
+                } else if (msgs24hEnviadas > 0) {
+                  etapaAquecimento = 'Já dispararam';
+                } else {
+                  etapaAquecimento = 'Com número';
+                }
+
+                const encryptedToken = encryptToken(cleanToken);
+                const masked = maskToken(cleanToken);
+
+                const newConn = {
+                  id: Date.now(),
+                  nome: cleanNome,
+                  bm_id: cleanBmId,
+                  tipo,
+                  status: 'ativa',
+                  token_cifrado: encryptedToken,
+                  token_mascarado: masked,
+                  ultima_verificacao: new Date().toISOString(),
+                  dados: {
+                    metaBm,
+                    wabas: wabasFull,
+                    totalNumeros,
+                    numerosQualidadeBaixa,
+                    totalTemplates,
+                    templatesRejeitados,
+                    msgs24hEnviadas,
+                    msgs24hEntregues,
+                    wabaNotificada,
+                    etapaAquecimento,
+                    lastSync: new Date().toISOString()
+                  }
+                };
+
+                const currentList = loadDevBmStorage();
+                const filtered = currentList.filter(c => c.bm_id !== cleanBmId);
+                filtered.unshift(newConn);
+                saveDevBmStorage(filtered);
+
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({
+                  success: true,
+                  id: newConn.id,
+                  totalNumeros,
+                  totalTemplates,
+                  message: `BM conectada com sucesso! ${totalNumeros} número(s) e ${totalTemplates} template(s) carregados da Meta.`
+                }));
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ success: false, error: e.message || 'Erro inesperado ao conectar BM' }));
+              }
+            });
+            return;
+          }
+
+          if (rawUrl.startsWith('/api/bm/sincronizar') && req.method === 'POST') {
+            (async () => {
+              try {
+                const list = loadDevBmStorage();
+                let updatedCount = 0;
+
+                for (const conn of list) {
+                  const token = decryptToken(conn.token_cifrado);
+                  if (!token) continue;
+
+                  try {
+                    const { bm: metaBm, wabas } = await testAndFetchBm(conn.bm_id, token);
+                    const wabasFull: any[] = await Promise.all(
+                      wabas.map(async (w: any) => {
+                        try {
+                          const details = await fetchWabaDetails(w.id, token);
+                          return { ...w, ...details };
+                        } catch (_) {
+                          return w;
+                        }
+                      })
+                    );
+
+                    const totalNumeros = wabasFull.reduce((acc, w) => acc + (w.numeros?.length || 0), 0);
+                    const numerosQualidadeBaixa = wabasFull.reduce((acc, w) => acc + (w.numeros?.filter((n: any) => n.qualidadeBaixa)?.length || 0), 0);
+                    const totalTemplates = wabasFull.reduce((acc, w) => acc + (w.templates?.length || 0), 0);
+                    const templatesRejeitados = wabasFull.reduce((acc, w) => acc + (w.templates?.filter((t: any) => t.status === 'REJECTED')?.length || 0), 0);
+                    const msgs24hEnviadas = wabasFull.reduce((acc, w) => acc + (w.msgs24h?.enviadas || 0), 0);
+                    const msgs24hEntregues = wabasFull.reduce((acc, w) => acc + (w.msgs24h?.entregues || 0), 0);
+                    const wabaNotificada = wabasFull.some(w => w.notificada);
+
+                    conn.ultima_verificacao = new Date().toISOString();
+                    conn.dados = {
+                      metaBm,
+                      wabas: wabasFull,
+                      totalNumeros,
+                      numerosQualidadeBaixa,
+                      totalTemplates,
+                      templatesRejeitados,
+                      msgs24hEnviadas,
+                      msgs24hEntregues,
+                      wabaNotificada,
+                      lastSync: new Date().toISOString()
+                    };
+                    updatedCount++;
+                  } catch (syncErr: any) {
+                    console.warn(`[BM Sync] Erro ao sincronizar BM ${conn.bm_id}:`, syncErr.message);
+                  }
+                }
+
+                saveDevBmStorage(list);
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ success: true, count: updatedCount }));
+              } catch (e: any) {
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ success: false, error: e.message }));
+              }
+            })();
+            return;
+          }
+
+          if (rawUrl.startsWith('/api/bm/aquecimento-config') && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', () => {
+              try {
+                const parsed = JSON.parse(body || '{}');
+                const found = devAquecimento.find(a => a.etapa === parsed.etapa);
+                if (found) found.meta_diaria = Number(parsed.meta_diaria) || 0;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ success: true }));
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ success: false, error: e.message }));
+              }
+            });
+            return;
+          }
+
+          if (rawUrl.startsWith('/api/bm/conexoes/') && req.method === 'DELETE') {
+            const parts = rawUrl.split('/');
+            const id = Number(parts[parts.length - 1]);
+            const list = loadDevBmStorage();
+            const filtered = list.filter(c => c.id !== id);
+            saveDevBmStorage(filtered);
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({ success: true }));
+            return;
+          }
+
+          if (rawUrl.includes('/resolver') && req.method === 'POST') {
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({ success: true }));
+            return;
+          }
+        }
+        next();
+      });
+
       // Middleware de fallback para servir arquivos de /uploads no ambiente Vite dev
       server.middlewares.use((req, res, next) => {
         const rawUrl = req.url || '';
         if (rawUrl.startsWith('/uploads/')) {
           const filename = path.basename(rawUrl.split('?')[0]);
-          const candidate1 = path.join(__dirname, 'uploads', filename);
-          const candidate2 = path.join(__dirname, '..', 'uploads', filename);
+          const candidate1 = path.join(import.meta.dirname, 'uploads', filename);
+          const candidate2 = path.join(import.meta.dirname, '..', 'uploads', filename);
 
           let filePath = '';
           if (fs.existsSync(candidate1)) {

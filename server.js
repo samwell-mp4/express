@@ -8,6 +8,7 @@ import { createClient } from 'redis';
 import pg from 'pg';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { encryptToken, decryptToken, maskToken, testAndFetchBm, fetchWabaDetails, syncAllBms } from './metaBmService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -230,6 +231,56 @@ async function initDB() {
       `, ['Admin Fast Dispatch', 'plug2026#adsales', defaultPasswordHash, 'ADMIN']);
       console.log('🔒 [Security] Usuário administrador padrão inicializado.');
     }
+
+    // Tabelas para Painel de BMs & Meta WhatsApp
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS bm_conexoes (
+        id SERIAL PRIMARY KEY,
+        nome TEXT NOT NULL,
+        bm_id TEXT NOT NULL,
+        token_cifrado TEXT NOT NULL,
+        tipo TEXT DEFAULT 'agencia',
+        status TEXT DEFAULT 'ativo',
+        dados_cache JSONB DEFAULT '{}'::jsonb,
+        ultima_verificacao TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS bm_aquecimento_config (
+        etapa TEXT PRIMARY KEY,
+        meta_diaria INTEGER DEFAULT 0,
+        o_que_fazer TEXT DEFAULT '',
+        ordem INTEGER DEFAULT 0,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      INSERT INTO bm_aquecimento_config (etapa, meta_diaria, o_que_fazer, ordem)
+      VALUES 
+        ('Conectada', 0, 'Começar os primeiros envios, de forma gradual.', 1),
+        ('Aquecendo', 0, 'Manter envio diário, com qualidade verde, até o limite subir.', 2),
+        ('Subindo limite', 0, 'Aumentar o volume aos poucos e vigiar a qualidade.', 3)
+      ON CONFLICT (etapa) DO NOTHING;
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS bm_alertas (
+        id SERIAL PRIMARY KEY,
+        bm_id TEXT,
+        waba_id TEXT,
+        phone_number_id TEXT,
+        tipo TEXT NOT NULL,
+        severidade TEXT NOT NULL DEFAULT 'aviso',
+        titulo TEXT NOT NULL,
+        mensagem TEXT NOT NULL,
+        resolvido BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
     client.release();
     setTimeout(() => syncLocalUploadsToPostgres(), 1000);
@@ -2385,6 +2436,322 @@ const server = http.createServer(async (req, res) => {
   // -------------------------------------------------------------
   // 7. GOOGLE SHEETS & META TEMPLATES COM CREDENCIAIS SEGURAS
   // -------------------------------------------------------------
+  // ==========================================
+  // PAINEL DE MONITORAMENTO DE BMS (META GRAPH API)
+  // ==========================================
+  const BM_STORAGE_FILE = path.join(__dirname, 'bm_storage.json');
+  function loadFileBms() {
+    try {
+      if (fs.existsSync(BM_STORAGE_FILE)) {
+        const data = fs.readFileSync(BM_STORAGE_FILE, 'utf-8');
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (_) {}
+    return [];
+  }
+  function saveFileBms(list) {
+    try {
+      fs.writeFileSync(BM_STORAGE_FILE, JSON.stringify(list, null, 2), 'utf-8');
+    } catch (_) {}
+  }
+
+  if (pathname === '/api/bm/dados' && req.method === 'GET') {
+    try {
+      if (!isPostgresConnected) {
+        const conexoes = loadFileBms();
+        let totalNums = 0;
+        let totalWabas = 0;
+        let totalQualidadeBaixa = 0;
+        let totalTemplates = 0;
+        let totalTemplatesRejeitados = 0;
+        let msgs = 0;
+        let msgsEntregues = 0;
+        let wabasNotificadas = 0;
+        const alertas = [];
+
+        conexoes.forEach(c => {
+          const wabas = c.dados?.wabas || [];
+          totalWabas += wabas.length;
+          totalNums += c.dados?.totalNumeros || 0;
+          totalQualidadeBaixa += c.dados?.numerosQualidadeBaixa || 0;
+          totalTemplates += c.dados?.totalTemplates || 0;
+          totalTemplatesRejeitados += c.dados?.templatesRejeitados || 0;
+          msgs += c.dados?.msgs24hEnviadas || 0;
+          msgsEntregues += c.dados?.msgs24hEntregues || 0;
+          if (c.dados?.wabaNotificada) wabasNotificadas += 1;
+
+          wabas.forEach(w => {
+            if (w.notificada) {
+              alertas.push({
+                id: `${c.bm_id}_${w.id}_res`,
+                bm_id: c.bm_id,
+                waba_id: w.id,
+                tipo: 'waba_restrita',
+                severidade: 'critico',
+                titulo: `WABA ${w.name || w.id} com restrição`,
+                mensagem: w.motivoNotificacao || 'A Meta emitiu uma notificação para esta conta.'
+              });
+            }
+            (w.numeros || []).forEach(n => {
+              if (n.qualidadeBaixa) {
+                alertas.push({
+                  id: `${c.bm_id}_${n.id}_qual`,
+                  bm_id: c.bm_id,
+                  waba_id: w.id,
+                  phone_number_id: n.id,
+                  tipo: 'qualidade_baixa',
+                  severidade: n.quality_rating === 'RED' ? 'critico' : 'aviso',
+                  titulo: `Qualidade baixa no número ${n.display_phone_number || n.id}`,
+                  mensagem: `Número com qualidade ${n.quality_rating} e limite ${n.messaging_limit_tier}.`
+                });
+              }
+            });
+          });
+        });
+
+        return sendJson({
+          success: true,
+          conexoes,
+          aquecimentoConfig: [
+            { etapa: 'Conectada', meta_diaria: 50, o_que_fazer: 'Começar os primeiros envios, de forma gradual.' },
+            { etapa: 'Aquecendo', meta_diaria: 250, o_que_fazer: 'Manter envio diário, com qualidade verde, até o limite subir.' },
+            { etapa: 'Subindo limite', meta_diaria: 1000, o_que_fazer: 'Aumentar o volume aos poucos e vigiar a qualidade.' },
+            { etapa: 'Escalando', meta_diaria: 5000, o_que_fazer: 'Operação em alta escala com monitoramento contínuo.' },
+            { etapa: 'Matura', meta_diaria: 10000, o_que_fazer: 'BM estabelecida e estável para envios volumosos.' }
+          ],
+          alertas,
+          resumoGeral: {
+            totalBms: conexoes.length,
+            totalWabas,
+            totalNumeros: totalNums,
+            totalNumerosQualidadeBaixa,
+            totalTemplates,
+            totalTemplatesRejeitados,
+            totalMsgs24hEnviadas: msgs,
+            totalMsgs24hEntregues: msgsEntregues,
+            totalWabasNotificadas: wabasNotificadas
+          }
+        });
+      }
+
+      const { rows: conexoes } = await pgPool.query('SELECT id, nome, bm_id, tipo, status, dados_cache, ultima_verificacao, created_at FROM bm_conexoes ORDER BY id ASC');
+      const { rows: aquecimentoConfig } = await pgPool.query('SELECT * FROM bm_aquecimento_config ORDER BY ordem ASC, etapa ASC');
+      const { rows: alertas } = await pgPool.query('SELECT * FROM bm_alertas WHERE resolvido = false ORDER BY created_at DESC LIMIT 50');
+
+      let totalBms = conexoes.length;
+      let totalWabas = 0;
+      let totalNumeros = 0;
+      let totalNumerosQualidadeBaixa = 0;
+      let totalTemplates = 0;
+      let totalTemplatesRejeitados = 0;
+      let totalMsgs24hEnviadas = 0;
+      let totalMsgs24hEntregues = 0;
+      let totalWabasNotificadas = 0;
+
+      const conexoesFormatadas = conexoes.map(c => {
+        const cache = c.dados_cache || {};
+        totalNumeros += Number(cache.totalNumeros) || 0;
+        totalNumerosQualidadeBaixa += Number(cache.numerosQualidadeBaixa) || 0;
+        totalTemplates += Number(cache.totalTemplates) || 0;
+        totalTemplatesRejeitados += Number(cache.templatesRejeitados) || 0;
+        totalMsgs24hEnviadas += Number(cache.msgs24hEnviadas) || 0;
+        totalMsgs24hEntregues += Number(cache.msgs24hEntregues) || 0;
+        if (cache.wabas) totalWabas += cache.wabas.length;
+        if (cache.wabaNotificada) totalWabasNotificadas += 1;
+
+        return {
+          id: c.id,
+          nome: c.nome,
+          bm_id: c.bm_id,
+          tipo: c.tipo || 'agencia',
+          status: c.status,
+          ultima_verificacao: c.ultima_verificacao,
+          created_at: c.created_at,
+          token_mascarado: '••••••••',
+          dados: cache
+        };
+      });
+
+      return sendJson({
+        success: true,
+        conexoes: conexoesFormatadas,
+        aquecimentoConfig,
+        alertas,
+        resumoGeral: {
+          totalBms,
+          totalWabas,
+          totalNumeros,
+          totalNumerosQualidadeBaixa,
+          totalTemplates,
+          totalTemplatesRejeitados,
+          totalMsgs24hEnviadas,
+          totalMsgs24hEntregues,
+          totalWabasNotificadas
+        }
+      });
+    } catch (err) {
+      console.error('Erro em GET /api/bm/dados:', err.message);
+      return sendError(err.message, 500);
+    }
+  }
+
+  if (pathname === '/api/bm/conectar' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const { nome, bm_id, token, tipo = 'agencia' } = body;
+      if (!bm_id || !token) {
+        return sendError('ID da BM e Token do usuário do sistema são obrigatórios.', 400);
+      }
+
+      const cleanBmId = String(bm_id).trim();
+      const cleanToken = String(token).trim();
+      const cleanNome = String(nome || '').trim() || ('BM ' + cleanBmId);
+
+      const metaResult = await testAndFetchBm(cleanBmId, cleanToken);
+      const tokenCifrado = encryptToken(cleanToken);
+
+      let insertedBm = { id: Date.now(), nome: cleanNome, bm_id: cleanBmId, tipo };
+      if (isPostgresConnected) {
+        const { rows } = await pgPool.query(`
+          INSERT INTO bm_conexoes (nome, bm_id, token_cifrado, tipo, status, ultima_verificacao)
+          VALUES ($1, $2, $3, $4, 'ativo', NOW())
+          RETURNING id, nome, bm_id, tipo, status, created_at
+        `, [cleanNome, cleanBmId, tokenCifrado, tipo]);
+        insertedBm = rows[0];
+
+        syncAllBms(pgPool).catch(e => console.warn('Sync background após conectar BM:', e.message));
+      } else {
+        const { bm: metaBm, wabas } = metaResult;
+        const wabasFull = await Promise.all(
+          wabas.map(async (w) => {
+            try {
+              const details = await fetchWabaDetails(w.id, cleanToken);
+              return { ...w, ...details };
+            } catch (wErr) {
+              return w;
+            }
+          })
+        );
+        const totalNumeros = wabasFull.reduce((acc, w) => acc + (w.numeros?.length || 0), 0);
+        const numerosQualidadeBaixa = wabasFull.reduce((acc, w) => acc + (w.numeros?.filter(n => n.qualidadeBaixa)?.length || 0), 0);
+        const totalTemplates = wabasFull.reduce((acc, w) => acc + (w.templates?.length || 0), 0);
+        const templatesRejeitados = wabasFull.reduce((acc, w) => acc + (w.templates?.filter(t => t.status === 'REJECTED')?.length || 0), 0);
+        const msgs24hEnviadas = wabasFull.reduce((acc, w) => acc + (w.msgs24h?.enviadas || 0), 0);
+        const msgs24hEntregues = wabasFull.reduce((acc, w) => acc + (w.msgs24h?.entregues || 0), 0);
+        const wabaNotificada = wabasFull.some(w => w.notificada);
+
+        let etapaAquecimento = 'Conectada';
+        if (totalNumeros === 0) etapaAquecimento = 'Conta sem número';
+        else if (msgs24hEnviadas > 0) etapaAquecimento = 'Já dispararam';
+        else etapaAquecimento = 'Com número';
+
+        const masked = maskToken(cleanToken);
+        const fileConn = {
+          id: Date.now(),
+          nome: cleanNome,
+          bm_id: cleanBmId,
+          tipo,
+          status: 'ativa',
+          token_cifrado: tokenCifrado,
+          token_mascarado: masked,
+          ultima_verificacao: new Date().toISOString(),
+          dados: {
+            metaBm,
+            wabas: wabasFull,
+            totalNumeros,
+            numerosQualidadeBaixa,
+            totalTemplates,
+            templatesRejeitados,
+            msgs24hEnviadas,
+            msgs24hEntregues,
+            wabaNotificada,
+            etapaAquecimento,
+            lastSync: new Date().toISOString()
+          }
+        };
+
+        const current = loadFileBms();
+        const updated = [fileConn, ...current.filter(c => c.bm_id !== cleanBmId)];
+        saveFileBms(updated);
+        insertedBm = fileConn;
+      }
+
+      return sendJson({
+        success: true,
+        message: 'BM conectada e validada com sucesso na Meta!',
+        bm: insertedBm,
+        totalNumeros: insertedBm.dados?.totalNumeros || 0,
+        totalTemplates: insertedBm.dados?.totalTemplates || 0,
+        meta: metaResult
+      });
+    } catch (err) {
+      console.error('Erro em POST /api/bm/conectar:', err.message);
+      return sendError(err.message || 'Falha ao validar BM com a Meta', 400);
+    }
+  }
+
+  if (pathname === '/api/bm/sincronizar' && req.method === 'POST') {
+    try {
+      if (!isPostgresConnected) return sendJson({ success: true, resultados: [] });
+      const resultados = await syncAllBms(pgPool);
+      return sendJson({ success: true, resultados });
+    } catch (err) {
+      console.error('Erro em POST /api/bm/sincronizar:', err.message);
+      return sendError(err.message, 500);
+    }
+  }
+
+  if (pathname.startsWith('/api/bm/conexoes/') && req.method === 'DELETE') {
+    try {
+      const id = Number(pathname.split('/').pop());
+      if (isPostgresConnected && id) {
+        await pgPool.query('DELETE FROM bm_conexoes WHERE id = $1', [id]);
+      } else if (id) {
+        const current = loadFileBms();
+        saveFileBms(current.filter(c => c.id !== id));
+      }
+      return sendJson({ success: true });
+    } catch (err) {
+      console.error('Erro em DELETE /api/bm/conexoes/:id:', err.message);
+      return sendError(err.message, 500);
+    }
+  }
+
+  if (pathname === '/api/bm/aquecimento-config' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const { etapa, meta_diaria } = body;
+      if (!etapa) return sendError('Etapa é obrigatória', 400);
+
+      if (isPostgresConnected) {
+        await pgPool.query(`
+          UPDATE bm_aquecimento_config 
+          SET meta_diaria = $1, updated_at = NOW() 
+          WHERE etapa = $2
+        `, [Number(meta_diaria) || 0, etapa]);
+      }
+      return sendJson({ success: true });
+    } catch (err) {
+      console.error('Erro em POST /api/bm/aquecimento-config:', err.message);
+      return sendError(err.message, 500);
+    }
+  }
+
+  if (pathname.startsWith('/api/bm/alertas/') && pathname.endsWith('/resolver') && req.method === 'POST') {
+    try {
+      const parts = pathname.split('/');
+      const id = Number(parts[parts.length - 2]);
+      if (isPostgresConnected && id) {
+        await pgPool.query('UPDATE bm_alertas SET resolvido = true WHERE id = $1', [id]);
+      }
+      return sendJson({ success: true });
+    } catch (err) {
+      console.error('Erro em POST /api/bm/alertas/:id/resolver:', err.message);
+      return sendError(err.message, 500);
+    }
+  }
+
   if (pathname === '/api/bm-sheets') {
     try {
       const gid = urlObj.searchParams.get('gid');

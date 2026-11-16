@@ -835,7 +835,7 @@ export const DispatchRecords: React.FC = () => {
                     </div>
 
                     {/* GRID DE DUAS COLUNAS (Esquerda: Relatórios / Direita: Simulador WhatsApp) */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(400px, 1.8fr) minmax(320px, 1fr)', gap: '20px', alignItems: 'start' }}>
+                    <div className="dispatch-records-grid">
                         
                         {/* COLUNA ESQUERDA: RESUMOS E TABELA DE NÚMEROS */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -846,7 +846,7 @@ export const DispatchRecords: React.FC = () => {
                                     Resumo das estimativas
                                 </h3>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
+                                <div className="dispatch-estimates-grid" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
                                     {/* Enviadas */}
                                     <div>
                                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>

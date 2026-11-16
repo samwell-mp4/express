@@ -1153,7 +1153,7 @@ export const TemplateCreatorWizard: React.FC<TemplateCreatorWizardProps> = ({
             )}
 
             {/* Main Workspace Layout */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: '20px', alignItems: 'start' }}>
+            <div className="template-wizard-grid">
 
                 {/* LEFT COLUMN: ACTIVE MODE (WIZARD OR BULK) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

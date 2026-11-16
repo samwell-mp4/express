@@ -1,0 +1,1658 @@
+[
+  {
+    "id": 1794768281326,
+    "nome": "Snack Store BH",
+    "bm_id": "355063842003536",
+    "tipo": "agencia",
+    "status": "ativa",
+    "token_cifrado": "5980596a2eb060f3fdb1f4d14aa6b497:66a77064c39fcf11e3fa66cedca58cc792f9088e22de0f7de09f8a58c81d44dab6778d354c4771a00ffae28c16c42a9decb2d9f14e50598b758e3e758bf35111259b841567db9af26897f62050a8ea6d66df00091430858b33227b86f2acc1b617d50aa6fbdc2a1482626c61b1d502e573904210dba35778d8761834815620722edbdb76e2e2aed4dd6796e786420251e281044f2dd161e7156925bfb707eefc373c7f98d4c9b40daef2d41efeda028d67521bc7a49d440b9cf258572dc4277cea37a73893a0580f6b6073fa2c09d9d1bd4c5980817d822f35f2dfa611f9dec7645c645d2b985f758373325bc07ca905ca6e7bb259a7af6879683c77ec394cbafd3ed5320b5e8895b5a7c5c4d7ef9d9873ac2f3981d3827e0625ce8f7f176b83f92d7486674e5047307065844749b7e7",
+    "token_mascarado": "EAAP••••••••ZDZD",
+    "ultima_verificacao": "2026-11-15T18:46:16.558Z",
+    "dados": {
+      "metaBm": {
+        "id": "355063842003536",
+        "name": "Snack Store BH"
+      },
+      "wabas": [
+        {
+          "id": "2589586361492683",
+          "name": "Snack Store BH",
+          "currency": "BRL",
+          "timezone_id": "25",
+          "message_template_namespace": "042c8ada_1e58_43c0_a616_5d7178a2ab14",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "2589586361492683",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "2513281772480709",
+          "name": "Vitoria Confeccoes LTDA",
+          "timezone_id": "25",
+          "message_template_namespace": "df932a70_8fe7_4af6_b125_cc85430d0cd2",
+          "account_review_status": "REJECTED",
+          "tipo_propriedade": "owned",
+          "wabaId": "2513281772480709",
+          "status": "REJECTED",
+          "notificada": true,
+          "motivoNotificacao": "WABA com status: REJECTED",
+          "numeros": [
+            {
+              "id": "1330841803445386",
+              "display_phone_number": "+55 11 91606-4089",
+              "verified_name": "Vitoria Confeccoes LTDA",
+              "code_verification_status": "EXPIRED",
+              "quality_rating": "UNKNOWN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "PENDING",
+              "throughput": {
+                "level": "NOT_APPLICABLE"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "2354910931994661",
+          "name": "Barataco Comercial LTDA",
+          "timezone_id": "25",
+          "message_template_namespace": "b18a6be9_22a1_46f1_b8ba_e6f97de7f255",
+          "account_review_status": "REJECTED",
+          "tipo_propriedade": "owned",
+          "wabaId": "2354910931994661",
+          "status": "REJECTED",
+          "notificada": true,
+          "motivoNotificacao": "WABA com status: REJECTED",
+          "numeros": [],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "2035913123708662",
+          "name": "Barataco Comercial LTDA",
+          "currency": "EUR",
+          "timezone_id": "25",
+          "message_template_namespace": "1c51901a_a518_4b52_8c39_acddac7a47c2",
+          "account_review_status": "REJECTED",
+          "tipo_propriedade": "owned",
+          "wabaId": "2035913123708662",
+          "status": "REJECTED",
+          "notificada": true,
+          "motivoNotificacao": "WABA com status: REJECTED",
+          "numeros": [
+            {
+              "id": "1256855470851636",
+              "display_phone_number": "+55 11 97114-3677",
+              "verified_name": "Atendimentos Gerais",
+              "code_verification_status": "EXPIRED",
+              "quality_rating": "UNKNOWN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "PENDING",
+              "throughput": {
+                "level": "NOT_APPLICABLE"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [
+            {
+              "id": "1360758892708493",
+              "name": "campanha_2003",
+              "status": "REJECTED",
+              "category": "UTILITY",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/810699178_1360758899375159_7386064310290887879_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=GLgxibaYlEEQ7kNvwFQXWvl&_nc_oc=Adp4i580gR95MnW2PTg2Igcn1x1GF91oFqwZzAFpzNwN8VcDwSyTvHabjfdKWi8LCfI7C3TMQrhyG-f_hrg8P6IE&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=AdVyqOvC7sfLV5ZLTj5V0g&_nc_tpa=Q5bMBQJhw86B6nLS24Amu2YpHpn691lxMSWYTCDHbJ4GXOxnSMM1XQmEtmn19_uFNQDl2LLBOTTLkjzMlg&oh=01_Q5Aa6AE9_0F4h1GTp4RgcV6wWGjDsRZq0Xv2yc_zct-wF3zQOg&oe=6B215A0A"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/e4cofi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "2311208909651125",
+              "name": "campanha_2002",
+              "status": "REJECTED",
+              "category": "UTILITY",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/810899869_2311208916317791_3245389637706569947_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=kbd7VogdSvQQ7kNvwHwqCsQ&_nc_oc=Adpp8kTr5Xcjai4C24axbl9sRu2Ej7CyAG9U-Lq2_WJRi3GlYk3o3UyZlVcbZvAhlcbc3bVLR02rT4D3HRN5l6eM&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=AdVyqOvC7sfLV5ZLTj5V0g&_nc_tpa=Q5bMBQK809YzW0QhbcjveZer3Yy4K7XOHGffREouo2hvGLCA3zkUjDQzqel6iT3jKvITgGpRMounXq1e2g&oh=01_Q5Aa6AHE7u5Ou2yY6mBMd9iVehxLpQeKB6wprq-HzSzaVN3oRw&oe=6B21576C"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/e4cofi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "4482084515387868",
+              "name": "campanha_2001",
+              "status": "REJECTED",
+              "category": "UTILITY",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/810813068_4482084522054534_232494524746178952_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=wqe1n-6Q2NoQ7kNvwHDIOpA&_nc_oc=AdqqQvvEZ0u_BQeJgpiMGxdEd_c-xFaFF41yPp8nOK2_mdQA7E-uBUgTrvwm-ZjaLeETLe4nVx8rIjKHfx6xhLgn&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=AdVyqOvC7sfLV5ZLTj5V0g&_nc_tpa=Q5bMBQIEeB-lyTAPqpRJKkdjfiZ-Vc0dr9a2Qa1BO__WvpTu1y0dq1Bz5KZvOGR34SqueYdMNNfvuLrFoQ&oh=01_Q5Aa6AE4j7pF7Nn2HrNyFhXEQWsPP-Q-Sp-wFXn2LpdT7RweAw&oe=6B21609A"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/e4cofi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "2259517384890976",
+              "name": "campanha_1003",
+              "status": "REJECTED",
+              "category": "UTILITY",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/810622834_2259517388224309_6563210366168912579_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=EB4vn4x2IyQQ7kNvwEYzbE2&_nc_oc=AdphWK1RXg7GkbjBPxox6j35QTTS94OqTfTBMqipmAjhi8BmQ5TOXi1C4vsWRlcr-FnhOxFYe1nNJoAP8D4eb_PB&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=AdVyqOvC7sfLV5ZLTj5V0g&_nc_tpa=Q5bMBQIiO9LC6wAQHVmTbxPsgwOJGpwiS1Te391ulvMt9djArAQmcvwdwxyuYSJCm8-EUXmM07Fxu-vKnQ&oh=01_Q5Aa6AH3ztSub_w-lZAE79UXK6KI92_l2M269Id1ztkcNio4yQ&oe=6B21595B"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/z5g6g9"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "1118634950633009",
+              "name": "campanha_1002",
+              "status": "REJECTED",
+              "category": "UTILITY",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/805576620_1118634957299675_7159075200256111296_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=RaVKj3sA7A4Q7kNvwGd6ezE&_nc_oc=AdpDMtB1m57EZteKvW037c1pGHefeUIviAOQ_rezkpAsq8TrA2HW4yhtKSug0Z-knOKUHz2XRsoNvto_9mt3kvOH&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=AdVyqOvC7sfLV5ZLTj5V0g&_nc_tpa=Q5bMBQI0fDFfEJ2MITgHnLwrawFxyIhrHE9sQTTzsssPKGL_OHKzXqdkuDNTrvL15X3291fPG3rR5_dr5w&oh=01_Q5Aa6AEML_SyyJvng0S_335EqAg6eOrXivwafmFBAYratF3rLw&oe=6B215579"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/z5g6g9"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "1080418371238734",
+              "name": "campanha_1001",
+              "status": "REJECTED",
+              "category": "UTILITY",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/810556112_1080418377905400_5543621778939161623_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=lHdW8oQ31a8Q7kNvwHcRXu0&_nc_oc=AdrGLOhTY0vAS5Y0oxP6_Bbwu6RT79jGW2070FVVMPXDb5BQjcWm3y-IVV9G1HMoCS9P_LZvDWmPb9FyBYM7m58u&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=AdVyqOvC7sfLV5ZLTj5V0g&_nc_tpa=Q5bMBQJOECjR6Lv54xSOb-krCu33X5VUgt35_9yjlPYrFNhJNbwn-z6adhcPeqHLSfgqQw7YEn-DwijOhQ&oh=01_Q5Aa6AE8aWrnhHaWxsqwExzyPFPde_nTrdF6Dc0AUCdiTiZ6eg&oe=6B2164A5"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/z5g6g9"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "1636855287791997",
+              "name": "compra_04",
+              "status": "REJECTED",
+              "category": "UTILITY",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}.\n\nPara, {{4}} clique no botão abaixo! 👇",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/806141172_1636855294458663_1522124985129788099_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=v3dz7neL5vMQ7kNvwHOac-e&_nc_oc=AdoOwFBDCBVc3Xrq1-OzhqtCpr4s2ouMooghcWeI8752fScijZVhiG8Ml7-iaI5CFzelMOv_2_IHBCSc74V1gepR&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=AdVyqOvC7sfLV5ZLTj5V0g&_nc_tpa=Q5bMBQLm7lA-EE8yG-sj8LOK4U7zsL4cW66UQS5yb5sJDWhHo8peVXTLGQ7kW8q50Yq4oBrzTOdJijgDZA&oh=01_Q5Aa6AEexPB7d-24gOs5lFSr8LaaUJPzkegBUcdJa6rFVTEL0w&oe=6B215348"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}.\n\nPara, {{4}} clique no botão abaixo! 👇",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"SAIR\" para não receber mais mensagens."
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/jf29ak"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "2896750607352453",
+              "name": "compra_03",
+              "status": "REJECTED",
+              "category": "UTILITY",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}.\n\nPara, {{4}} clique no botão abaixo! 👇",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/809384877_2896750610685786_475288730557522128_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=tUboDxyvX9YQ7kNvwFgOJWE&_nc_oc=AdoVM8aK96c4b8KTHz48zdminkCXpYz8p6c0u48uBAOuLezQwlGY201MmrCVnKxcIckcFnmS_eQwqKIcroQkOzxp&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=AdVyqOvC7sfLV5ZLTj5V0g&_nc_tpa=Q5bMBQIO9CgFVm74VECqDMR-GqoseYNnldCiBHp6R4JJqS5he5OPL3JEL2z6GP0FNPWYtYZv_laQ8BJNfA&oh=01_Q5Aa6AECuhNlqelLNftbqBPgC5JZau8sXpLknIEY4XZtVPbo_Q&oe=6B2186E9"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}.\n\nPara, {{4}} clique no botão abaixo! 👇",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"SAIR\" para não receber mais mensagens."
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/jf29ak"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "1896845751280607",
+              "name": "compra_02",
+              "status": "REJECTED",
+              "category": "UTILITY",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}.\n\nPara, {{4}} clique no botão abaixo! 👇",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/809458456_1896845757947273_303020951444784510_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=Bsde6BKjXi4Q7kNvwH7xXw-&_nc_oc=AdryLnQMYnjhgbJyY2pukr-q6iwTPCv2igmUnk9am7TY9JV4v0y1WBH9v3xR8Ryq9HSZb60e15_ykc9JJztDWXCy&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=AdVyqOvC7sfLV5ZLTj5V0g&_nc_tpa=Q5bMBQIcMo8Dlpf0u32Dgh8KWU4lCZQM_SV3fhxYbWGnurWgN-gqH2nEp6wzRiiWbLIvLul6ZR25WJKrfA&oh=01_Q5Aa6AG40lKbRDn94OwUDI_0aGbOZLlqAlJKOXtMCe5TGN7Ijg&oe=6B2184B9"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}.\n\nPara, {{4}} clique no botão abaixo! 👇",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"SAIR\" para não receber mais mensagens."
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/nyw2p6"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "2142745756620324",
+              "name": "compra_01",
+              "status": "REJECTED",
+              "category": "UTILITY",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}.\n\nPara, {{4}} clique no botão abaixo! 👇",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/809601283_2142745759953657_8498338443044877725_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=bf4bnVS78vsQ7kNvwH8IM-z&_nc_oc=Adp_QWpd2z90WyfeAs0eYuokCCgc3uPs7_SGCdKTPx8lHcZ-WOhGS1SwBx8rW0e0psS-EBLtZjPpGf4Wsp1jdciv&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=AdVyqOvC7sfLV5ZLTj5V0g&_nc_tpa=Q5bMBQI2HzwRz-h0T3V56g2q5wvQE8dERaMl1RSbnkDkbLf81XED7AlWpGSfrO2yuY5VvR0XvLpXPiFTog&oh=01_Q5Aa6AGavGwgq0yJD1puDBRuttI-2-bydE4QBJtvElXrgRy56g&oe=6B218ABE"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}.\n\nPara, {{4}} clique no botão abaixo! 👇",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"SAIR\" para não receber mais mensagens."
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/nyw2p6"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "1968759920467282",
+          "name": "Barataco Comercial LTDA",
+          "timezone_id": "25",
+          "message_template_namespace": "80724af5_8af5_489c_8ebc_1cf537f86012",
+          "account_review_status": "REJECTED",
+          "tipo_propriedade": "owned",
+          "wabaId": "1968759920467282",
+          "status": "REJECTED",
+          "notificada": true,
+          "motivoNotificacao": "WABA com status: REJECTED",
+          "numeros": [
+            {
+              "id": "1350200408173726",
+              "display_phone_number": "+55 11 97087-6531",
+              "verified_name": "Barataco Comercial LTDA",
+              "code_verification_status": "EXPIRED",
+              "quality_rating": "UNKNOWN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "PENDING",
+              "throughput": {
+                "level": "NOT_APPLICABLE"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "1735338324430040",
+          "name": "Raimundo Nonato",
+          "timezone_id": "25",
+          "message_template_namespace": "114fbcd6_a4d1_4299_8d30_5cc6a91b0652",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "1735338324430040",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [
+            {
+              "id": "1228497043690280",
+              "display_phone_number": "+55 31 7554-8470",
+              "verified_name": "Raimundo Nonato",
+              "code_verification_status": "EXPIRED",
+              "quality_rating": "GREEN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "CONNECTED",
+              "throughput": {
+                "level": "STANDARD"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "1606492844313538",
+          "name": "Raimundi Serviços",
+          "timezone_id": "25",
+          "message_template_namespace": "e6c8bea8_6632_4842_9769_712dd057d664",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "1606492844313538",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [
+            {
+              "id": "1320772797786149",
+              "display_phone_number": "+1 555-968-0387",
+              "verified_name": "Raimundi Serviços",
+              "code_verification_status": "VERIFIED",
+              "quality_rating": "UNKNOWN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "CONNECTED",
+              "throughput": {
+                "level": "STANDARD"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "1441047414535367",
+          "name": "Atendimentos Gerais",
+          "currency": "EUR",
+          "timezone_id": "25",
+          "message_template_namespace": "5d3c85c4_d678_4b56_8750_553619024152",
+          "account_review_status": "REJECTED",
+          "tipo_propriedade": "owned",
+          "wabaId": "1441047414535367",
+          "status": "REJECTED",
+          "notificada": true,
+          "motivoNotificacao": "WABA com status: REJECTED",
+          "numeros": [
+            {
+              "id": "1281260228408030",
+              "display_phone_number": "+55 11 92580-7930",
+              "verified_name": "Atendimentos Gerais",
+              "code_verification_status": "EXPIRED",
+              "quality_rating": "UNKNOWN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "PENDING",
+              "throughput": {
+                "level": "NOT_APPLICABLE"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [
+            {
+              "id": "1837056684323551",
+              "name": "aprovada_5003",
+              "status": "REJECTED",
+              "category": "MARKETING",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/810383545_1837056687656884_3541224441067547049_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=1GdluLNWrrMQ7kNvwFQ8pPr&_nc_oc=AdooEvplpxutIMxSNnwigs7GBUQCd8cuvj7GA9vDC_i9_08DyBztlmKNsuvfI8GLCuR6T5ImwETPrZ_FqaV67bQF&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=o3aOYEgk0ufE8ONtHFtoew&_nc_tpa=Q5bMBQJL9Eqp8sy3rggUj6Gi8Rjdb_-inGiLGKQrwZqJ15xFyhmtU5c8TZagtInJr8llTcaF7H1UaG7TrA&oh=01_Q5Aa6AEihQIUse-im4NUkc7robxqWpEvI7dnafFM7KVkY3DJQA&oe=6B215933"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/gykrsq"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "1335849445069098",
+              "name": "aprovada_5002",
+              "status": "REJECTED",
+              "category": "MARKETING",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/810214982_1335849448402431_2613362278520065466_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=OJGu6C11h9QQ7kNvwGTxDvu&_nc_oc=AdqVdXQTckrwBaiTnSrQS9I_7Zw3QrnMg9XyFVJ_YjQ3XPENp1H0OSAxYzJ6Siwbcbo3GZvIC12Lyd7WGaExkABG&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=o3aOYEgk0ufE8ONtHFtoew&_nc_tpa=Q5bMBQLyEv0U6KQthWV1kKySTkCrMu7xyimoKK7S-msgCXMHcx37ZUprqN5-oSAbGf-IWCnDwP-urffWow&oh=01_Q5Aa6AHec1wyNX0xllidmjtFYtJV3sG_iSZ67ZTBcRuP6QDY4g&oe=6B2185D0"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/gykrsq"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "1081353991058860",
+              "name": "aprovada_5001",
+              "status": "REJECTED",
+              "category": "MARKETING",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/810280922_1081353994392193_2645625826172473520_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=sKN3konyL_UQ7kNvwG81X7_&_nc_oc=Adr2iY-rwqF-UayYdez6QbFx1_Ysnens1yalnzIbM51slqToTNRVmLuKl98CRlxrOd8HG9V6OQt1CBLNWiVx1ZB9&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=o3aOYEgk0ufE8ONtHFtoew&_nc_tpa=Q5bMBQIe_CiiVAQYufL-7_0PDJRrmPUsUZ8Zctx2j7dzS_MjdEaCItH_rTqYKPlq0PtVGKwMSr-nYK6GnA&oh=01_Q5Aa6AFloHemYeFG9iNaaSw290we-Vyyk5zcUXzQ89RaK-vxZg&oe=6B216529"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/gykrsq"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "954464181032958",
+              "name": "aprovada_4003",
+              "status": "REJECTED",
+              "category": "MARKETING",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/810556112_954464187699624_4897228106846884819_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=o5gGtOVRR6QQ7kNvwFoijVc&_nc_oc=AdqDjUufNIt6oVZpOeKidTns_GYUqlS6cm32h95oLB2kcbKLgU8F5YYhUKZUEArH-DcoKo4tOP5_SdcE-EpZQJCo&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=o3aOYEgk0ufE8ONtHFtoew&_nc_tpa=Q5bMBQJwEzMY9cHJB20JsTIx21iYQCnq-M6LMvQ9dJRMbB6lkIHbbbHuzi-TK7mug0hgOcNErmzab4WStA&oh=01_Q5Aa6AEQBtBvU2ORDQNBqaElq1YV5RkiiLqvPRHGVlmTCDWS6A&oe=6B2166F6"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/9zlp81"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "1658556412279233",
+              "name": "aprovada_4002",
+              "status": "REJECTED",
+              "category": "MARKETING",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/800219915_1658556415612566_6952642250661927041_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=UKoEODwO_KcQ7kNvwG_oxH2&_nc_oc=Ado-FiYfloj2jLAzRJyY5Z1u99OEA-CNhj3YpEu0mNnQEVGMi5m5VbtWQQJDRvq88wKI7yRiU1w2aVm0DF-_4HSN&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=o3aOYEgk0ufE8ONtHFtoew&_nc_tpa=Q5bMBQK8T6330B7sKB6QzvrPI0-vkMrgw7kj0DhZGR0JIMy1gjqaQE0ptMV2AOrYxkDJGHQ9gOSwt3wO0A&oh=01_Q5Aa6AGcUTgRy6jJzgNklwzTPkYeUGU8zyTG4McqZO1OTSLsyQ&oe=6B2158E6"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/9zlp81"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "3485483514966814",
+              "name": "aprovada_4001",
+              "status": "REJECTED",
+              "category": "MARKETING",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/811266526_3485483521633480_1417687998429779152_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=737XzxUwnt8Q7kNvwEEOhSl&_nc_oc=AdrRbH7k3eIzUER9j1qfIg-AW2fodTb38FWqZ0U35jH_oetKt9Nm6etqsfrxjXAN7Jtp6AtYZN3-i_TBBbyQwgTd&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=o3aOYEgk0ufE8ONtHFtoew&_nc_tpa=Q5bMBQIvbrXlu7Aj-i1cRUzCX153Qf3aVkVlXiy5M3oupNBg3QgwsQLvKJUVqB1nYSWlgONhVs3dRrC4uQ&oh=01_Q5Aa6AHlJuzskXm_MdsXZqE7D16442tTj8dxErh59c2SV7XPdw&oe=6B2157C3"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/9zlp81"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "3906348229661137",
+              "name": "aprovada_1409003",
+              "status": "REJECTED",
+              "category": "MARKETING",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/809615373_3906348236327803_1428143171604052562_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=y2CYZOqGFFQQ7kNvwFhe0Hp&_nc_oc=Adq4kiOIiKI-6fiihSYIkkwU9vhGsRlNDbFW2cE2uz8cnnBV7X8irIKUo-vINgqocJUqPadxKlh9kz3lmQzfd6MK&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=o3aOYEgk0ufE8ONtHFtoew&_nc_tpa=Q5bMBQJmmOL9vjPlkDaTw9zfjajlzbZoyFhrCVpwg2gTK-rFYmHSBZZq_jFsBKvceiBAZmzKPmt7iR6pog&oh=01_Q5Aa6AFgg4w4S69fgS4uAFOvz0G-JkENe8ipTKJl6DXTmNTHIg&oe=6B217CC7"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/cg2mr0"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "2211163902779309",
+              "name": "aprovada_1409002",
+              "status": "REJECTED",
+              "category": "MARKETING",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/811027712_2211163906112642_945690640519026096_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=dinMHsJFoWQQ7kNvwGxNNM2&_nc_oc=Ado2oZ2tjR13QA5ZYxLicpfkd8svVzz-rh5RdBegF7X0_W3ADTIerr6htxkghgH9m_WE97qQU1Q5YvNx4gY-fkiY&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=o3aOYEgk0ufE8ONtHFtoew&_nc_tpa=Q5bMBQJh4OUWtrJHt9iuAdRJ1oAKzS8Syk9tQO4Eu8qNgiEgLwwtEo58aaigdWyssafPTDsqflFwPNDktg&oh=01_Q5Aa6AFuHwiFoyJeOd-1Wvb1gB-am-gycWrKzW2elzEgTW2J-w&oe=6B215A4E"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/cg2mr0"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "1074913191566962",
+              "name": "aprovada_1409001",
+              "status": "REJECTED",
+              "category": "MARKETING",
+              "language": "pt_BR",
+              "rejected_reason": "SCAM",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/811303416_1074913194900295_124908131835941187_n.jpg?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=t0JxH0rtpuAQ7kNvwG76Vnu&_nc_oc=AdozT-B-m_q1TaK4j1o4-xJpuirOj6kliLHjte2Q0l6cSltrquvbB59LKsYYqSdmINChbTF0Onl4T1OceYkocJvy&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=o3aOYEgk0ufE8ONtHFtoew&_nc_tpa=Q5bMBQKTwN9G5q5XkTyZpjPhwBb9_ZSgzeQgzqSVYjb19E0OyqSGTLLDf2B-ZkaoQoMoaaz0Y8F-WemOJQ&oh=01_Q5Aa6AE_LK9SElZoeaFTw0s63Bxg5vxPO2Q3AcCQPl5IJacYxg&oe=6B218396"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá {{1}}\n\nEstamos informando {{2}}\n\n{{3}}\n\nPara {{4}} Clique no botão abaixo!",
+                  "example": {
+                    "body_text": [
+                      [
+                        "Leandro",
+                        "recebemos a confirmação do pagamento referente ao protocolo nº 7164427, realizado em 12/10/2025",
+                        "O comprovante digital já se encontra disponível para conferência",
+                        "acessar o comprovante digital #54333 e verificar a entrega"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Digite \"sair\" para não receber mais mensagens"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Clique Aqui",
+                      "url": "https://plugesales.com/l/cg2mr0"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "1434823741834196",
+          "name": "Raimundi Serviços",
+          "currency": "EUR",
+          "timezone_id": "25",
+          "message_template_namespace": "e81953d1_8fb6_4bb4_849b_49a7ee8be089",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "1434823741834196",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [
+            {
+              "id": "1403046419551949",
+              "display_phone_number": "+1 555-959-6112",
+              "verified_name": "Raimundi Serviços",
+              "code_verification_status": "VERIFIED",
+              "quality_rating": "UNKNOWN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "CONNECTED",
+              "throughput": {
+                "level": "STANDARD"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "1354783431051830",
+          "name": "Samuel de Souza - Snack Store BH",
+          "currency": "BRL",
+          "timezone_id": "25",
+          "message_template_namespace": "89ee1f6e_dd6a_4875_b561_f711e0363bbe",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "1354783431051830",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [
+            {
+              "id": "1345415188651256",
+              "display_phone_number": "+55 31 8266-2365",
+              "verified_name": "Samuel de Souza - Snack Store BH",
+              "code_verification_status": "EXPIRED",
+              "quality_rating": "GREEN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "CONNECTED",
+              "throughput": {
+                "level": "STANDARD"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [
+            {
+              "id": "2407774086423144",
+              "name": "boas_vindas",
+              "status": "APPROVED",
+              "category": "MARKETING",
+              "language": "pt_BR",
+              "rejected_reason": "NONE",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Olá! 👋\n\nÉ um prazer receber você por aqui.\n\nHá 5 anos, trabalhamos para oferecer uma experiência cada vez melhor aos nossos clientes, e agora damos mais um passo nessa história: este WhatsApp passa a ser um dos nossos canais oficiais de comunicação. 💚\n\nPor aqui, você poderá receber novidades, informações sobre nossos produtos, lançamentos, ofertas e conteúdos da nossa empresa.\n\nQueremos tornar nosso atendimento mais próximo, rápido e prático, sempre respeitando suas preferências.\n\nObrigado por fazer parte da nossa história.\nQue venham muitos outros anos juntos! ✨",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "IMAGE",
+                  "example": {
+                    "header_handle": [
+                      "https://scontent.whatsapp.net/v/t61.29466-34/811472195_2407774089756477_8617759786301466691_n.png?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=GAyi2z-v7HMQ7kNvwGO7qm3&_nc_oc=AdqqpvyG-74Tzkga4fB0dxXYhV7bp0jwEOT0uBauOP9LORDSE64kXVqoR2D-5amljNY4vrTjb5ka1lNWDbJOBzmv&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=M44LUQfedjLjkEXOXRkTsA&_nc_tpa=Q5bMBQLeRvvjDE0DtFZOwPqH_N9hpRA0ybY6berbOhxSckdHoqpNh1ARK6PNBGnRuBpflMcyzJxsAZ4Smg&oh=01_Q5Aa6AGWpfUdppc7KO7-ZqOHEIpTqtxBNztbpoBFzbIeyu_izg&oe=6B216157"
+                    ]
+                  }
+                },
+                {
+                  "type": "BODY",
+                  "text": "Olá! 👋\n\nÉ um prazer receber você por aqui.\n\nHá 5 anos, trabalhamos para oferecer uma experiência cada vez melhor aos nossos clientes, e agora damos mais um passo nessa história: este WhatsApp passa a ser um dos nossos canais oficiais de comunicação. 💚\n\nPor aqui, você poderá receber novidades, informações sobre nossos produtos, lançamentos, ofertas e conteúdos da nossa empresa.\n\nQueremos tornar nosso atendimento mais próximo, rápido e prático, sempre respeitando suas preferências.\n\nObrigado por fazer parte da nossa história.\nQue venham muitos outros anos juntos! ✨"
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "Canal oficial • Atendimento e novidades"
+                },
+                {
+                  "type": "BUTTONS",
+                  "buttons": [
+                    {
+                      "type": "URL",
+                      "text": "Visitar nosso site",
+                      "url": "https://snackstorebh.com.br/"
+                    },
+                    {
+                      "type": "QUICK_REPLY",
+                      "text": "Não Receber Mais Notificações"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "1113098094764559",
+              "name": "hello_world",
+              "status": "APPROVED",
+              "category": "UTILITY",
+              "language": "en_US",
+              "rejected_reason": "NONE",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us.",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "TEXT",
+                  "text": "Hello World"
+                },
+                {
+                  "type": "BODY",
+                  "text": "Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us."
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "WhatsApp Business Platform sample message"
+                }
+              ]
+            }
+          ],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "1054793540824637",
+          "name": "SNACK STORE BH | ATENDIMENTO (Samuel Souza)",
+          "timezone_id": "0",
+          "message_template_namespace": "477866aa_f54e_498b_b1f7_7884603ed5db",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "1054793540824637",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [
+            {
+              "id": "1220456437819780",
+              "display_phone_number": "+55 31 7565-0503",
+              "verified_name": "SNACK STORE BH | ATENDIMENTO (Samuel Souza)",
+              "code_verification_status": "NOT_VERIFIED",
+              "quality_rating": "GREEN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "CONNECTED",
+              "throughput": {
+                "level": "STANDARD"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "1042967852053485",
+          "name": "Raimundo Nonato LTDA",
+          "currency": "EUR",
+          "timezone_id": "25",
+          "message_template_namespace": "f2a02168_0e71_4566_98f3_c6aa96a7f5a2",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "1042967852053485",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [
+            {
+              "id": "1238270632713008",
+              "display_phone_number": "+1 555-353-6718",
+              "verified_name": "Raimundo Nonato LTDA",
+              "code_verification_status": "VERIFIED",
+              "quality_rating": "UNKNOWN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "CONNECTED",
+              "throughput": {
+                "level": "STANDARD"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "632444607711726",
+          "name": "LR Informática BH",
+          "timezone_id": "0",
+          "message_template_namespace": "f58aca1b_9bf7_49b0_b81a_0a0071d8f1f3",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "632444607711726",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [
+            {
+              "id": "265761195327388",
+              "display_phone_number": "+55 31 8211-8282",
+              "verified_name": "LR Informática BH",
+              "code_verification_status": "NOT_VERIFIED",
+              "quality_rating": "GREEN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "CONNECTED",
+              "throughput": {
+                "level": "STANDARD"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "402387159619228",
+          "name": "Test WhatsApp Business Account",
+          "timezone_id": "1",
+          "message_template_namespace": "70a5b068_8435_465a_9b63_e79369c3002f",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "402387159619228",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [
+            {
+              "id": "385920721271446",
+              "display_phone_number": "+1 555-048-0691",
+              "verified_name": "Test Number",
+              "code_verification_status": "NOT_VERIFIED",
+              "quality_rating": "GREEN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "CONNECTED",
+              "throughput": {
+                "level": "STANDARD"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [
+            {
+              "id": "650003994082500",
+              "name": "hello_world",
+              "status": "APPROVED",
+              "category": "UTILITY",
+              "language": "en_US",
+              "rejected_reason": "NONE",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us.",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "TEXT",
+                  "text": "Hello World"
+                },
+                {
+                  "type": "BODY",
+                  "text": "Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us."
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "WhatsApp Business Platform sample message"
+                }
+              ]
+            }
+          ],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "373821099156101",
+          "name": "Samwell Midia",
+          "currency": "USD",
+          "timezone_id": "25",
+          "message_template_namespace": "f23d3ce0_3d91_4966_ac9b_3ce6be7b52a0",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "373821099156101",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [],
+          "templates": [
+            {
+              "id": "466195486231214",
+              "name": "hello_world",
+              "status": "APPROVED",
+              "category": "UTILITY",
+              "language": "en_US",
+              "rejected_reason": "NONE",
+              "quality_score": "UNKNOWN",
+              "bodyText": "Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us.",
+              "components": [
+                {
+                  "type": "HEADER",
+                  "format": "TEXT",
+                  "text": "Hello World"
+                },
+                {
+                  "type": "BODY",
+                  "text": "Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us."
+                },
+                {
+                  "type": "FOOTER",
+                  "text": "WhatsApp Business Platform sample message"
+                }
+              ]
+            }
+          ],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "321849284355882",
+          "name": "Samwell Midia Central",
+          "currency": "USD",
+          "timezone_id": "25",
+          "message_template_namespace": "a801a542_dca4_431f_9d27_c61dee1bcf4c",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "321849284355882",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [
+            {
+              "id": "372792035921142",
+              "display_phone_number": "+55 31 8222-3271",
+              "verified_name": "Samwell Midia Central",
+              "code_verification_status": "EXPIRED",
+              "quality_rating": "GREEN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "DISCONNECTED",
+              "throughput": {
+                "level": "NOT_APPLICABLE"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        },
+        {
+          "id": "304363400511105",
+          "name": "SAMWELL MIDIA",
+          "timezone_id": "0",
+          "message_template_namespace": "25500cbe_339e_b792_7bd1_d8aea9a6f027",
+          "account_review_status": "APPROVED",
+          "tipo_propriedade": "owned",
+          "wabaId": "304363400511105",
+          "status": "APPROVED",
+          "notificada": false,
+          "motivoNotificacao": "",
+          "numeros": [
+            {
+              "id": "2010369939089171",
+              "display_phone_number": "+55 31 8886-8362",
+              "verified_name": "SAMWELL MIDIA",
+              "code_verification_status": "NOT_VERIFIED",
+              "quality_rating": "GREEN",
+              "messaging_limit_tier": "TIER_250",
+              "status": "CONNECTED",
+              "throughput": {
+                "level": "STANDARD"
+              },
+              "qualidadeBaixa": false,
+              "alerta": null
+            }
+          ],
+          "templates": [],
+          "msgs24h": {
+            "enviadas": 0,
+            "entregues": 0,
+            "lidas": 0,
+            "conversas": 0
+          },
+          "banState": "NONE"
+        }
+      ],
+      "totalNumeros": 14,
+      "numerosQualidadeBaixa": 0,
+      "totalTemplates": 23,
+      "templatesRejeitados": 19,
+      "msgs24hEnviadas": 0,
+      "msgs24hEntregues": 0,
+      "wabaNotificada": true,
+      "etapaAquecimento": "Com número",
+      "lastSync": "2026-11-15T18:46:16.562Z"
+    }
+  }
+]

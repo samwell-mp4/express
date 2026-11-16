@@ -478,7 +478,7 @@ export const LinkRotatorManager: React.FC<LinkRotatorManagerProps> = ({ isEmbedd
             </div>
 
             {/* Split Layout: Creation Panel + List of Rotators */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 380px) 1fr', gap: '16px', alignItems: 'start' }}>
+            <div className="rotator-manager-grid">
 
                 {/* --- LEFT: CREATE ROTATOR FORM --- */}
                 <div style={{
